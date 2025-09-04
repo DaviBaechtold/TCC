@@ -1,0 +1,47 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "pytest smoke",
+			"type": "shell",
+			"command": "/home/davs/Documents/TCC/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"-q",
+				"Project/tests/test_smoke.py"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$pytest-postgres"
+			],
+			"group": "build"
+		},
+		{
+			"label": "pytest smoke",
+			"type": "shell",
+			"command": "/home/davs/Documents/TCC/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"-q",
+				"Project/tests/test_smoke.py"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "pytest smoke",
+			"type": "shell",
+			"command": "/home/davs/Documents/TCC/.venv/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"-q",
+				"Project/tests/test_smoke.py"
+			],
+			"isBackground": false,
+			"group": "build"
+		}
+	]
+}

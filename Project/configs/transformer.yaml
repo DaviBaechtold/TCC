@@ -1,0 +1,43 @@
+# Training configuration for temporal Transformer
+seed: 42
+work_dir: runs/transformer
+
+# Data
+data:
+  manifest: Project/data/manifest.csv  # csv with columns: path,label
+  num_keypoints: 21        # MediaPipe hands per hand
+  dims: 2                  # x,y
+  seq_len: 64              # frames per sample (pad/trim)
+  stride: 2                # frame stride during sampling
+  normalize: true          # per-sample min-max and wrist-centering
+  augment:
+    noise_std: 0.01
+    time_mask_prob: 0.2
+    time_mask_len: 4
+
+# Model
+model:
+  type: transformer
+  d_model: 192
+  nhead: 6
+  num_layers: 4
+  dim_feedforward: 512
+  dropout: 0.1
+
+# Optimization
+optim:
+  batch_size: 64
+  epochs: 50
+  lr: 3e-4
+  weight_decay: 1e-4
+  warmup_epochs: 5
+
+# Eval
+eval:
+  val_split: 0.2
+  test_split: 0.1
+  metrics: [acc, f1, cm]
+
+# Logging
+log_interval: 50
+checkpoint_best: true
