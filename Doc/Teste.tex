@@ -1,0 +1,117 @@
+% --------------------------------------------------------------------
+% PACOTES E CONFIGURAÇÕES DO DOCUMENTO
+% --------------------------------------------------------------------
+\documentclass[
+	a4paper,      % Tamanho do papel
+	12pt,         % Tamanho da fonte
+	english       % Idioma principal (para hifenização, etc.)
+]{abntex2}
+
+% Codificação de caracteres e fontes
+\usepackage[T1]{fontenc}      % Usa fontes de 8-bits, melhora a hifenização
+\usepackage[utf8]{inputenc}   % Permite usar acentos diretamente no código
+\usepackage[brazil]{babel}
+\usepackage{lmodern}          % Usa a fonte Latin Modern, uma versão melhorada do Computer Modern
+\usepackage{indentfirst}      % Indenta o primeiro parágrafo de cada seção
+
+% Pacotes para referências bibliográficas (padrão ABNT)
+\usepackage[brazilian,hyperpageref]{backref} % Cria links da bibliografia para o texto
+\usepackage[alf]{abntex2cite}  % Estilo de citação alfabético (Ex: [AUTOR, ANO])
+
+% Informações do trabalho para capa e folha de rosto
+% --------------------------------------------------------------------
+\titulo{Temporal Transformer-Based Gesture Recognition from Monocular 2D Skeleton Sequences}
+\autor{Davi Baechtold Campos}
+\instituicao{%
+  Pontifícia Universidade Católica do Paraná -- PUCPR
+  \par
+  Campus Curitiba
+  \par
+  Curso de Engenharia de Computação
+}
+\tipotrabalho{Trabalho de Conclusão de Curso (TCC)}
+\orientador{Prof. Dr. Alceu de Souza Brito Junior}
+\local{Curitiba}
+\data{\the\year} % Pega o ano atual automaticamente
+
+% Preâmbulo para a folha de rosto (o texto que descreve o trabalho)
+\preambulo{Trabalho de Conclusão de Curso apresentado como requisito parcial para a obtenção do grau de Bacharel em Engenharia de Computação, pelo Curso de Engenharia de Computação da Pontifícia Universidade Católica do Paraná.}
+
+% --------------------------------------------------------------------
+% INÍCIO DO DOCUMENTO
+% --------------------------------------------------------------------
+\begin{document}
+
+% Seleciona o idioma para o documento
+\selectlanguage{brazil}
+
+% --------------------------------------------------------------------
+% ELEMENTOS PRÉ-TEXTUAIS
+% --------------------------------------------------------------------
+
+% Gera a capa com as informações definidas acima
+\imprimircapa
+
+% Gera a folha de rosto com as informações definidas acima
+\imprimirfolhaderosto
+
+% --- DEDICATÓRIA ---
+% O ambiente 'dedicatoria' cria uma página separada.
+% O \vspace*{\fill} empurra o texto para o fim da página.
+\begin{dedicatoria}
+	\vspace*{\fill} % Move o texto para a parte inferior da página
+	\begin{flushright} % Alinha o texto à direita
+		\textit{Aos meus pais, pelo amor, apoio e incentivo incondicional.\\
+		Aos meus amigos, pela jornada compartilhada.}
+	\end{flushright}
+\end{dedicatoria}
+
+% --- AGRADECIMENTOS ---
+% O ambiente 'agradecimentos' cria uma seção formatada.
+\begin{agradecimentos}
+	Agradeço primeiramente a Deus, por me dar força e sabedoria durante esta jornada.
+
+	Ao meu orientador, Prof. Dr. Alceu de Souza Brito Junior, pela paciência, conhecimento compartilhado e pela orientação fundamental para a realização deste trabalho.
+	
+	Aos meus pais e minha família, por todo o suporte, amor e incentivo que foram a base para que eu chegasse até aqui.
+	
+	Aos meus amigos e colegas de curso, pelas longas noites de estudo, pela ajuda mútua e pelos momentos de descontração que tornaram a caminhada mais leve.
+	
+	A todos os professores do curso de Engenharia de Computação da PUCPR, pelos ensinamentos que moldaram minha formação profissional e pessoal.
+
+\end{agradecimentos}
+
+% --- RESUMO E ABSTRACT ---
+% (Adicione aqui quando for escrever)
+% \begin{resumo}
+% \end{resumo}
+% \begin{abstract}
+% \end{abstract}
+
+% --- SUMÁRIO ---
+\tableofcontents* % O asterisco remove o Sumário do próprio Sumário
+
+% --- LISTAS (FIGURAS, TABELAS) ---
+% \listoffigures*
+% \listoftables*
+
+% --------------------------------------------------------------------
+% ELEMENTOS TEXTUAIS (O CONTEÚDO DO SEU TCC)
+% --------------------------------------------------------------------
+\textual
+
+\chapter{Introdução}
+Esta é a introdução do seu trabalho. Aqui você irá contextualizar o tema, apresentar a problemática, os objetivos, a justificativa e a estrutura do documento.
+
+O reconhecimento de gestos humanos é uma área de pesquisa ativa em visão computacional...
+
+% --------------------------------------------------------------------
+% ELEMENTOS PÓS-TEXTUAIS
+% --------------------------------------------------------------------
+\postextual
+
+% --- REFERÊNCIAS ---
+% O comando \bibliography aponta para o arquivo .bib com suas referências
+\bibliography{referencias}
+
+\end{document}
