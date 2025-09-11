@@ -1,10 +1,10 @@
 # Training configuration for temporal Transformer
 seed: 42
-work_dir: runs/transformer
+work_dir: "/media/davs/SSD/TCC - Database/processed/runs/transformer"
 
 # Data
 data:
-  manifest: Project/data/manifest.csv  # csv with columns: path,label
+  manifest: "/media/davs/SSD/TCC - Database/processed/manifest_train.csv"  # csv with columns: path,label
   num_keypoints: 21        # MediaPipe hands per hand
   dims: 2                  # x,y
   seq_len: 64              # frames per sample (pad/trim)

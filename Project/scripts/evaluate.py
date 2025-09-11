@@ -1,8 +1,17 @@
 #!/usr/bin/env python
 import argparse
+from pathlib import Path
+import sys
+import os
 
 import torch
 from torch.utils.data import DataLoader
+
+# Ensure 'Project/src' is on sys.path when executing as a script
+THIS_DIR = Path(__file__).resolve().parent
+ROOT = THIS_DIR.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from src.data.dataset import DataConfig, SkeletonSequenceDataset
 from src.models.transformer import TransformerClassifier

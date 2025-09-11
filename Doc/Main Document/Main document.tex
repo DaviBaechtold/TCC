@@ -84,11 +84,14 @@
 \end{agradecimentos}
 
 % --- RESUMO E ABSTRACT ---
-% (Adicione aqui quando for escrever)
-% \begin{resumo}
-% \end{resumo}
-% \begin{abstract}
-% \end{abstract}
+\begin{resumo}
+O reconhecimento de gestos dinâmicos a partir de sequências de vídeo é um desafio central na área de Interação Humano-Computador (IHC), com aplicações que vão desde interfaces de controle até sistemas de assistência para pessoas com deficiência auditiva. Abordagens tradicionais frequentemente lutam para capturar as complexas dependências temporais inerentes aos gestos. Este trabalho propõe um modelo baseado na arquitetura Transformer para o reconhecimento de gestos a partir de sequências de coordenadas esqueléticas 2D extraídas de vídeos monoculares. O método utiliza o MediaPipe para a extração de pontos-chave das mãos e corpo, que são então processados por um codificador Transformer para classificação. Avaliamos nosso modelo em um dataset de gestos dinâmicos, comparando seu desempenho com baselines como LSTMs e MLPs. Os resultados demonstram a eficácia da arquitetura Transformer em modelar relações temporais, alcançando uma acurácia superior e destacando seu potencial para aplicações em tempo real.
+\end{resumo}
+
+\begin{abstract}
+Dynamic gesture recognition from video sequences is a central challenge in Human-Computer Interaction (HCI), with applications ranging from control interfaces to assistive systems for the hearing impaired. Traditional approaches often struggle to capture the complex temporal dependencies inherent in gestures. This work proposes a model based on the Transformer architecture for gesture recognition from sequences of 2D skeleton coordinates extracted from monocular videos. The method utilizes MediaPipe for hand and body keypoint extraction, which are then processed by a Transformer encoder for classification. We evaluate our model on a dynamic gesture dataset, comparing its performance against baselines such as LSTMs and MLPs. The results demonstrate the effectiveness of the Transformer architecture in modeling temporal relationships, achieving superior accuracy and highlighting its potential for real-time applications.
+\end{abstract}
+
 
 % --- SUMÁRIO ---
 \tableofcontents* % O asterisco remove o Sumário do próprio Sumário
@@ -103,9 +106,53 @@
 \textual
 
 \chapter{Introdução}
-Esta é a introdução do seu trabalho. Aqui você irá contextualizar o tema, apresentar a problemática, os objetivos, a justificativa e a estrutura do documento.
+\label{chap:introducao}
 
-O reconhecimento de gestos humanos é uma área de pesquisa ativa em visão computacional...
+O reconhecimento de gestos humanos é uma área de pesquisa fundamental em visão computacional e Interação Humano-Computador (IHC). A capacidade de um sistema computacional interpretar gestos dinâmicos abre um vasto leque de aplicações, desde o controle de dispositivos sem toque até a tradução automática de línguas de sinais, promovendo maior acessibilidade e novas formas de interação.
+
+Contudo, o reconhecimento de gestos a partir de vídeos 2D apresenta desafios significativos. Gestos são, por natureza, sequências temporais de posturas, e a captura das dependências de longo alcance entre os movimentos é crucial para uma classificação precisa. Além disso, variações na velocidade de execução, iluminação, oclusão e pontos de vista podem dificultar a tarefa.
+
+Modelos clássicos baseados em Redes Neurais Recorrentes (RNNs), como LSTMs, têm sido amplamente utilizados para essa tarefa. No entanto, a arquitetura Transformer \cite{vaswani2017attention}, originalmente proposta para tarefas de Processamento de Linguagem Natural (PLN), emergiu como uma alternativa poderosa devido ao seu mecanismo de auto-atenção, que permite modelar relações entre todos os pontos de uma sequência, independentemente da distância.
+
+Este trabalho explora o uso da arquitetura Transformer para o reconhecimento de gestos dinâmicos. A abordagem se baseia na extração de coordenadas esqueléticas 2D das mãos e do corpo utilizando a biblioteca MediaPipe \cite{lugaresi2019mediapipe}, que oferece uma representação robusta e de baixa dimensionalidade do movimento. Essas sequências de pontos-chave são então alimentadas em um modelo Transformer para classificação.
+
+\section{Objetivos}
+
+O objetivo principal deste trabalho é desenvolver e avaliar um modelo baseado em Transformer para o reconhecimento de gestos a partir de sequências de pontos-chave 2D. Os objetivos específicos são:
+\begin{itemize}
+    \item Implementar um pipeline para extração de coordenadas esqueléticas de vídeos usando MediaPipe.
+    \item Desenvolver um modelo de classificação de gestos baseado na arquitetura Transformer.
+    \item Treinar e avaliar o modelo em um dataset de gestos dinâmicos.
+    \item Comparar o desempenho do modelo Transformer com arquiteturas de baseline, como MLP e LSTM.
+\end{itemize}
+
+\section{Justificativa}
+
+A crescente necessidade por interfaces mais naturais e acessíveis impulsiona a pesquisa em reconhecimento de gestos. A arquitetura Transformer, com seu sucesso comprovado em domínios sequenciais como o PLN \cite{devlin2018bert}, apresenta uma oportunidade promissora para avançar o estado da arte no reconhecimento de gestos, superando algumas das limitações de modelos recorrentes. Este estudo busca validar essa hipótese, fornecendo uma análise comparativa em um contexto prático.
+
+\section{Estrutura do Documento}
+
+Este trabalho está organizado da seguinte forma: O Capítulo \ref{chap:referencial} apresenta o referencial teórico sobre as tecnologias utilizadas. O Capítulo \ref{chap:metodologia} descreve a metodologia de desenvolvimento. O Capítulo \ref{chap:resultados} apresenta os resultados obtidos e, finalmente, o Capítulo \ref{chap:conclusao} traz as conclusões e trabalhos futuros.
+
+\chapter{Referencial Teórico}
+\label{chap:referencial}
+
+Este capítulo aborda os conceitos fundamentais que sustentam este trabalho. Iniciamos com uma visão geral sobre o reconhecimento de gestos, seguido por uma descrição das principais tecnologias empregadas: a biblioteca MediaPipe para extração de características e a arquitetura Transformer, que constitui o núcleo do nosso modelo.
+
+\section{Reconhecimento de Gestos}
+...
+
+\section{MediaPipe}
+O MediaPipe é um framework de código aberto desenvolvido pelo Google que permite a construção de pipelines de processamento de dados multimodais, como vídeo, áudio e sensores \cite{lugaresi2019mediapipe}. Ele oferece soluções pré-treinadas e otimizadas para tarefas de visão computacional, como detecção de faces, mãos e pose corporal.
+
+Neste trabalho, utilizamos a solução de detecção de mãos e pose do MediaPipe para extrair as coordenadas 2D dos pontos-chave (keypoints) que representam a estrutura esquelética das mãos e do corpo. Essa abordagem transforma os dados de vídeo brutos em uma representação sequencial e estruturada, ideal para ser processada por modelos de aprendizado de máquina.
+
+\section{Arquitetura Transformer}
+Proposta originalmente por Vaswani et al. \cite{vaswani2017attention}, a arquitetura Transformer revolucionou o campo do Processamento de Linguagem Natural e desde então tem sido adaptada para diversas outras áreas, incluindo visão computacional.
+
+Diferentemente das arquiteturas recorrentes (RNNs) que processam os dados sequencialmente, o Transformer processa a sequência inteira de uma só vez, utilizando um mecanismo chamado de **auto-atenção (self-attention)**. Esse mecanismo permite ao modelo ponderar a importância de cada elemento da sequência em relação a todos os outros, capturando dependências complexas e de longo alcance de forma mais eficaz que as RNNs.
+
+A arquitetura é composta principalmente por blocos de codificador (Encoder) e decodificador (Decoder). Para tarefas de classificação de sequência, como a nossa, apenas a pilha de codificadores é necessária. Cada codificador é composto por uma camada de auto-atenção multi-cabeça (multi-head self-attention) e uma rede feed-forward totalmente conectada.
 
 % --------------------------------------------------------------------
 % ELEMENTOS PÓS-TEXTUAIS

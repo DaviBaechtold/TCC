@@ -1,0 +1,20 @@
+\providecommand{\abntreprintinfo}[1]{%
+ \citeonline{#1}}
+\setlength{\labelsep}{0pt}\begin{thebibliography}{}
+\providecommand{\abntrefinfo}[3]{}
+\providecommand{\abntbstabout}[1]{}
+\abntbstabout{v-1.9.7 }
+
+\bibitem[Devlin et al. 2018]{devlin2018bert}
+\abntrefinfo{Devlin et al.}{DEVLIN et al.}{2018}
+{DEVLIN, J. et al. Bert: Pre-training of deep bidirectional transformers for language understanding. In:  \emph{Proceedings of the 2019 Conference of the North American Chapter of the Association for Computational Linguistics: Human Language Technologies, Volume 1 (Long and Short Papers)}. [S.l.: s.n.], 2018.}
+
+\bibitem[Lugaresi et al. 2019]{lugaresi2019mediapipe}
+\abntrefinfo{Lugaresi et al.}{LUGARESI et al.}{2019}
+{LUGARESI, C. et al. Mediapipe: A framework for building multimodal applied ml pipelines. In:  \emph{Proceedings of the 3rd International Conference on Machine Learning and Computer Science}. [S.l.: s.n.], 2019.}
+
+\bibitem[Vaswani et al. 2017]{vaswani2017attention}
+\abntrefinfo{Vaswani et al.}{VASWANI et al.}{2017}
+{VASWANI, A. et al. \emph{Attention Is All You Need}. 2017.}
+
+\end{thebibliography}
