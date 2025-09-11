@@ -50,25 +50,33 @@ python Project/scripts/merge_manifests.py \
 	--out "/media/davs/SSD/TCC - Database/processed/manifest_full.csv" --dedup
 ```
 
+Option C — Já possui `.npz` prontos? Gere um manifest único a partir do diretório:
+```bash
+python Project/scripts/build_manifest_from_npz.py \
+  --npz-dir "/media/davs/SSD/TCC - Database/processed/npz_jester" \
+  --out "/media/davs/SSD/TCC - Database/processed/manifest_full.csv"
+```
+
 3) Configure training
 
-Edit `Project/configs/transformer.yaml` to point `data.manifest` and `work_dir` to the SSD (examples already set):
+Edit `Project/configs/transformer.yaml` to point `data.manifest` and `work_dir` to the SSD (já configurado para o `manifest_full.csv`):
 
-- `data.manifest: "/media/davs/SSD/TCC - Database/processed/manifest_train.csv"`
+- `data.manifest: "/media/davs/SSD/TCC - Database/processed/manifest_full.csv"`
 - `work_dir: "/media/davs/SSD/TCC - Database/processed/runs/transformer"`
 
 4) Train
 ```bash
-python Project/scripts/train.py --config Project/configs/transformer.yaml
+# Em máquinas com GPU não compatível, force CPU
+CUDA_VISIBLE_DEVICES="" python Project/scripts/train.py --config Project/configs/transformer.yaml
 ```
 
 Resume training later (after Ctrl+C):
 ```bash
-# resume from rolling last checkpoint
-python Project/scripts/train.py --config Project/configs/transformer.yaml --resume last
+# resume from rolling last checkpoint (CPU)
+CUDA_VISIBLE_DEVICES="" python Project/scripts/train.py --config Project/configs/transformer.yaml --resume last
 
 # or from best checkpoint
-python Project/scripts/train.py --config Project/configs/transformer.yaml --resume best
+CUDA_VISIBLE_DEVICES="" python Project/scripts/train.py --config Project/configs/transformer.yaml --resume best
 ```
 
 5) Evaluate
@@ -87,7 +95,7 @@ python Project/scripts/camera_test.py --mirror
 
 7) Real-time classification demo (requires a trained checkpoint)
 ```bash
-python Project/scripts/demo.py --checkpoint runs/transformer/best.pt
+CUDA_VISIBLE_DEVICES="" python Project/scripts/demo.py --checkpoint "/media/davs/SSD/TCC - Database/processed/runs/transformer/best.pt"
 ```
 
 See `Project/configs/` for hyperparameters.

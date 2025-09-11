@@ -4,7 +4,7 @@ work_dir: "/media/davs/SSD/TCC - Database/processed/runs/transformer"
 
 # Data
 data:
-  manifest: "/media/davs/SSD/TCC - Database/processed/manifest_train.csv"  # csv with columns: path,label
+  manifest: "/media/davs/SSD/TCC - Database/processed/manifest_full.csv"  # csv with columns: path,label
   num_keypoints: 21        # MediaPipe hands per hand
   dims: 2                  # x,y
   seq_len: 64              # frames per sample (pad/trim)
