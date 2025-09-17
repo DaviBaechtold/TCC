@@ -18,6 +18,8 @@
 \usepackage[brazil]{babel}
 \usepackage{booktabs}
 \usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric}
 \usepackage{hyperref}
 \usepackage{xcolor}
 
@@ -66,6 +68,28 @@
   \end{itemize}
 \end{frame}
 
+\begin{frame}{Workflow do Pipeline}
+  \centering
+  \begin{tikzpicture}[
+    node distance=10mm,
+    >=Stealth,
+    box/.style={draw, rounded corners, align=center, minimum height=8mm, inner sep=3pt, fill=blue!6},
+    arr/.style={->, thick}
+  ]
+    \node[box] (in) {Vídeo/Frames RGB};
+    \node[box, right=20mm of in] (mp) {MediaPipe\\(Hands/Pose)};
+    \node[box, right=20mm of mp] (prep) {Pad/Trim\\Norm (z-score)\\Máscara Temporal};
+    \node[box, right=20mm of prep] (enc) {PosEnc +\\Transformer Encoder};
+    \node[box, right=20mm of enc] (head) {Pooling (CLS)\\Head MLP};
+    \node[box, right=20mm of head] (out) {Logits\\Classe};
+    \draw[arr] (in) -- (mp);
+    \draw[arr] (mp) -- (prep);
+    \draw[arr] (prep) -- (enc);
+    \draw[arr] (enc) -- (head);
+    \draw[arr] (head) -- (out);
+  \end{tikzpicture}
+\end{frame}
+
 \begin{frame}{Implementação (Resumo)}
   \begin{itemize}
     \item Código: \texttt{Project/src} (\texttt{data}, \texttt{models}, \texttt{utils}), scripts em \texttt{Project/scripts}.
@@ -84,6 +108,39 @@
     \item \textbf{NTU RGB+D 60/120} (ações corporais): pode-se extrair 2D (MediaPipe) para usar no pipeline.
     \item \textbf{ChaLearn LAP IsoGD / Montalbano} (gestos): conjuntos multimodais (RGB-D), uso acadêmico.
     \item \textbf{Something-Something V2 / Kinetics} (ações gerais): muito grandes; seleção de subset recomendada.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{20BN-Jester (detalhes)}
+  \begin{itemize}
+    \item Dados: sequências de frames por vídeo (RGB), gestos manuais dinâmicos (ex.: deslizar, apontar, rodar).
+    \item Rótulos: ação por vídeo (classe única).
+    \item Integração: pasta de frames \Rightarrow MediaPipe Hands \Rightarrow `.npz` (sequência de keypoints) + manifesto CSV.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{EgoGesture (detalhes)}
+  \begin{itemize}
+    \item Dados: vídeos egocêntricos com gestos manuais; condições variadas (fundo, iluminação).
+    \item Rótulos: conjunto de gestos predefinidos; metadados por sujeito/sessão.
+    \item Integração: vídeos \Rightarrow extração de frames \Rightarrow MediaPipe Hands/Pose \Rightarrow `.npz` + manifesto.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{NTU RGB+D (detalhes)}
+  \begin{itemize}
+    \item Dados: ações corporais multi-sujeito; sensores RGB-D (usaremos apenas RGB \& 2D keypoints).
+    \item Rótulos: ação por vídeo (multi-categoria); particionamento por sujeito/câmera.
+    \item Integração: vídeos \Rightarrow MediaPipe Pose \Rightarrow `.npz` (pose 2D por frame) + manifesto.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Unificação de múltiplos datasets}
+  \begin{itemize}
+    \item Normalização de labels: mapear gestos similares para uma taxonomia comum (ex.: \emph{swipe-left/right}, \emph{pointing}).
+    \item Manifesto unificado: `path,label` com one-hot via `class_to_idx` consistente entre bases.
+    \item Balanceamento: amostragem estratificada por classe e por origem (dataset) para evitar viés.
+    \item Validação cruzada: splits por vídeo/sujeito; manter splits separados por origem quando necessário.
   \end{itemize}
 \end{frame}
 
@@ -128,6 +185,70 @@
 \end{frame}
 
 \section{Riscos e Mitigações}
+\section{Literature Review e Justificativas}
+\begin{frame}{Literature Review (resumo)}
+  \begin{itemize}
+    \item \textbf{2D Skeleton-based}: ST-GCN, TCNs, RNN/LSTM; foco em topologia e dinâmica (citações a inserir).
+    \item \textbf{Transformers} para séries temporais e vídeo: atenção global, modelagem de longo alcance (citações a inserir).
+    \item \textbf{Modelos híbridos}: atenção espacial-temporal, pooling adaptativo, multi-modal (RGB + keypoints) (citações a inserir).
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Por que 2D Skeletons?}
+  \begin{itemize}
+    \item Robustez a variações de aparência, iluminação e fundo; menor custo de processamento que vídeo bruto.
+    \item Privacidade: reduz exposição de imagem completa ao trabalhar com coordenadas.
+    \item Compatível com câmeras simples (RGB) e bibliotecas como MediaPipe (tempo real em CPU).
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Por que Transformers?}
+  \begin{itemize}
+    \item Captura dependências de longo alcance via auto-atenção; bom para gestos com duração variável.
+    \item Flexível para incorporar tokens especiais (CLS), máscaras temporais e multi-head attention.
+    \item Resultados competitivos em visão e séries temporais; boa base para extensões.
+  \end{itemize}
+\end{frame}
+
+\section{Publicação e RQs}
+\begin{frame}{Possíveis tópicos de publicação}
+  \begin{itemize}
+    \item Fusões de bases de gestos com taxonomia unificada e análise de transferência entre domínios.
+    \item Técnicas de data augmentation temporal para skeletons 2D e impacto na generalização.
+    \item Comparativo prático: LSTM/TCN/ST-GCN vs Transformer em cenários de baixo recurso (CPU).
+    \item Demo robusto em tempo real com MediaPipe + Transformer e avaliação em uso prático.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Onde publicar}
+  \begin{itemize}
+    \item Workshops/Conferências: WACV Workshops, ICCV/ICPR Workshops, SIBGRAPI, CVPR Workshops, ICRA Workshops, IEEE LatinX.
+    \item Revistas/Periódicos: IEEE Access, Pattern Recognition Letters, Multimedia Tools and Applications.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Objetivo e Research Questions (RQs)}
+  \begin{itemize}
+    \item \textbf{Objetivo}: construir e avaliar um pipeline geral de reconhecimento de gestos/ações baseado em esqueletos 2D e Transformer.
+    \item \textbf{RQs iniciais}:
+      \begin{itemize}
+        \item RQ1: Quão bem um Transformer baseado em skeletons 2D generaliza entre diferentes datasets de gestos?
+        \item RQ2: Quais aumentos temporais e de normalização mais impactam a robustez em CPU/tempo real?
+        \item RQ3: Quais são os limites de latência/precisão para uma demo estável em hardware de baixo custo?
+      \end{itemize}
+  \end{itemize}
+\end{frame}
+
+\section{Referências}
+\begin{frame}{Referências (seleção inicial)}
+  \small
+  \begin{itemize}
+    \item MediaPipe Hands/Pose: (inserir citação).
+    \item Transformers (Attention is All You Need; aplicações em visão): (inserir citação).
+    \item ST-GCN/TCN para skeletons: (inserir citação).
+    \item Datasets (Jester, EgoGesture, NTU, ChaLearn): (inserir URLs e referências).
+  \end{itemize}
+\end{frame}
 \begin{frame}{Riscos principais}
   \begin{itemize}
   \item \textbf{Hardware} (tempo de treinamento) $\Rightarrow$ Mitigar com RTX 5060 / servidor PUCPR; usar CPU apenas para validações rápidas.
