@@ -91,7 +91,16 @@ def main():
     epochs = int(cfg['optim']['epochs'])
     warmup = int(cfg['optim'].get('warmup_epochs', 0))
     optim = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=wd)
-    sched = torch.optim.lr_scheduler.CosineAnnealingLR(optim, T_max=max(1, epochs - warmup))
+    # Learning rate schedule: optional linear warmup -> cosine
+    if warmup > 0:
+        from torch.optim.lr_scheduler import LambdaLR, SequentialLR, CosineAnnealingLR
+        def warmup_lambda(step):
+            return min(1.0, (step + 1) / max(1, warmup))
+        warmup_sched = LambdaLR(optim, lr_lambda=warmup_lambda)
+        cosine_sched = CosineAnnealingLR(optim, T_max=max(1, epochs - warmup))
+        sched = SequentialLR(optimizer=optim, schedulers=[warmup_sched, cosine_sched], milestones=[warmup])
+    else:
+        sched = torch.optim.lr_scheduler.CosineAnnealingLR(optim, T_max=max(1, epochs))
 
     work_dir = cfg.get('work_dir', 'runs/transformer')
     ensure_dir(work_dir)

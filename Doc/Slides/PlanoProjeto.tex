@@ -1,0 +1,211 @@
+% !TEX program = pdflatex
+% Instruções de compilação:
+% 1) Instale pacotes LaTeX (beamer, fontenc, babel, etc.). Em Debian/Ubuntu:
+%    sudo apt-get update && sudo apt-get install -y texlive-latex-recommended texlive-fonts-recommended texlive-latex-extra
+% 2) Compile:
+%    latexmk -pdf Doc/Slides/PlanoProjeto.tex
+%    # ou
+%    pdflatex Doc/Slides/PlanoProjeto.tex
+\documentclass[aspectratio=169]{beamer}
+% Se tiver abntex2beamer instalado, use a linha abaixo em vez de beamer puro:
+% \documentclass[aspectratio=169]{abntex2beamer}
+
+% Tema
+% Tema (opcional). Se não possuir o pacote, comente a linha abaixo.
+% \usetheme{metropolis}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[brazil]{babel}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{xcolor}
+
+\title{Reconhecimento de Gestos/Ações com Esqueletos 2D e Transformers}
+\subtitle{Plano de Projeto e Andamento}
+\author{Davi Baechtold}
+\institute{PUCPR}
+\date{16 de setembro de 2025}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+\begin{frame}{Agenda}
+  \tableofcontents
+\end{frame}
+
+\section{Objetivo e Escopo}
+\begin{frame}{Objetivo}
+  \begin{itemize}
+    \item Desenvolver um pipeline geral de reconhecimento de gestos/ações a partir de vídeos RGB monoculares via esqueletos 2D (mãos/pose) e Transformer.
+    \item Foco abrangente (HCI, XR, robótica, esportes, segurança, educação) – não restrito a comunicação entre surdos e mudos.
+    \item Entrega: código reprodutível, modelos treinados, demo em tempo real e documentação.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Escopo}
+  \begin{itemize}
+    \item Extração de keypoints com MediaPipe (mãos/pose) e preparação de sequências temporais.
+    \item Classificação com Transformer encoder; baselines LSTM/MLP para comparação.
+    \item Treinamento, avaliação e demo em tempo real com webcam.
+    \item Suporte a múltiplos datasets (ex.: Jester, EgoGesture, NTU RGB+D (2D), HaGRID, etc.).
+  \end{itemize}
+\end{frame}
+
+\section{Pipeline Técnico}
+\begin{frame}{Arquitetura do Pipeline}
+  \begin{itemize}
+    \item \textbf{Entrada}: vídeo RGB ou sequência de frames.
+    \item \textbf{Extração}: MediaPipe Hands/Pose $\Rightarrow$ keypoints 2D por frame.
+    \item \textbf{Pré-processamento}: pad/trim para $T$ quadros, normalização (z-score por amostra), máscara temporal.
+  \item \textbf{Modelo}: projeção linear $\Rightarrow$ positional encoding $\Rightarrow$ Transformer encoder (multihead) $\Rightarrow$ pooling (CLS) $\Rightarrow$ cabeça MLP.
+    \item \textbf{Saída}: logits $\Rightarrow$ classe de gesto/ação.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Implementação (Resumo)}
+  \begin{itemize}
+    \item Código: \texttt{Project/src} (\texttt{data}, \texttt{models}, \texttt{utils}), scripts em \texttt{Project/scripts}.
+    \item Configuração YAML: \texttt{Project/configs/transformer.yaml}.
+    \item Treino: \texttt{train.py}; Avaliação: \texttt{evaluate.py}; Demo: \texttt{demo.py}.
+    \item Teste de fumaça: \texttt{tests/test\_smoke.py} (verifica formas do Transformer).
+  \end{itemize}
+\end{frame}
+
+\section{Bases de Dados}
+\begin{frame}{Datasets considerados}
+  \begin{itemize}
+    \item \textbf{20BN-Jester} (dinâmico, mãos): leve, ótimo para Gestos manuais; já integrado.
+    \item \textbf{EgoGesture} (dinâmico, egocêntrico): variedade de gestos, cenário natural; maior porte.
+    \item \textbf{HaGRID} (estático, mãos): 2.8M imagens; útil para pré-treino de detector/classificador estático.
+    \item \textbf{NTU RGB+D 60/120} (ações corporais): pode-se extrair 2D (MediaPipe) para usar no pipeline.
+    \item \textbf{ChaLearn LAP IsoGD / Montalbano} (gestos): conjuntos multimodais (RGB-D), uso acadêmico.
+    \item \textbf{Something-Something V2 / Kinetics} (ações gerais): muito grandes; seleção de subset recomendada.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Critérios de seleção}
+  \begin{itemize}
+    \item Licença/uso acadêmico, tamanho e facilidade de download.
+    \item Alinhamento com os gestos-alvo e com o escopo geral.
+    \item Facilidade de integração: frames em diretórios ou vídeos; rótulos claros; divisão treino/val/teste.
+  \end{itemize}
+\end{frame}
+
+\section{Cronograma}
+\begin{frame}{Fase 1: Plano de Projeto (até 03/10)}
+  \begin{itemize}
+    \item \textbf{Semana 1 (10/09–17/09)}: Introdução + Referencial (draft); organizar base de vídeos; rodar \texttt{extract\_keypoints.py}.
+    \item \textbf{Semana 2 (18/09–24/09)}: Metodologia (pipeline + arquitetura); iniciar treinamentos (Transformer/baselines).
+    \item \textbf{Semana 3 (25/09–01/10)}: Consolidar Plano de Projeto (26/09); preparar Resultados iniciais e slides.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Fase 2: Desenvolvimento (até 12/11)}
+  \begin{itemize}
+    \item \textbf{Semanas 4–6 (02/10–22/10)}: Refino e re-treino; ajustar hiperparâmetros; obter \texttt{best.pt}.
+    \item \textbf{Semanas 7–8 (23/10–05/11)}: Foco na demo (robustez e UX); Conclusão + revisão de referências.
+    \item \textbf{Semana 9 (06/11–12/11)}: Revisão final ABNT e entrega (código + documento) em 12/11.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Fase 3: Defesa Final (até 18/11)}
+  \begin{itemize}
+    \item \textbf{Semana 10 (13/11–18/11)}: Preparar slides da Defesa do Projeto Físico; ensaios e validação da demo.
+  \end{itemize}
+\end{frame}
+
+\section{Status Atual}
+\begin{frame}{Andamento}
+  \begin{itemize}
+    \item Código funcional: extração, dataset, modelos, treino, avaliação e demo; teste de fumaça passa.
+    \item Treino em CPU operando (fallback). \textbf{Limitação}: GPU atual (GTX 1050 Ti) insuficiente para treino rápido.
+    \item Plano de mitigação: upgrade para \textbf{RTX 5060} e/ou uso de recursos da PUCPR (consultar laboratório/servidor).
+  \end{itemize}
+\end{frame}
+
+\section{Riscos e Mitigações}
+\begin{frame}{Riscos principais}
+  \begin{itemize}
+  \item \textbf{Hardware} (tempo de treinamento) $\Rightarrow$ Mitigar com RTX 5060 / servidor PUCPR; usar CPU apenas para validações rápidas.
+  \item \textbf{Dados} (cobertura de classes) $\Rightarrow$ Ampliar com EgoGesture/NTU; balanceamento e curadoria de classes.
+  \item \textbf{Agenda} (prazos curtos) $\Rightarrow$ Treinos incrementais com \texttt{--resume}; checkpoints frequentes; priorizar resultados mínimos viáveis.
+  \end{itemize}
+\end{frame}
+
+\section{Próximos Passos}
+\begin{frame}{Próximos Passos Imediatos}
+  \begin{itemize}
+    \item Consolidar Metodologia no documento (pipeline, configs, parâmetros).
+    \item Iniciar/retomar treinamentos com subsets e validação frequente; salvar métricas e confusão por época.
+    \item Selecionar e baixar dataset adicional (EgoGesture/NTU subset) e integrar no manifest.
+    \item Preparar slides finais da defesa do Plano de Projeto (com resultados parciais).
+  \end{itemize}
+\end{frame}
+
+\section{Resultados}
+\begin{frame}{Resultados Parciais (val)}
+  \begin{itemize}
+    \item Métricas (placeholder): Val (macro-F1): \textbf{--\%} | Acc: \textbf{--\%} | Loss: \textbf{--}
+    \item Comparação (placeholder): LSTM vs MLP vs Transformer
+  \end{itemize}
+  \begin{center}
+    \includegraphics[width=0.78\linewidth]{Doc/Slides/cm_val.png}
+  \end{center}
+\end{frame}
+
+\begin{frame}{Resultados Parciais (train)}
+  \begin{itemize}
+    \item Matriz de confusão (train) para verificar overfitting/underfitting.
+  \end{itemize}
+  \begin{center}
+    \includegraphics[width=0.78\linewidth]{Doc/Slides/cm_train.png}
+  \end{center}
+\end{frame}
+
+\begin{frame}{F1 por classe (val)}
+  \begin{itemize}
+    \item Distribuição de desempenho entre classes; identificar classes difíceis.
+  \end{itemize}
+  \begin{center}
+    \includegraphics[width=0.88\linewidth]{Doc/Slides/f1_val.png}
+  \end{center}
+\end{frame}
+
+\begin{frame}{Resultados Finais (placeholder)}
+  \begin{itemize}
+    \item Hiperparâmetros finais: d\_model=192, n\_layers=4, n\_heads=6, seq\_len=64, batch=64 (ajustar se necessário).
+    \item Teste (macro-F1): \textbf{--\%} | Acurácia: \textbf{--\%} | Tempo de inferência (CPU/GPU): \textbf{--/-- ms}.
+    \item Análise por classe: principais confusões, classes fáceis/difíceis.
+  \end{itemize}
+\end{frame}
+
+\section{Referências e Repositório}
+\begin{frame}{Repositório e Execução}
+  \begin{itemize}
+    \item Repositório: estrutura em \texttt{Project/} (código) e \texttt{Doc/} (texto/figuras).
+    \item Execução (CPU): \verb|CUDA_VISIBLE_DEVICES="" python Project/scripts/train.py --config Project/configs/transformer.yaml|
+    \item Demo: \verb|CUDA_VISIBLE_DEVICES="" python Project/scripts/demo.py --checkpoint best.pt|
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[standout]
+  Obrigado! \newline Perguntas?
+\end{frame}
+
+% Slide extra com checklist para orientar a conversa
+\begin{frame}{Checklist e pontos para decidir}
+  \begin{itemize}
+    \item Dataset adicional prioritário: EgoGesture vs NTU (subset) vs outro? Critérios de seleção.
+    \item Acesso a recursos de treino: RTX 5060 local e/ou servidor PUCPR? Procedimentos e prazos.
+    \item Escopo de classes/gestos alvo: taxonomia final (número de classes, definição por gesto/ação).
+    \item Métricas de avaliação: macro-F1, acurácia, matriz de confusão, tempo de inferência (CPU/GPU).
+    \item Demonstração: requisitos para a defesa (resolução, FPS, cenário de teste, roteiros).
+    \item Riscos e mitigação: cronograma, backups de checkpoint, plano B para hardware/dados.
+  \end{itemize}
+\end{frame}
+
+\end{document}

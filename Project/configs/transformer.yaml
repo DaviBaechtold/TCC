@@ -5,11 +5,11 @@ work_dir: "/media/davs/SSD/TCC - Database/processed/runs/transformer"
 # Data
 data:
   manifest: "/media/davs/SSD/TCC - Database/processed/manifest_full.csv"  # csv with columns: path,label
-  num_keypoints: 21        # MediaPipe hands per hand
-  dims: 2                  # x,y
+  num_keypoints: 21        # informational (not used at runtime)
+  dims: 2                  # informational (not used at runtime)
   seq_len: 64              # frames per sample (pad/trim)
   stride: 2                # frame stride during sampling
-  normalize: true          # per-sample min-max and wrist-centering
+  normalize: true          # per-sample z-score over flattened features
   augment:
     noise_std: 0.01
     time_mask_prob: 0.2

@@ -1,12 +1,16 @@
-# Temporal Transformer-Based Gesture Recognition (2D Skeletons)
+# General Gesture/Action Recognition from 2D Skeletons
 
-This project recognizes dynamic hand/body gestures from monocular RGB videos. It extracts 2D keypoints with MediaPipe, builds temporal sequences, and classifies them using a Transformer encoder. Includes a baseline (LSTM/MLP), training loop, evaluation, and a simple real-time demo.
+This project performs general gesture/action recognition from monocular RGB videos by extracting 2D keypoints (hands/pose) with MediaPipe, assembling temporal sequences, and classifying them using a Transformer encoder. It’s domain-agnostic: applicable to HCI, XR, sports, robotics, safety monitoring, or educational interfaces. Baselines (LSTM/MLP), training/eval scripts, and a real-time demo are included.
 
 ## Layout
 - `src/data/`: data extraction and datasets
 - `src/models/`: transformer, baselines
 - `src/utils/`: training, metrics, viz
 - `scripts/`: CLI entry-points
+
+## Scope and applications
+- Not tied to a specific communication use case. You can target different gesture taxonomies (e.g., interaction commands, sports drills, assembly actions, general hand signs) by changing the manifest/dataset.
+- The pipeline is keypoint-centric and robust to background and appearance; it does not require audio or specialized sensors beyond a standard RGB camera.
 
 ## Quickstart
 1) Create a Python env and install deps
@@ -99,6 +103,17 @@ CUDA_VISIBLE_DEVICES="" python Project/scripts/demo.py --checkpoint "/media/davs
 ```
 
 See `Project/configs/` for hyperparameters.
+
+## Current limitations and roadmap
+
+- Data config fields `num_keypoints` and `dims` in the YAML are informational and not consumed at runtime yet. Input dimensionality is inferred from the `.npz` content.
+- Normalization currently applies per-sample standardization (z-score) after flattening; there is no wrist-centering/min–max at the moment.
+- LR warmup + cosine is supported, but there’s no advanced scheduler like OneCycleLR yet.
+- Logging is simple (stdout). Consider integrating TensorBoard or Weights & Biases.
+- Datasets are loaded from compressed `.npz`, which may be CPU-bound. For large-scale training, consider uncompressed `.npy` or chunked formats (e.g., Zarr) and larger `num_workers`.
+- Tests cover model shapes (smoke). Add tests for dataset padding, manifest parsing, and augmentation edge cases.
+
+Planned improvements (suggested): type hints + mypy, ruff/black formatting, GitHub Actions to run smoke tests, richer evaluation (AUC/PR, per-class metrics, calibration), and optional TorchScript/`torch.compile` for the demo.
 
 ## Solução de Problemas (Troubleshooting)
 
