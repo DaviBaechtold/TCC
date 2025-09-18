@@ -12,10 +12,17 @@ normalize:
 
 # Model
 model:
-  type: mlp
-  hidden: 512
-  depth: 4
+  type: mlp          # mlp | tcn
+  hidden: 512        # for mlp
+  depth: 4           # for mlp
   dropout: 0.2
+  # temporal (tcn) params:
+  d_model: 256
+  levels: 4
+  k: 3
+
+# Temporal
+seq_len: 1            # >1 enables temporal synthetic generation for TCN
 
 # Optim
 optim:

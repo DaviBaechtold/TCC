@@ -59,3 +59,27 @@ python Project/scripts/lift_sequences.py \
 	--checkpoint Project/data/lifter_runs/lifter_best.pt \
 	--root-center --device cpu
 ```
+
+### Treino temporal (TCN)
+Edite `Project/configs/lifter.yaml` e ajuste:
+```yaml
+model:
+	type: tcn
+seq_len: 16
+```
+Rode:
+```bash
+python Project/scripts/train_lifter.py --config Project/configs/lifter.yaml --synthetic --device cpu --n-train 4000 --n-val 800
+```
+
+### Captura de keypoints reais (webcam)
+```bash
+python Project/scripts/capture_keypoints.py --out Project/data/captura_seq.npz --camera 1 --frames 300 --mirror --show
+```
+Depois fazer lifting:
+```bash
+python Project/scripts/lift_sequences.py \
+	--input Project/data/captura_seq.npz \
+	--output Project/data/captura_seq_3d.npz \
+	--checkpoint Project/data/lifter_runs/lifter_best.pt --root-center
+```

@@ -136,3 +136,71 @@ __all__ = [
     "mpjpe",
     "procrustes_align",
 ]
+
+
+class TemporalBlock(nn.Module):
+    def __init__(self, in_ch: int, out_ch: int, k: int = 3, d: int = 1, dropout: float = 0.1):
+        super().__init__()
+        pad = (k - 1) * d
+        self.conv1 = nn.Conv1d(in_ch, out_ch, k, padding=pad, dilation=d)
+        self.conv2 = nn.Conv1d(out_ch, out_ch, k, padding=pad, dilation=d)
+        self.downsample = nn.Conv1d(in_ch, out_ch, 1) if in_ch != out_ch else nn.Identity()
+        self.dropout = nn.Dropout(dropout)
+        self.act = nn.ReLU(inplace=True)
+
+    def forward(self, x):  # x: (B,C,T)
+        h = self.conv1(x)
+        h = h[..., : x.shape[-1]]  # causal trim
+        h = self.act(h)
+        h = self.dropout(h)
+        h = self.conv2(h)
+        h = h[..., : x.shape[-1]]
+        h = self.act(h)
+        return self.downsample(x) + self.dropout(h)
+
+
+class TemporalTCNLifter(nn.Module):
+    """Temporal lifter using 1D dilated convolutions.
+    Input: (B, T, J, 2)
+    Output: (B, T, J, 3)
+    We flatten joint dims into channels per time step.
+    """
+
+    def __init__(self, num_joints: int, d_model: int = 256, levels: int = 4, k: int = 3, dropout: float = 0.1):
+        super().__init__()
+        self.num_joints = num_joints
+        in_ch = num_joints * 2
+        self.stem = nn.Linear(in_ch, d_model)
+        blocks = []
+        for i in range(levels):
+            d = 2 ** i
+            blocks.append(TemporalBlock(d_model, d_model, k=k, d=d, dropout=dropout))
+        self.blocks = nn.Sequential(*blocks)
+        self.head = nn.Linear(d_model, num_joints * 3)
+
+    def forward(self, x):  # x: (B,T,J,2)
+        B, T, J, D = x.shape
+        assert D == 2 and J == self.num_joints
+        h = x.reshape(B, T, J * D)  # (B,T,Cin)
+        h = self.stem(h)  # (B,T,d_model)
+        h = h.transpose(1, 2)  # (B,d_model,T)
+        h = self.blocks(h)
+        h = h.transpose(1, 2)  # (B,T,d_model)
+        out = self.head(h).reshape(B, T, self.num_joints, 3)
+        return out
+
+
+def build_lifter(model_type: str, num_joints: int, **kwargs):
+    if model_type == 'mlp':
+        return LifterMLP(num_joints=num_joints,
+                         hidden=kwargs.get('hidden', 512),
+                         depth=kwargs.get('depth', 4),
+                         dropout=kwargs.get('dropout', 0.2))
+    if model_type == 'tcn':
+        return TemporalTCNLifter(num_joints=num_joints,
+                                 d_model=kwargs.get('d_model', 256),
+                                 levels=kwargs.get('levels', 4),
+                                 k=kwargs.get('k', 3),
+                                 dropout=kwargs.get('dropout', 0.1))
+    raise ValueError(f"Unknown model_type={model_type}")
+
