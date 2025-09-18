@@ -42,6 +42,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--width', type=int, default=960)
     ap.add_argument('--height', type=int, default=540)
+    ap.add_argument('--camera', type=int, default=0, help='Camera index (use 1 if external C922 is not 0)')
+    ap.add_argument('--fps', type=int, default=30, help='Target capture FPS, if supported by the camera')
     ap.add_argument('--mirror', action='store_true', help='Flip horizontally for a selfie view')
     args = ap.parse_args()
 
@@ -52,11 +54,13 @@ def main():
     mp_draw = mp.solutions.drawing_utils
     mp_styles = mp.solutions.drawing_styles
 
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture(args.camera)
     if args.width:
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, args.width)
     if args.height:
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, args.height)
+    if args.fps:
+        cap.set(cv2.CAP_PROP_FPS, float(args.fps))
 
     show_face, show_hands, show_pose = True, True, True
     prev_t = cv2.getTickCount()
