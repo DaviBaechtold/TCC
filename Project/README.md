@@ -37,3 +37,25 @@ python Project/scripts/camera_test.py --camera 1 --width 1280 --height 720 --fps
 6) (Opcional) `scripts/depth_segment_features.py`: extração de sinais auxiliares
 
 Consulte o documento da proposta para o protocolo experimental (P1–P5), métricas e critérios de sucesso.
+
+## Comandos rápidos (modo sintético)
+Treinar o lifter (gera checkpoint em `Project/data/lifter_runs/lifter_best.pt`):
+```bash
+python Project/scripts/train_lifter.py --config Project/configs/lifter.yaml --synthetic --device cpu
+```
+
+Avaliá-lo:
+```bash
+python Project/scripts/evaluate_3d_metrics.py \
+	--checkpoint Project/data/lifter_runs/lifter_best.pt \
+	--num-joints 17 --n-val 1000 --device cpu
+```
+
+Converter um `.npz` 2D para 3D:
+```bash
+python Project/scripts/lift_sequences.py \
+	--input /path/to/input_2d.npz \
+	--output /path/to/output_3d.npz \
+	--checkpoint Project/data/lifter_runs/lifter_best.pt \
+	--root-center --device cpu
+```

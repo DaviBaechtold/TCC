@@ -1,0 +1,28 @@
+# Config for 2D->3D lifter (synthetic-friendly defaults)
+seed: 42
+work_dir: Project/data/lifter_runs
+
+# Data
+num_joints: 17           # adjust to your 2D detector
+root_index: 0
+normalize:
+  root_center: true
+  scale_mean_bone: false  # enable if edges are provided
+  edges: []               # list of pairs, e.g., [[11,12],[12,14],...]
+
+# Model
+model:
+  type: mlp
+  hidden: 512
+  depth: 4
+  dropout: 0.2
+
+# Optim
+optim:
+  batch_size: 256
+  epochs: 5
+  lr: 3e-4
+  weight_decay: 1e-4
+
+# Eval
+metrics: [mpjpe, pa_mpjpe]
