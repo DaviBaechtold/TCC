@@ -1,163 +1,39 @@
-# General Gesture/Action Recognition from 2D Skeletons
+# Lifting 2D→3D para Reconhecimento de Gestos (TCC)
 
-This project performs general gesture/action recognition from monocular RGB videos by extracting 2D keypoints (hands/pose) with MediaPipe, assembling temporal sequences, and classifying them using a Transformer encoder. It’s domain-agnostic: applicable to HCI, XR, sports, robotics, safety monitoring, or educational interfaces. Baselines (LSTM/MLP), training/eval scripts, and a real-time demo are included.
+Projeto minimalista para estudo de lifting de poses 2D→3D aplicado a reconhecimento de gestos.
 
-## Layout
-- `src/data/`: data extraction and datasets
-- `src/models/`: transformer, baselines
-- `src/utils/`: training, metrics, viz
-- `scripts/`: CLI entry-points
+Documento da proposta: `Doc/Project Propose/Proposta.md`.
 
-## Scope and applications
-- Not tied to a specific communication use case. You can target different gesture taxonomies (e.g., interaction commands, sports drills, assembly actions, general hand signs) by changing the manifest/dataset.
-- The pipeline is keypoint-centric and robust to background and appearance; it does not require audio or specialized sensors beyond a standard RGB camera.
+## Estrutura
+- `Project/src/` — código-fonte (placeholder)
+- `Project/configs/` — configurações (placeholder)
+- `Project/data/` — dados (placeholder)
+- `Project/scripts/camera_test.py` — teste de webcam (MediaPipe Holistic)
 
-## Quickstart
-1) Create a Python env and install deps
+## Requisitos
+Crie e ative o ambiente Python e instale dependências:
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -r Project/requirements.txt
 ```
-2) Prepare data
 
-Option A — From standalone videos (mp4/avi): extract keypoints into `.npz` sequences
+Se necessário em Linux para OpenCV GUI:
 ```bash
-python Project/scripts/extract_keypoints.py --videos /path/to/videos --out Project/data/npz --max-frames 120
-```
-Option B — From 20BN-Jester frames on SSD: convert frame folders to `.npz` and a manifest
-
-- Expected dataset root (example):
-	- `/media/davs/SSD/TCC - Database/20bn-jester/Train/<video_id>/*.jpg`
-	- `/media/davs/SSD/TCC - Database/20bn-jester/Validation/<video_id>/*.jpg`
-- Run conversion per split to SSD:
-```bash
-python Project/scripts/build_manifest_from_jester.py \
-	--root "/media/davs/SSD/TCC - Database/20bn-jester" \
-	--split Train \
-	--out "/media/davs/SSD/TCC - Database/processed/npz_jester" \
-	--manifest "/media/davs/SSD/TCC - Database/processed/manifest_train.csv" \
-	--stride 2 --max-frames 64
-
-python Project/scripts/build_manifest_from_jester.py \
-	--root "/media/davs/SSD/TCC - Database/20bn-jester" \
-	--split Validation \
-	--out "/media/davs/SSD/TCC - Database/processed/npz_jester" \
-	--manifest "/media/davs/SSD/TCC - Database/processed/manifest_val.csv" \
-	--stride 2 --max-frames 64
-```
-Optionally merge manifests:
-```bash
-python Project/scripts/merge_manifests.py \
-	--inputs "/media/davs/SSD/TCC - Database/processed/manifest_train.csv" \
-					 "/media/davs/SSD/TCC - Database/processed/manifest_val.csv" \
-	--out "/media/davs/SSD/TCC - Database/processed/manifest_full.csv" --dedup
+sudo apt-get update && sudo apt-get install -y libgl1 libglib2.0-0
 ```
 
-Option C — Já possui `.npz` prontos? Gere um manifest único a partir do diretório:
+## Teste rápido com a Logitech C922
 ```bash
-python Project/scripts/build_manifest_from_npz.py \
-  --npz-dir "/media/davs/SSD/TCC - Database/processed/npz_jester" \
-  --out "/media/davs/SSD/TCC - Database/processed/manifest_full.csv"
+python Project/scripts/camera_test.py --camera 1 --width 1280 --height 720 --fps 30 --mirror
 ```
 
-3) Configure training
+## Roadmap de Implementação
+1) `configs/lifter.yaml`: hiperparâmetros do lifter 2D→3D (MPJPE/PA-MPJPE)
+2) `src/models/lifter.py`: MLP/TCN de lifting e utilitários de normalização
+3) `scripts/train_lifter.py`: treino do lifter em dados sintéticos ou pares 2D↔3D
+4) `scripts/lift_sequences.py`: conversão de sequências 2D `.npz` → 3D `.npz`
+5) `scripts/evaluate_3d_metrics.py`: MPJPE, PA-MPJPE (e MPVE se aplicável)
+6) (Opcional) `scripts/depth_segment_features.py`: extração de sinais auxiliares
 
-Edit `Project/configs/transformer.yaml` to point `data.manifest` and `work_dir` to the SSD (já configurado para o `manifest_full.csv`):
-
-- `data.manifest: "/media/davs/SSD/TCC - Database/processed/manifest_full.csv"`
-- `work_dir: "/media/davs/SSD/TCC - Database/processed/runs/transformer"`
-
-4) Train
-```bash
-# Em máquinas com GPU não compatível, force CPU
-CUDA_VISIBLE_DEVICES="" python Project/scripts/train.py --config Project/configs/transformer.yaml
-```
-
-Resume training later (after Ctrl+C):
-```bash
-# resume from rolling last checkpoint (CPU)
-CUDA_VISIBLE_DEVICES="" python Project/scripts/train.py --config Project/configs/transformer.yaml --resume last
-
-# or from best checkpoint
-CUDA_VISIBLE_DEVICES="" python Project/scripts/train.py --config Project/configs/transformer.yaml --resume best
-```
-
-5) Evaluate
-```bash
-# Evaluate a trained checkpoint on a manifest
-python Project/scripts/evaluate.py \
-	--manifest "/media/davs/SSD/TCC - Database/processed/manifest_val.csv" \
-	--checkpoint "/media/davs/SSD/TCC - Database/processed/runs/transformer/best.pt" \
-	--seq-len 64
-```
-
-6) Quick camera test (show face/hand/pose landmarks and bounding boxes)
-```bash
-python Project/scripts/camera_test.py --mirror
-```
-
-7) Real-time classification demo (requires a trained checkpoint)
-```bash
-CUDA_VISIBLE_DEVICES="" python Project/scripts/demo.py --checkpoint "/media/davs/SSD/TCC - Database/processed/runs/transformer/best.pt"
-```
-
-See `Project/configs/` for hyperparameters.
-
-## Current limitations and roadmap
-
-- Data config fields `num_keypoints` and `dims` in the YAML are informational and not consumed at runtime yet. Input dimensionality is inferred from the `.npz` content.
-- Normalization currently applies per-sample standardization (z-score) after flattening; there is no wrist-centering/min–max at the moment.
-- LR warmup + cosine is supported, but there’s no advanced scheduler like OneCycleLR yet.
-- Logging is simple (stdout). Consider integrating TensorBoard or Weights & Biases.
-- Datasets are loaded from compressed `.npz`, which may be CPU-bound. For large-scale training, consider uncompressed `.npy` or chunked formats (e.g., Zarr) and larger `num_workers`.
-- Tests cover model shapes (smoke). Add tests for dataset padding, manifest parsing, and augmentation edge cases.
-
-Planned improvements (suggested): type hints + mypy, ruff/black formatting, GitHub Actions to run smoke tests, richer evaluation (AUC/PR, per-class metrics, calibration), and optional TorchScript/`torch.compile` for the demo.
-
-## Solução de Problemas (Troubleshooting)
-
-- CUDA/GPU não usada ou erro de arquitetura (ex.: sm_61):
-  - O script faz fallback automático para CPU.
-  - Para forçar CPU: adicione `device: cpu` no YAML ou rode com `CUDA_VISIBLE_DEVICES=""`.
-  - Para usar GPU, instale o PyTorch compatível com sua GPU/CUDA.
-
-- ModuleNotFoundError: 'src' ou imports quebrados:
-  - Execute os scripts a partir da raiz do repositório: `/home/davs/Documents/TCC`.
-  - Opcional: exporte `PYTHONPATH` uma vez: `export PYTHONPATH="$PWD/Project:$PYTHONPATH"`.
-
-- Caminhos no SSD com espaço no nome:
-  - Sempre use aspas: "/media/davs/SSD/TCC - Database/...".
-  - Em YAML, mantenha os caminhos entre aspas.
-
-- Manifesto (.csv) não encontrado, vazio ou inconsistente:
-  - Cabeçalho deve ser `path,label` e cada linha apontar para um `.npz` existente.
-  - Se houver aviso de `class_to_idx` ao retomar, use o mesmo manifest do treino original.
-
-- Extração (MediaPipe/OpenCV) falhando:
-  - Em Linux, instale libs do sistema para OpenCV GUI/GL:
-    - `sudo apt-get update && sudo apt-get install -y libgl1 libglib2.0-0`
-  - Avisos de delegates do MediaPipe/TFLite podem ser ignorados; para estabilidade, execute em CPU.
-  - Lento/pesado? Use `--stride 2`, `--max-frames 64` e `--limit` para validar.
-
-- Permissão negada ao salvar no SSD:
-  - Verifique se a unidade está montada com escrita e você tem permissão no diretório `processed/`.
-  - Ajuste permissões (ex.): `sudo chown -R "$USER":"$USER" "/media/davs/SSD/TCC - Database/processed"`.
-
-- Retomar treinamento interrompido:
-  - `--resume last` (checkpoint rolante) ou `--resume best`.
-  - Não altere classes/labels entre sessões; se mudar, recomece do zero.
-
-- Desempenho e memória:
-  - Em CPU, use `num_workers: 2-4` e reduza `batch_size`/`seq_len` se faltar RAM.
-  - `pin_memory` é desativado automaticamente em CPU.
-
-- Erros de YAML:
-  - Coloque caminhos entre aspas e use espaços (sem tabs).
-
-- Diagnóstico rápido do ambiente:
-  - `which python && python -V`
-  - `pip show torch mediapipe opencv-python`
-  - `python -c "import torch; print(torch.__version__, torch.cuda.is_available())"`
-
-Se o problema persistir, compartilhe o comando usado, a mensagem completa e as últimas ~20 linhas do log.
+Consulte o documento da proposta para o protocolo experimental (P1–P5), métricas e critérios de sucesso.
