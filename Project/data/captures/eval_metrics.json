@@ -1,0 +1,12 @@
+{
+  "files": [
+    {
+      "file": "Project/data/captures/sample_capture.npz",
+      "error": "too many values to unpack (expected 3)"
+    },
+    {
+      "file": "Project/data/captures/sample_capture_3d.npz",
+      "error": "No (N,J,2) array found in NPZ"
+    }
+  ]
+}

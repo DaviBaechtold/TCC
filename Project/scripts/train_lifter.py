@@ -24,6 +24,8 @@ PROJECT_ROOT = THIS.parents[1]
 sys.path.append(str(PROJECT_ROOT))
 
 from src.models.lifter import LifterMLP, mpjpe, procrustes_align, root_center, build_lifter, TemporalTCNLifter
+from src.utils.preprocess import fill_nans_temporal, to_tensor_and_normalize_mean_bone
+from src.utils.metrics_logging import make_writer, save_metrics_json, log_epoch
 
 
 def set_seed(seed: int):
@@ -78,6 +80,13 @@ def main():
     ytr = torch.from_numpy(ytr)
     xva = torch.from_numpy(xva)
     yva = torch.from_numpy(yva)
+    # Fill NaNs
+    if seq_len > 1:
+        xtr = torch.from_numpy(fill_nans_temporal(xtr.numpy()))
+        xva = torch.from_numpy(fill_nans_temporal(xva.numpy()))
+    else:
+        xtr = torch.from_numpy(np.nan_to_num(xtr.numpy(), nan=0.0))
+        xva = torch.from_numpy(np.nan_to_num(xva.numpy(), nan=0.0))
 
     # Optional root-centering
     if cfg.get('normalize', {}).get('root_center', True):
@@ -117,6 +126,7 @@ def main():
     work_dir = Path(cfg.get('work_dir', 'Project/data/lifter_runs'))
     work_dir.mkdir(parents=True, exist_ok=True)
     ckpt_path = work_dir / 'lifter_best.pt'
+    writer = make_writer(str(work_dir / 'tb'))
 
     # Dataloaders (simple tensor batches)
     def batches(x, y, batch_size, shuffle=True):
@@ -128,7 +138,7 @@ def main():
     best_val = float('inf')
 
     for ep in range(1, epochs + 1):
-        model.train()
+    model.train()
         tr_loss = 0.0
         for xb, yb in batches(xtr, ytr, bs, shuffle=True):
             xb = xb.to(device)
@@ -152,6 +162,13 @@ def main():
             best_val = val_mpjpe
             torch.save({'model': model.state_dict(), 'cfg': cfg}, ckpt_path)
         print(f"Epoch {ep}/{epochs} | train_mpjpe={tr_loss:.4f} val_mpjpe={val_mpjpe:.4f} pa_mpjpe={val_pa:.4f}")
+
+        # Logging
+        metrics = {'train_mpjpe': tr_loss, 'val_mpjpe': val_mpjpe, 'pa_mpjpe': val_pa}
+        log_epoch(writer, metrics, ep)
+
+    # Save metrics JSON
+    save_metrics_json(str(work_dir / 'metrics.json'), {'best_val_mpjpe': best_val})
 
     print(f"Best MPJPE: {best_val:.4f} | saved to {ckpt_path}")
 
