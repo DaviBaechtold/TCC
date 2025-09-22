@@ -1,0 +1,99 @@
+% Beamer slides: Lifting 2D->3D para Reconhecimento de Gestos
+\documentclass{beamer}
+\usetheme{Madrid}
+\usecolortheme{seahorse}
+\usepackage[utf8]{inputenc}
+\usepackage[brazil]{babel}
+\usepackage{graphicx}
+
+\title{Análise de Lifting de Dados 2D para 3D \newline para Reconhecimento de Gestos}
+\author{Davi Baechtold}
+\date{2025-09-18}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+\begin{frame}{Motivação}
+  \begin{itemize}
+    \item Reconhecimento de gestos é fundamental em HCI, robótica colaborativa, e veículos.
+    \item Representações 3D reduzem ambiguidade de profundidade e melhoram robustez a oclusões.
+    \item Objetivo: estudar lifting 2D→3D e impacto na classificação de gestos.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Objetivos}
+  \begin{enumerate}
+    \item Comparar classificadores treinados em 2D vs. 3D (pós-lifting).
+    \item Avaliar métricas de estimação 3D: MPJPE, PA-MPJPE, (MPVE opcional).
+    \item Investigar sinais auxiliares: depth monocular e segmentação.
+    \item Demonstrar protótipo em tempo real com webcam Logitech C922.
+  \end{enumerate}
+\end{frame}
+
+\begin{frame}{Metodologia (visão geral)}
+  \begin{enumerate}
+    \item Extração de keypoints 2D (MediaPipe).
+    \item Lifting 2D→3D: monocular (MLP/TCN) e multi-view (quando disponível).
+    \item Enriquecimento do espaço latente com depth e segmentação.
+    \item Classificador temporal (Transformer / LSTM) sobre 2D/3D.
+  \end{enumerate}
+\end{frame}
+
+\begin{frame}{Lifting: técnicas}
+  \begin{itemize}
+    \item LiftPose3D: mapeamento 2D→3D e adaptação linear entre domínios.
+    \item MPL: fusão multi-view via Transformer com dados sintéticos (AMASS).
+    \item Proposta: começar com MLP por frame e TCN temporal; expandir para multi-view.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Métricas}
+  \begin{itemize}
+    \item MPJPE (Mean Per Joint Position Error).
+    \item PA-MPJPE (Procrustes Aligned MPJPE).
+    \item MPVE (Mean Per Vertex Error) — se houver malhas 3D.
+    \item Classificação: Acurácia, F1-macro, matriz de confusão, latência do demo.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Protocolo Experimental}
+  \begin{itemize}
+    \item P1: Baseline 2D (treino/eval atual do repositório).
+    \item P2: Treinar lifter (sintético e pares 2D↔3D) e converter sequências 2D→3D.
+    \item P3: Ablations (2D vs 3D vs 3D+depth/seg).
+    \item P4: Domain adaptation linear para pequenos conjuntos com C922.
+    \item P5: Demo tempo real e métricas de latência.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Resultados Sintéticos (exemplo)}
+  \begin{itemize}
+    \item Treino rápido sintético com MLP/TCN — checkpoint salvo.
+    \item Métricas observadas (ex.): MPJPE ≈ 1.15 (unidade sintética), PA-MPJPE ≈ 1.42.
+    \item Próxima etapa: testar com dados capturados (C922) e avaliar domain shift.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Próximos Passos}
+  \begin{itemize}
+    \item Implementar normalização por "mean bone" e máscara/interpolação de NaNs.
+    \item Integrar MiDaS (depth monocular) e segmentação para vetorização auxiliar.
+    \item Construir avaliação em multi-view (se possível) e domain adaptation.
+    \item Preparar relatório e textos finais do TCC.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Compilação}
+  \begin{itemize}
+    \item Compilar com pdflatex/lualatex:
+    \begin{verbatim}
+    pdflatex -output-directory Slides Slides/Lifting_Presentation.tex
+    \end{verbatim}
+    \item Recomendo usar `latexmk -pdf Slides/Lifting_Presentation.tex` para compilação automática.
+  \end{itemize}
+\end{frame}
+
+\end{document}
