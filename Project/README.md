@@ -65,6 +65,42 @@ python Project/scripts/lift_sequences.py \
 	--root-center --device cpu
 ```
 
+## Demo de Visualização 3D em Tempo Real 🎯
+Visualize poses 3D em tempo real usando sua webcam (similar ao exemplo 3d-pose-baseline):
+
+### Opção 1: Matplotlib (Interface Científica)
+```bash
+# Demo básica com webcam padrão
+python Project/scripts/demo_3d_visualization.py \
+	--checkpoint Project/data/lifter_runs/lifter_best.pt \
+	--camera 0 --device cpu
+
+# Para câmeras específicas (ex: Logitech C922)
+python Project/scripts/demo_3d_visualization.py \
+	--checkpoint Project/data/lifter_runs/lifter_best.pt \
+	--camera 2 --device cpu --no-mirror
+```
+
+### Opção 2: OpenCV (Mais Compatível)
+```bash
+# Demo usando apenas OpenCV (mais estável)
+python Project/scripts/demo_3d_opencv.py \
+	--checkpoint Project/data/lifter_runs/lifter_best.pt \
+	--camera 0 --device cpu
+```
+
+**Controles da demo:**
+- `r` - Reset da visualização 3D (apenas matplotlib)
+- `s` - Salvar pose 3D atual como `.npy`
+- `q` ou `ESC` - Sair
+
+**Requisitos:** Certifique-se de ter um modelo treinado em `Project/data/lifter_runs/lifter_best.pt`. Se não tiver, execute primeiro o treinamento sintético acima.
+
+**Listagem de dispositivos:**
+```bash
+python Project/scripts/camera_test.py --list-devices
+```
+
 ### Treino temporal (TCN)
 Edite `Project/configs/lifter.yaml` e ajuste:
 ```yaml
