@@ -15,7 +15,13 @@ mediapipe>=0.10.14
 # Deep Learning
 torch>=2.2
 torchvision>=0.17
+# Multimodal / modeling helpers
+einops>=0.7
+timm>=0.9  # optional (future pretrained vision/video backbones)
 # Utils
 pyyaml>=6.0
 tqdm>=4.66
 rich>=13.7
+
+# Optional (not auto-installed):
+# depth-anything-v2, depth-pro, opencv-contrib-python

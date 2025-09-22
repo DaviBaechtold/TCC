@@ -138,7 +138,7 @@ def main():
     best_val = float('inf')
 
     for ep in range(1, epochs + 1):
-    model.train()
+        model.train()
         tr_loss = 0.0
         for xb, yb in batches(xtr, ytr, bs, shuffle=True):
             xb = xb.to(device)

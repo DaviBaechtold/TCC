@@ -1,0 +1,72 @@
+# Multimodal 2D->3D lifting with auxiliary depth, segmentation and video embeddings
+seed: 42
+work_dir: Project/data/multimodal_runs
+
+# Data specification
+num_joints: 17
+root_index: 0
+seq_len: 16              # temporal context (frames)
+frame_stride: 1          # sampling stride
+
+modalities:
+  keypoints:            # Always required
+    dropout: 0.0
+  depth:
+    enabled: true
+    resize: [256, 256]
+    normalize: true
+    encoder: "cnn"      # cnn | vit (future)
+    in_channels: 1
+    out_dim: 128
+  segmentation:
+    enabled: true
+    classes: ["person"]
+    mode: "binary"      # binary mask for person
+    out_dim: 64
+  video:
+    enabled: true
+    type: "clip3d"      # clip3d | resnet3d | videomae (placeholders)
+    clip_size: 16
+    out_dim: 256
+
+fusion:
+  type: transformer      # transformer | mlp
+  d_model: 512
+  depth: 4
+  heads: 8
+  dropout: 0.1
+  proj_3d_dim: 3
+  use_cls_token: false
+
+normalize:
+  root_center: true
+  scale_mean_bone: false
+  edges: []
+
+optim:
+  batch_size: 8
+  epochs: 10
+  lr: 3e-4
+  weight_decay: 1e-4
+  grad_clip: 1.0
+
+scheduler:
+  type: cosine
+  warmup_epochs: 1
+
+loss:
+  type: mpjpe
+  aux_depth_weight: 0.0
+  aux_mask_weight: 0.0
+
+logging:
+  save_every: 2
+  eval_every: 1
+  max_eval_batches: 50
+
+# Expected dataset NPZ structure (one or many files merged):
+#   keypoints: (N, T, J, 2)
+#   depth: (N, T, H, W)             # optional
+#   mask: (N, T, H, W)              # optional (binary person)
+#   video_rgb: (N, T, 3, H, W)      # optional for video embeddings
+#   pose3d: (N, T, J, 3)            # supervision

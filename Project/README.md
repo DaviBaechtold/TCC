@@ -1,14 +1,23 @@
-# Lifting 2D→3D para Reconhecimento de Gestos (TCC)
+# Lifting 2D→3D Multimodal para Reconhecimento de Gestos (TCC)
 
-Projeto minimalista para estudo de lifting de poses 2D→3D aplicado a reconhecimento de gestos.
+Projeto evoluído: de um lifter minimalista 2D→3D para uma arquitetura multimodal que integra
+`keypoints` + `depth (monocular)` + `human segmentation` + `video embeddings` em um espaço latente
+temporal para melhorar robustez e semântica de gestos. Multi‑view futuro pode substituir depth
+monocular quando disponível.
 
 Documento da proposta: `Doc/Project Propose/Proposta.md`.
 
-## Estrutura
-- `Project/src/` — código-fonte (placeholder)
-- `Project/configs/` — configurações (placeholder)
-- `Project/data/` — dados (placeholder)
-- `Project/scripts/camera_test.py` — teste de webcam (MediaPipe Holistic)
+## Estrutura (principal)
+- `Project/configs/lifter.yaml` — lifting simples (baseline)
+- `Project/configs/multimodal.yaml` — configuração multimodal (seq temporal, fusão)
+- `Project/src/models/lifter.py` — MLP / TCN baseline
+- `Project/src/models/multimodal_lifter.py` — modelo multimodal (Transformer de fusão)
+- `Project/src/features/` — encoders de depth, máscara e vídeo (stubs leves)
+- `Project/scripts/train_lifter.py` — treino baseline
+- `Project/scripts/train_multimodal.py` — treino multimodal (sintético ou dataset NPZ)
+- `Project/scripts/extract_modalities.py` — extração rápida de keypoints + pseudo depth/mask
+- `Project/scripts/lift_sequences.py` — inferência (baseline)
+- `Project/scripts/camera_test.py` — teste de câmera / keypoints
 
 ## Requisitos
 Crie e ative o ambiente Python e instale dependências:
@@ -33,27 +42,51 @@ python Project/scripts/camera_test.py --camera 2 --width 1280 --height 720 --fps
 python Project/scripts/camera_test.py --camera /dev/video2 --width 1280 --height 720 --fps 30 --mirror
 ```
 
-## Roadmap de Implementação
-1) `configs/lifter.yaml`: hiperparâmetros do lifter 2D→3D (MPJPE/PA-MPJPE)
-2) `src/models/lifter.py`: MLP/TCN de lifting e utilitários de normalização
-3) `scripts/train_lifter.py`: treino do lifter em dados sintéticos ou pares 2D↔3D
-4) `scripts/lift_sequences.py`: conversão de sequências 2D `.npz` → 3D `.npz`
-5) `scripts/evaluate_3d_metrics.py`: MPJPE, PA-MPJPE (e MPVE se aplicável)
-6) (Opcional) `scripts/depth_segment_features.py`: extração de sinais auxiliares
+## Arquitetura Multimodal (Resumo)
+1. `Keypoints Encoder`: MLP por junta gera tokens (B,T,J,D)
+2. `Depth Encoder`: CNN leve em mapas de profundidade monocular → (B,T,Dd)
+3. `Segmentation Encoder`: CNN leve em máscara binária de pessoa → (B,T,Ds)
+4. `Video Encoder`: 3D CNN simples → (B,T,Dv)
+5. `Fusion Transformer`: Soma tokens de keypoints com embeddings broadcast de frame (depth+mask+vídeo) e aplica Transformer temporal sobre sequência flatten (T×J)
+6. `Head`: Linear para (x,y,z) por junta → (B,T,J,3)
 
-Consulte o documento da proposta para o protocolo experimental (P1–P5), métricas e critérios de sucesso.
+Cada modalidade pode ser desligada em `configs/multimodal.yaml`. Depth real (Depth Anything 2 / Depth Pro) e segmentação avançada podem ser plugadas substituindo os stubs.
+
+## Formato de Dataset NPZ Multimodal
+Chaves esperadas (as ausentes são ignoradas):
+```
+keypoints: (N,T,J,2)
+pose3d:    (N,T,J,3)   # ground truth
+depth:     (N,T,Hd,Wd)
+mask:      (N,T,Hm,Wm)
+video_rgb: (N,T,3,Hv,Wv)
+```
+
+## Fluxo de Uso Multimodal
+1. Extrair modalidades de um vídeo cru:
+```bash
+python Project/scripts/extract_modalities.py \
+	--video input.mp4 --out Project/data/sample_multi.npz --max-frames 128 --stride 1
+```
+2. (Opcional) Substituir depth/mask pseudo por versões reais.
+3. Treinar (sintético multimodal de demonstração):
+```bash
+python Project/scripts/train_multimodal.py --config Project/configs/multimodal.yaml --synthetic --device cpu
+```
+4. Treinar em dataset real (supondo `pose3d` disponível):
+```bash
+python Project/scripts/train_multimodal.py \
+	--config Project/configs/multimodal.yaml \
+	--dataset Project/data/sample_multi.npz --device cuda:0
+```
+
+## Baseline Original (Simples)
+Mantido para comparações (MPJPE / PA-MPJPE) conforme roadmap inicial.
 
 ## Comandos rápidos (modo sintético)
 Treinar o lifter (gera checkpoint em `Project/data/lifter_runs/lifter_best.pt`):
 ```bash
 python Project/scripts/train_lifter.py --config Project/configs/lifter.yaml --synthetic --device cpu
-```
-
-Avaliá-lo:
-```bash
-python Project/scripts/evaluate_3d_metrics.py \
-	--checkpoint Project/data/lifter_runs/lifter_best.pt \
-	--num-joints 17 --n-val 1000 --device cpu
 ```
 
 Converter um `.npz` 2D para 3D:
@@ -63,42 +96,6 @@ python Project/scripts/lift_sequences.py \
 	--output /path/to/output_3d.npz \
 	--checkpoint Project/data/lifter_runs/lifter_best.pt \
 	--root-center --device cpu
-```
-
-## Demo de Visualização 3D em Tempo Real 🎯
-Visualize poses 3D em tempo real usando sua webcam (similar ao exemplo 3d-pose-baseline):
-
-### Opção 1: Matplotlib (Interface Científica)
-```bash
-# Demo básica com webcam padrão
-python Project/scripts/demo_3d_visualization.py \
-	--checkpoint Project/data/lifter_runs/lifter_best.pt \
-	--camera 0 --device cpu
-
-# Para câmeras específicas (ex: Logitech C922)
-python Project/scripts/demo_3d_visualization.py \
-	--checkpoint Project/data/lifter_runs/lifter_best.pt \
-	--camera 2 --device cpu --no-mirror
-```
-
-### Opção 2: OpenCV (Mais Compatível)
-```bash
-# Demo usando apenas OpenCV (mais estável)
-python Project/scripts/demo_3d_opencv.py \
-	--checkpoint Project/data/lifter_runs/lifter_best.pt \
-	--camera 0 --device cpu
-```
-
-**Controles da demo:**
-- `r` - Reset da visualização 3D (apenas matplotlib)
-- `s` - Salvar pose 3D atual como `.npy`
-- `q` ou `ESC` - Sair
-
-**Requisitos:** Certifique-se de ter um modelo treinado em `Project/data/lifter_runs/lifter_best.pt`. Se não tiver, execute primeiro o treinamento sintético acima.
-
-**Listagem de dispositivos:**
-```bash
-python Project/scripts/camera_test.py --list-devices
 ```
 
 ### Treino temporal (TCN)
@@ -125,3 +122,14 @@ python Project/scripts/lift_sequences.py \
 	--output Project/data/captura_seq_3d.npz \
 	--checkpoint Project/data/lifter_runs/lifter_best.pt --root-center
 ```
+
+## Próximos Passos Sugeridos
+- Integrar Depth Anything 2 (converter para inferência Torch, normalizar 0–1).
+- Substituir máscara pseudo por Segment Anything / DeepLab v3.
+- Incorporar embeddings CLIP ou VideoMAE pré-treinados (substituir `Simple3DConvEncoder`).
+- Suporte multi-view: agregar features de câmeras distintas antes da fusão (concat + proj). 
+- Métricas adicionais: P-MPJPE, velocidade média por junta (dinâmica), robustez a oclusões.
+
+## Notas de Performance
+Implementação atual prioriza clareza: não há caching de embeddings nem data pipeline otimizado. Para produção, usar DataLoader com prefetch, mixed precision (`torch.cuda.amp`) e acumulação de gradiente para lotes grandes.
+
