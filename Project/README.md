@@ -25,7 +25,12 @@ sudo apt-get update && sudo apt-get install -y libgl1 libglib2.0-0
 
 ## Teste rápido com a Logitech C922
 ```bash
-python Project/scripts/camera_test.py --camera 1 --width 1280 --height 720 --fps 30 --mirror
+# The camera numeric index can vary between machines. First list devices:
+python Project/scripts/camera_test.py --list-devices
+
+# Then run using the working index (e.g. 2) or, more reliably, the device path:
+python Project/scripts/camera_test.py --camera 2 --width 1280 --height 720 --fps 30 --mirror
+python Project/scripts/camera_test.py --camera /dev/video2 --width 1280 --height 720 --fps 30 --mirror
 ```
 
 ## Roadmap de Implementação
@@ -74,7 +79,8 @@ python Project/scripts/train_lifter.py --config Project/configs/lifter.yaml --sy
 
 ### Captura de keypoints reais (webcam)
 ```bash
-python Project/scripts/capture_keypoints.py --out Project/data/captura_seq.npz --camera 1 --frames 300 --mirror --show
+# Prefer listing devices first and using a device path if index is unreliable:
+python Project/scripts/capture_keypoints.py --out Project/data/captura_seq.npz --camera /dev/video2 --frames 300 --mirror --show
 ```
 Depois fazer lifting:
 ```bash

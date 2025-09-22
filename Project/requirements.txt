@@ -1,3 +1,9 @@
+# NOTE: The following are Python packages. On Linux you may also want to install
+# system packages for video device helpers and OpenCV GUI support:
+#   sudo apt update && sudo apt install -y v4l-utils libgl1 libglib2.0-0
+# `v4l-utils` provides `v4l2-ctl --list-devices` which is useful to inspect
+# camera nodes; `libgl1`/`libglib2.0-0` are commonly needed for OpenCV GUI windows.
+
 # Core
 numpy<2
 pandas>=1.5

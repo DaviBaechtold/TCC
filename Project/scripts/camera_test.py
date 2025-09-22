@@ -42,7 +42,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--width', type=int, default=960)
     ap.add_argument('--height', type=int, default=540)
-    ap.add_argument('--camera', type=int, default=0, help='Camera index (use 1 if external C922 is not 0)')
+    ap.add_argument('--camera', type=str, default='0', help='Camera index (e.g. 0) or device path (e.g. /dev/video2).')
+    ap.add_argument('--list-devices', action='store_true', help='List /dev/video* nodes and their names then exit')
     ap.add_argument('--fps', type=int, default=30, help='Target capture FPS, if supported by the camera')
     ap.add_argument('--mirror', action='store_true', help='Flip horizontally for a selfie view')
     args = ap.parse_args()
@@ -50,11 +51,39 @@ def main():
     if mp is None:
         raise ImportError('mediapipe not installed. pip install mediapipe')
 
+    if args.list_devices:
+        # Print simple mapping of /dev/video* -> sysfs name
+        import glob, os
+        vlist = sorted(glob.glob('/dev/video*'))
+        if not vlist:
+            print('No /dev/video* devices found')
+            return
+        for v in vlist:
+            name = 'N/A'
+            path = 'N/A'
+            try:
+                name = open(f'/sys/class/video4linux/{os.path.basename(v)}/name').read().strip()
+            except Exception:
+                pass
+            try:
+                path = os.path.realpath(f'/sys/class/video4linux/{os.path.basename(v)}/device')
+            except Exception:
+                pass
+            print(f"{v}\t{name}\tdevice:{path}")
+        return
+
     mp_holistic = mp.solutions.holistic
     mp_draw = mp.solutions.drawing_utils
     mp_styles = mp.solutions.drawing_styles
 
-    cap = cv2.VideoCapture(args.camera)
+    # Allow camera to be an index (string of digits) or a device path like /dev/video2
+    cam_arg = args.camera
+    try:
+        cam = int(cam_arg) if isinstance(cam_arg, str) and cam_arg.isdigit() else cam_arg
+    except Exception:
+        cam = cam_arg
+
+    cap = cv2.VideoCapture(cam)
     if args.width:
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, args.width)
     if args.height:
