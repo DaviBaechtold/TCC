@@ -19,4 +19,4 @@ The current PyTorch install supports CUDA capabilities sm_70 sm_75 sm_80 sm_86 s
 If you want to use the NVIDIA GeForce GTX 1050 Ti GPU with PyTorch, please check the instructions at https://pytorch.org/get-started/locally/
 
   warnings.warn(
-Epoch 0:  34%|████████████████████                                       | 1057/3116 [14:15<29:49,  1.15it/s, Loss=1.1255, Avg Loss=1.0089]
+Epoch 0:  34%|████████████████████▏                                      | 1064/3116 [14:22<28:08,  1.22it/s, Loss=1.1107, Avg Loss=1.0088]
