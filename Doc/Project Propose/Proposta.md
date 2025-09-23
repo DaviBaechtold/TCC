@@ -1,113 +1,132 @@
 # Proposta de Projeto de TCC
 
-Título (provisório): Análise de Lifting de Dados 2D para 3D para Reconhecimento de Gestos
+Título (provisório): Lifting Multimodal 2D→3D com Espaço Latente Integrando Depth Monocular, Segmentação Humana, Multi‑View e Video Embeddings para Reconhecimento de Gestos
 
-Autor: Davi Baechtold
-Data: 2025-09-18
+Autor: Davi Baechtold  
+Data: 2025-09-22
 
 ## 1. Motivação e Objetivo
 
-Reconhecer gestos de forma robusta em cenários do mundo real (indústria, veículos, robótica, XR) requer representações espaciais e temporais consistentes. Abordagens 2D (keypoints) são leves e generalistas, mas perdem profundidade e sofrem com oclusões. Este trabalho investiga o lifting 2D→3D (a partir de keypoints 2D) para melhorar a discriminação e a estabilidade temporal no reconhecimento de gestos, explorando também sinais auxiliares (depth monocular e segmentação humana) e cenários multi-view quando possível.
+Modelos de reconhecimento de gestos baseados apenas em keypoints 2D sofrem com ambiguidade de profundidade, oclusões e perda de contexto dinâmico. Avanços recentes em: 
+1) lifting 2D→3D (reduzindo ambiguidades geométricas), 
+2) depth monocular (Depth Anything 2 / Depth Pro), 
+3) segmentação humana robusta, e 
+4) embeddings de vídeo pré‑treinados (capturam dinâmica e textura global), 
+permitem compor um espaço latente multimodal mais informativo. Com múltiplas câmeras (quando disponíveis), a fusão multi-view pode ainda reduzir incerteza estrutural. Este projeto propõe uma arquitetura unificada que gera e explora esse espaço latente para melhorar lifting e, por consequência, a classificação de gestos.
 
-Objetivos:
-- O1: Comparar reconhecimento de gestos usando sequências 2D vs. 3D (pós-lifting), mantendo o mesmo classificador temporal.
-- O2: Avaliar métricas de estimação 3D (MPJPE, PA-MPJPE, MPVE quando aplicável) e o impacto na acurácia/F1 da classificação de gestos.
-- O3: Estudar integração de sinais auxiliares (depth monocular, segmentação humana) e de múltiplas visões (quando disponível) no processo de lifting.
-- O4: Demonstrar um protótipo em tempo real com webcam Logitech C922 Pro Stream.
+Objetivos Específicos:
+- O1: Projetar e implementar um modelo multimodal de lifting 2D→3D que integre keypoints + depth monocular + máscara de segmentação + embeddings de vídeo.
+- O2: Investigar a contribuição incremental de cada modalidade para a qualidade 3D (MPJPE / PA-MPJPE) e para métricas de classificação de gestos (F1 macro, acurácia).
+- O3: Extender a arquitetura para multi‑view quando um dataset com múltiplas câmeras estiver disponível, analisando ganhos versus single-view enriquecido.
+- O4: Demonstrar um pipeline (quase) em tempo real (webcam) usando depth monocular leve como proxy.
+- O5: Criar protocolo de ablação e documentação reprodutível no repositório.
 
 ## 2. Escopo e Questões de Pesquisa
 
-- Q1: Em que condições o lifting 2D→3D reduz ambiguidades e melhora a classificação de gestos em relação ao uso apenas de 2D?
-- Q2: Qual o ganho de qualidade do lifting com uma única câmera (LiftPose3D-style) vs. múltiplas câmeras (MPL/Transformer multi-view)?
-- Q3: Sinais auxiliares (depth monocular, segmentação) ajudam o lifting em cenários desafiadores (oclusões, iluminação, fundo complexo)?
-- Q4: Como técnicas de domain adaptation linear (LiftPose3D) facilitam transferir modelos para novos ambientes com poucos dados?
+Perguntas:
+- Q1: Em que medida depth monocular e segmentação reduzem erros de lifting em cenários com oclusões parciais?
+- Q2: Video embeddings (3D CNN / ViT temporal) acrescentam sinal complementar além de keypoints + depth? Em quais gestos (rápidos vs. estáticos)?
+- Q3: Multi‑view oferece ganho substancial adicional sobre single‑view multimodal ou os proxies (depth + video) já capturam a maior parte do benefício?
+- Q4: Qual a sensibilidade do espaço latente a ruído em keypoints (ex.: jitter de MediaPipe) com e sem modalidades auxiliares?
+- Q5: Qual o custo computacional incremental por modalidade e o trade-off precisão vs. latência?
 
-## 3. Metodologia
+## 3. Arquitetura Proposta (Visão Geral)
 
-Pipeline geral:
-1) Extração de keypoints 2D (MediaPipe: pose/mãos) de vídeos ou webcam.
-2) Lifting 2D→3D:
-   - Monocular (single-view): baseline LiftPose3D-like (MLP/TCN) sobre joints 2D normalizados.
-   - Multi-view (opcional): fusão via Transformer (MPL-like) de esqueleto 2D por câmera para um único esqueleto 3D.
-3) Enriquecimento opcional do espaço latente com:
-   - Depth monocular por frame (ex.: MiDaS/Torch Hub) resumido por estatísticas regionais alinhadas ao esqueleto.
-   - Segmentação humana (máscara binária/contornos) para robustez a fundos complexos.
-4) Classificação temporal de gestos (Transformer encoder; baselines LSTM/MLP) sobre sequências 2D vs. 3D vs. 3D+auxiliares.
-5) Avaliação offline (manifests) e em tempo real (webcam C922).
+Pipeline:  
+Entrada (por frame / sequência): keypoints 2D (pose + mãos), frame RGB, mapa de profundidade estimado, máscara de pessoa, (opcional) múltiplas vistas.  
+1. Pré-processamento: normalização root-centered, escalonamento (opcional), redimensionamento depth/mask, sincronização temporal.  
+2. Encoders:
+   - Keypoint Encoder (MLP por junta) → tokens (T×J×D).
+   - Depth Encoder (CNN leve ou backbone pré‑treinado) → embedding por frame (T×Dd).
+   - Segmentation Encoder (CNN leve) → (T×Ds).
+   - Video Encoder (3D Conv ou ViT temporal) → (T×Dv) ou (T×Patches×Dv).
+   - Multi‑View: empilhamento por câmera e atenção cruzada (futuro).  
+3. Fusão Latente: broadcasting de embeddings frame-level somados aos tokens de juntas; Transformer temporal sobre sequência flatten (T×J) ou concat de vistas.  
+4. Regressão 3D: cabeça linear → (T×J×3).  
+5. (Opcional) Classificador de gesto: opera sobre sequência 3D (ou features latentes agregadas) para F1/Acurácia.
 
-### 3.1. Lifting Single-View (LiftPose3D)
-- Entrada: joints 2D normalizados por root e escala (e.g., centro do quadril + normalização por distância ombro).
-- Modelo: MLP/TCN com camadas residuais, perda MPJPE; variante PA-MPJPE para análise pós-alinhamento.
-- Domain Adaptation: mapeamento linear de poses 2D para reduzir shift entre dataset fonte (pré-treino) e domínio alvo (webcam).
+## 4. Espaço Latente Multimodal
 
-### 3.2. Lifting Multi-View (MPL-like)
-- Pré-requisito: múltiplas câmeras sincronizadas (quando disponível em dataset público). Não é exigência do demo com webcam.
-- Estratégia: estimar pose 2D por vista; empilhar e fundir via Transformer; supervisionar com 3D GT (real ou sintético).
-- Dados Sintéticos: renderização de malhas (AMASS) para gerar pares 2D ruidosos ↔ 3D, como em MPL.
+Representado por um conjunto de tokens de dimensão unificada D:  
+L = { k_{t,j}, d_t, s_t, v_t, (cameras) } → projeções para D e combinação (soma + atenção).  
+Critérios de design: (i) modularidade (ativar/desativar modalidades), (ii) baixa acoplagem de pré-processamento, (iii) escalável para multi-view (adicionar dimensão V).  
+Futuro: contraste supervisionado (pose 3D como alvo) ou auto-regressão para robustez temporal.
 
-### 3.3. Depth Monocular e Segmentação Humana
-- Depth: usar um estimador leve (MiDaS pequeno) em CPU, extrair features por regiões (por junta, média/local patch) para compor vetores auxiliares por frame.
-- Segmentação: máscara humana para filtrar ruídos do fundo e estabilizar detecção 2D.
+## 5. Metodologia Detalhada
 
-## 4. Métricas
+Etapas Incrementais:  
+Fase A (Baseline): keypoints → lifting MLP/TCN.  
+Fase B: adicionar depth monocular (Depth Anything 2 / Depth Pro) → análise de ganho relativo.  
+Fase C: adicionar segmentação (DeepLab / SAM recortado em máscara simples).  
+Fase D: incorporar video embeddings (3D CNN simples → substituível por modelo pré‑treinado).  
+Fase E: integração multi‑view (atenção entre vistas).  
+Fase F: ablações e otimizações (mixed precision, quantização leve se necessário).  
 
-Estimação 3D:
-- MPJPE: média da distância euclidiana por articulação.
-- PA-MPJPE: MPJPE após alinhamento de Procrustes (translação/rotação/escala).
-- MPVE: média por vértice em malha (se usarmos malhas; caso contrário, opcional).
+## 6. Plano Experimental
 
-Classificação de Gestos:
-- Acurácia, F1 macro, matriz de confusão, curva PR por classe.
-- Latência média (ms/frame) no demo em tempo real (C922, CPU).
+Ablações Principais (cada linha treinada sob mesmo protocolo):
+1. 2D somente (baseline classificador de gestos)  
+2. Lifting 3D (keypoints somente)  
+3. 3D + depth  
+4. 3D + depth + seg  
+5. 3D + depth + seg + video embeddings  
+6. Multi‑view + (todas modalidades) (quando disponível)  
+7. Robustez: injeção de ruído nos keypoints vs. latente multimodal.
 
-## 5. Datasets e Coleta
+Métricas:
+- Estimação 3D: MPJPE, PA-MPJPE (obrigatórios); (opcional) erro relativo por membro (upper/lower body).  
+- Classificação: F1 macro, Acurácia, Latência média (ms/frame).  
+- Eficiência: parâmetros, FLOPs aproximados, throughput FPS.
 
-- Públicos: 20BN-Jester (gestos manuais), outros se necessário (e.g., SHREC, NTU RGB+D apenas como referência de protocolo).
-- Coleta própria (opcional): conjunto pequeno de gestos alvo gravados com a C922 para avaliar domain adaptation.
-- Manifestos `.csv` no formato `path,label` apontando para `.npz` com sequências de keypoints (2D) e, quando disponível, variantes com 3D.
+Critérios de Sucesso (indicativos):
+- Redução ≥ X% em MPJPE ao passar de keypoints→multimodal (definir X após baseline).  
+- Ganho F1 macro ≥ Y% (multimodal vs. 2D puro).  
+- Latência pipeline ≤ 60 ms/frame (CPU otimizada ou CPU+GPU leve).
 
-## 6. Protocolo Experimental
+## 7. Datasets e Dados
 
-- P1: Treinar classificador com 2D (baseline atual do repositório); avaliar em `manifest_val.csv` e `manifest_test.csv`.
-- P2: Treinar lifter 2D→3D com MPJPE em dados sintéticos ou pares 2D↔3D de dataset público; converter sequências 2D para 3D; re-treinar classificador no 3D.
-- P3: Ablations: 2D vs. 3D vs. 3D+depth/seg; LSTM vs. Transformer; normalização por-junta vs. global.
-- P4: Domain adaptation linear (LiftPose3D) para pequena coleta própria (C922) e comparação.
-- P5: Demo tempo real com pipeline on-device; medir latência e robustez.
+- Públicos candidatos: 20BN-Jester (gestos manuais), SHREC (gestos de mão), (se disponível) dataset multi‑view com pose 3D anotada (Human3.6M apenas para estudo metodológico – atenção a licenças).  
+- Coleta própria: pequeno conjunto custom (webcam) para teste de generalização e ruído real.  
+- Armazenamento: usar `.npz` com chaves (keypoints, depth, mask, video_rgb, pose3d).  
+- Privacidade: descartar frames brutos quando possível, manter apenas derivados (keypoints/máscara/depth).  
 
-Critérios de sucesso:
-- +ΔF1 macro de X% ao migrar 2D→3D em pelo menos N classes.
-- MPJPE ≤ baseline simples do lifter monocular; redução adicional sob PA-MPJPE.
-- Latência do demo ≤ 60 ms/frame em CPU (objetivo; ajustar conforme hardware).
+## 8. Cronograma (Macro)
 
-## 7. Implementação no Repositório (Roadmap)
+- Semana 1–2: Baseline + integração depth monocular.  
+- Semana 3–4: Segmentação + refino do pipeline de treinamento.  
+- Semana 5–6: Video embeddings + otimizações (caching, AMP).  
+- Semana 7–8: Multi‑view (se houver dataset) + análise comparativa.  
+- Semana 9: Ablations completas + coleta própria + robustez a ruído.  
+- Semana 10: Escrita de resultados, gráficos, relatório final, demo.  
 
-- `scripts/`:
-  - `train_lifter.py`: treinar MLP/TCN 2D→3D com MPJPE.
-  - `lift_sequences.py`: converter `.npz` 2D em `.npz` 3D.
-  - `evaluate_3d_metrics.py`: calcular MPJPE/PA-MPJPE (e MPVE se aplicável).
-  - `depth_segment_features.py` (opcional): extrair features de depth/segmentação alinhadas aos joints.
-- `src/models/lifter.py`, `src/models/temporal_tcn.py`.
-- `configs/lifter.yaml`.
+## 9. Riscos e Mitigações
 
-Integração mínima ao README: link para esta proposta e checklist de experimentos.
+- Falta de dataset multi‑view acessível: focar em single‑view multimodal e simulação sintética (render pose3D→2D de múltiplas vistas).  
+- Custo computacional de video embeddings: iniciar com 3D CNN leve; só depois testar ViT/VideoMAE.  
+- Profundidade inconsistente (depth monocular instável): normalizar por mediana temporal ou z-score por sequência.  
+- Overfitting em dataset pequeno: regularização (dropout, augment jitter em keypoints, redução de dimensões).  
+- Latência acima da meta: profiling + redução de resolução depth/mask + pruning do Transformer.
 
-## 8. Riscos, Limitações e Ética
+## 10. Aspectos Éticos e Privacidade
 
-- Ambiguidade de profundidade em monocular; dependência de normalização e qualidade 2D.
-- Datasets com bias de domínio; validar com domain adaptation.
-- Privacidade: evitar armazenar vídeos crus; preferir sequências de keypoints/mascaras.
-- Uso de CPU: priorizar modelos leves para demo.
+- Minimizar armazenamento de vídeo bruto; preferir derivados anônimos (keypoints, máscaras, depth normalizado).  
+- Avisar participantes em coleta própria; evitar identificação facial (não armazenar rosto RGB).  
+- Garantir que modelos pré-treinados usados respeitam licenças (Depth Anything 2, SAM, etc.).
 
-## 9. Referências (anexas na pasta Doc/References/2D to 3D)
-- LiftPose3D: mapeamento 2D→3D com domain adaptation linear.
-- MPL (Multi-view Pose Lifter): fusão Transformer com dados sintéticos (AMASS).
-- Survey “An In-Depth Analysis of 2D and 3D Pose Estimation Techniques”.
+## 11. Implementação no Repositório
 
-## 10. Estado da Arte (Resumo)
+Estrutura já refletida no código atual: `multimodal_lifter.py`, encoders em `src/features/`, config `multimodal.yaml`, script `train_multimodal.py`, extração `extract_modalities.py`. Próximos incrementos: script de inferência multimodal, integração real de depth/seg, caching de embeddings, suporte multi‑view (dimensão adicional V em tokens) e testes automatizados.
 
-- Aplicações: HCI/XR, robótica colaborativa, direção assistida por gestos, segurança ocupacional e análise de movimento. O reconhecimento baseado em pose é leve, interpretável e menos sensível a variações de aparência.
-- Vídeo/Temporal: além de MLP, modelos como RNN/LSTM, TCN e Transformers temporais capturam dependências de longo alcance. TCNs e Transformers têm mostrado excelente desempenho para sequências de keypoints.
-- Cinético (MoCap) vs. Infravermelho/RGB: MoCap é padrão-ouro para GT 3D, porém caro e restrito; RGB/IR são acessíveis, e o lifting permite recuperar 3D apenas com câmeras comuns.
-- Modelos pré-treinados (Língua de Sinais/Gestos): uso de keypoints 2D/3D como entrada facilita transferência entre domínios; domain adaptation linear (LiftPose3D) reduz necessidade de grande re-treinamento.
-- Pose 2D: pipelines top-down (detecção→pose) vs. bottom-up (chaves→agrupamento), com trade-offs de precisão e velocidade; MediaPipe oferece solução prática para tempo real.
-- Pose 3D (Lifting): single-view é ambíguo mas efetivo com normalização e perdas adequadas; multi-view baseado em Transformer (MPL) resolve oclusões e melhora a precisão, inclusive com dados sintéticos (AMASS).
+## 12. Referências (seleção)
+
+- LiftPose3D (domain adaptation + lifting).  
+- MPL (Multi-view Pose Lifting via Transformer).  
+- Depth Anything 2 / Depth Pro (monocular depth).  
+- Segment Anything (SAM) / DeepLab v3.  
+- VideoMAE / Timesformer (embeddings de vídeo).  
+- Surveys em 2D/3D pose estimation e gesture recognition.
+
+## 13. Estado da Arte (Resumo Sintético)
+
+Avanços em lifting 2D→3D e visão multimodal apontam para arquiteturas que integram sinais complementares para reduzir ambiguidades espaciais. Depth monocular fornece proxy de escala/oclusão mesmo sem multi‑view; segmentação estabiliza keypoints filtrando ruído de fundo; embeddings de vídeo capturam dinâmica e contexto global além da geometricidade dos joints; multi‑view (quando disponível) consolida reconstrução precisa. O projeto posiciona-se como ponte entre abordagens minimalistas (apenas keypoints) e pipelines ricos em sinais, analisando custo/benefício de cada modalidade na prática.
+
