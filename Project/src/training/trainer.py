@@ -312,8 +312,9 @@ class MultiModalTrainer:
             
             # Log da época
             epoch_time = time.time() - start_time
+            val_loss_str = f"{val_loss:.4f}" if val_loss is not None else "N/A"
             print(f"Epoch {epoch}: Train Loss = {train_loss:.4f}, "
-                  f"Val Loss = {val_loss:.4f if val_loss else 'N/A'}, "
+                  f"Val Loss = {val_loss_str}, "
                   f"Time = {epoch_time:.2f}s")
             
             if self.use_wandb:

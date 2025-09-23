@@ -19,4 +19,15 @@ The current PyTorch install supports CUDA capabilities sm_70 sm_75 sm_80 sm_86 s
 If you want to use the NVIDIA GeForce GTX 1050 Ti GPU with PyTorch, please check the instructions at https://pytorch.org/get-started/locally/
 
   warnings.warn(
-Epoch 0:  34%|████████████████████▏                                      | 1064/3116 [14:22<28:08,  1.22it/s, Loss=1.1107, Avg Loss=1.0088]
+Epoch 0: 100%|███████████████████████████████████████████████████████████| 3116/3116 [42:20<00:00,  1.23it/s, Loss=1.0160, Avg Loss=1.0065]
+Validation: 100%|████████████████████████████████████████████████████████████████████████████████████████| 508/508 [03:07<00:00,  2.71it/s]
+Traceback (most recent call last):
+  File "/home/davs/Documents/TCC/Project/scripts/train.py", line 165, in <module>
+    main()
+  File "/home/davs/Documents/TCC/Project/scripts/train.py", line 150, in main
+    results = trainer.train(
+              ^^^^^^^^^^^^^^
+  File "/home/davs/Documents/TCC/Project/src/training/trainer.py", line 316, in train
+    f"Val Loss = {val_loss:.4f if val_loss else 'N/A'}, "
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: Invalid format specifier '.4f if val_loss else 'N/A'' for object of type 'float'
