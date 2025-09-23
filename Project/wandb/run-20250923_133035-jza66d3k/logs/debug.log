@@ -1,0 +1,21 @@
+2025-09-23 13:30:35,726 INFO    MainThread:122000 [wandb_setup.py:_flush():81] Current SDK version is 0.22.0
+2025-09-23 13:30:35,727 INFO    MainThread:122000 [wandb_setup.py:_flush():81] Configure stats pid to 122000
+2025-09-23 13:30:35,727 INFO    MainThread:122000 [wandb_setup.py:_flush():81] Loading settings from /home/davs/.config/wandb/settings
+2025-09-23 13:30:35,727 INFO    MainThread:122000 [wandb_setup.py:_flush():81] Loading settings from /home/davs/Documents/TCC/Project/wandb/settings
+2025-09-23 13:30:35,727 INFO    MainThread:122000 [wandb_setup.py:_flush():81] Loading settings from environment variables
+2025-09-23 13:30:35,727 INFO    MainThread:122000 [wandb_init.py:setup_run_log_directory():686] Logging user logs to /home/davs/Documents/TCC/Project/wandb/run-20250923_133035-jza66d3k/logs/debug.log
+2025-09-23 13:30:35,727 INFO    MainThread:122000 [wandb_init.py:setup_run_log_directory():687] Logging internal logs to /home/davs/Documents/TCC/Project/wandb/run-20250923_133035-jza66d3k/logs/debug-internal.log
+2025-09-23 13:30:35,727 INFO    MainThread:122000 [wandb_init.py:init():813] calling init triggers
+2025-09-23 13:30:35,727 INFO    MainThread:122000 [wandb_init.py:init():818] wandb.init called with sweep_config: {}
+config: {'model': {'depth': {'name': 'depth_anything_v2', 'model_name': 'depth-anything/Depth-Anything-V2-Small-hf', 'pretrained': True}, 'segmentation': {'name': 'deeplabv3_resnet50', 'num_classes': 21, 'pretrained': True}, 'pose': {'static_image_mode': False, 'model_complexity': 1, 'smooth_landmarks': True, 'min_detection_confidence': 0.5, 'min_tracking_confidence': 0.5}, 'fusion': {'fusion_dim': 256, 'output_dim': 128, 'use_temporal': False, 'num_attention_heads': 4}, 'video_embeddings': {'embedding_dim': 256, 'temporal_depth': 16, 'spatial_size': 112, 'architecture': '3dcnn'}}, 'data': {'loader': {'batch_size': 1, 'sequence_length': 8, 'frame_size': [224, 224], 'num_workers': 2, 'shuffle': True}, 'preprocessing': {'normalize': True, 'augmentations': []}}, 'training': {'optimizer': {'name': 'adamw', 'learning_rate': 0.0001, 'weight_decay': 1e-05, 'betas': [0.9, 0.999]}, 'scheduler': {'name': 'cosine', 'warmup_epochs': 5, 'max_epochs': 20}, 'loss': {'reconstruction_weight': 1.0, 'consistency_weight': 0.5, 'temporal_weight': 0.3}, 'device': 'cpu', 'mixed_precision': False, 'gradient_clip': 1.0, 'save_frequency': 5, 'validation_frequency': 2}, 'evaluation': {'metrics': ['mse', 'ssim', 'lpips', 'temporal_consistency'], 'test_batch_size': 1, 'save_predictions': True}, 'logging': {'use_wandb': True, 'project_name': 'tcc-multimodal-fusion', 'experiment_name': 'baseline', 'log_frequency': 100, 'save_model_frequency': 10}, 'paths': {'data_root': './data', 'output_dir': './outputs', 'checkpoint_dir': './checkpoints', 'log_dir': './logs'}, '_wandb': {}}
+2025-09-23 13:30:35,727 INFO    MainThread:122000 [wandb_init.py:init():861] starting backend
+2025-09-23 13:30:35,931 INFO    MainThread:122000 [wandb_init.py:init():864] sending inform_init request
+2025-09-23 13:30:35,934 INFO    MainThread:122000 [wandb_init.py:init():872] backend started and connected
+2025-09-23 13:30:35,935 INFO    MainThread:122000 [wandb_init.py:init():942] updated telemetry
+2025-09-23 13:30:35,943 INFO    MainThread:122000 [wandb_init.py:init():966] communicating run to backend with 90.0 second timeout
+2025-09-23 13:30:36,537 INFO    MainThread:122000 [wandb_init.py:init():1017] starting run threads in backend
+2025-09-23 13:30:36,646 INFO    MainThread:122000 [wandb_run.py:_console_start():2506] atexit reg
+2025-09-23 13:30:36,646 INFO    MainThread:122000 [wandb_run.py:_redirect():2354] redirect: wrap_raw
+2025-09-23 13:30:36,646 INFO    MainThread:122000 [wandb_run.py:_redirect():2423] Wrapping output streams.
+2025-09-23 13:30:36,646 INFO    MainThread:122000 [wandb_run.py:_redirect():2446] Redirects installed.
+2025-09-23 13:30:36,648 INFO    MainThread:122000 [wandb_init.py:init():1057] run started, returning control to user process

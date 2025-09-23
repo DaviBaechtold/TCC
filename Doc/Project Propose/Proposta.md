@@ -79,17 +79,6 @@ Critérios de sucesso:
 - MPJPE ≤ baseline simples do lifter monocular; redução adicional sob PA-MPJPE.
 - Latência do demo ≤ 60 ms/frame em CPU (objetivo; ajustar conforme hardware).
 
-## 7. Implementação no Repositório (Roadmap)
-
-- `scripts/`:
-  - `train_lifter.py`: treinar MLP/TCN 2D→3D com MPJPE.
-  - `lift_sequences.py`: converter `.npz` 2D em `.npz` 3D.
-  - `evaluate_3d_metrics.py`: calcular MPJPE/PA-MPJPE (e MPVE se aplicável).
-  - `depth_segment_features.py` (opcional): extrair features de depth/segmentação alinhadas aos joints.
-- `src/models/lifter.py`, `src/models/temporal_tcn.py`.
-- `configs/lifter.yaml`.
-
-Integração mínima ao README: link para esta proposta e checklist de experimentos.
 
 ## 8. Riscos, Limitações e Ética
 

@@ -1,0 +1,22 @@
+Weights & Biases configurado com sucesso
+Iniciando treinamento...
+Iniciando treinamento por 20 épocas
+Epoch 0:   0%|                                                                                                    | 0/3116 [00:00<?, ?it/s]/home/davs/Documents/TCC/Project/.venv/lib/python3.12/site-packages/torch/cuda/__init__.py:283: UserWarning:
+    Found GPU0 NVIDIA GeForce GTX 1050 Ti which is of cuda capability 6.1.
+    Minimum and Maximum cuda capability supported by this version of PyTorch is
+    (7.0) - (12.0)
+
+  warnings.warn(
+/home/davs/Documents/TCC/Project/.venv/lib/python3.12/site-packages/torch/cuda/__init__.py:304: UserWarning:
+    Please install PyTorch with a following CUDA
+    configurations:  12.6 following instructions at
+    https://pytorch.org/get-started/locally/
+
+  warnings.warn(matched_cuda_warn.format(matched_arches))
+/home/davs/Documents/TCC/Project/.venv/lib/python3.12/site-packages/torch/cuda/__init__.py:326: UserWarning:
+NVIDIA GeForce GTX 1050 Ti with CUDA capability sm_61 is not compatible with the current PyTorch installation.
+The current PyTorch install supports CUDA capabilities sm_70 sm_75 sm_80 sm_86 sm_90 sm_100 sm_120.
+If you want to use the NVIDIA GeForce GTX 1050 Ti GPU with PyTorch, please check the instructions at https://pytorch.org/get-started/locally/
+
+  warnings.warn(
+Epoch 0:  34%|████████████████████                                       | 1057/3116 [14:15<29:49,  1.15it/s, Loss=1.1255, Avg Loss=1.0089]
