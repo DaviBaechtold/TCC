@@ -1,221 +1,284 @@
-1. Visão Geral
+# Estudo de Caso: Espaço Latente Multimodal para Pose Estimation
 
-Este estudo de caso aprofunda a motivação, tecnologias e escolhas de arquitetura para gerar um espaço latente multimodal integrando: (i) keypoints 2D (MediaPipe), (ii) depth monocular (Depth Anything 2 ou Depth Pro), (iii) segmentação humana, (iv) embeddings de vídeo temporais, e (v) extensões multi‑view. O objetivo é melhorar robustez geométrica, temporal e semântica do lifting 2D→3D e, em consequência, elevar a qualidade na classificação de gestos.
+## 1. Visão Geral
 
-2. Motivação Multimodal
+Este estudo de caso aprofunda a motivação, tecnologias e escolhas de arquitetura para gerar um espaço latente multimodal integrando:
 
-Limitações de somente keypoints 2D: ambiguidade de profundidade, sensibilidade a oclusões, perda de contexto (velocidade, dinâmica global). A fusão multimodal adiciona:
+- **(i)** keypoints 2D (MediaPipe)
+- **(ii)** depth monocular (Depth Anything 2 ou Depth Pro)
+- **(iii)** segmentação humana
+- **(iv)** embeddings de vídeo temporais
+- **(v)** extensões multi‑view
 
-Depth: proxy de escala / ordem relativa (quem está à frente / atrás) mesmo sem múltiplas câmeras.
+**Objetivo**: melhorar robustez geométrica, temporal e semântica do lifting 2D→3D e, em consequência, elevar a qualidade na classificação de gestos.
 
-Segmentação: estabiliza detecção e reduz ruído de fundo (melhora consistência espacial dos keypoints).
+## 2. Motivação Multimodal
 
-Video Embeddings: capturam padrões temporais (aceleração, ritmo) e textura (mãos parcialmente detectadas).
+### Limitações de Keypoints 2D
+- Ambiguidade de profundidade
+- Sensibilidade a oclusões
+- Perda de contexto (velocidade, dinâmica global)
 
-Multi‑View: reduz ambiguidades estruturais, melhora triangulação implícita, reforça correspondência inter-vistas.
+### Benefícios da Fusão Multimodal
 
-3. Monocular Depth como Proxy
+**🔍 Depth**: proxy de escala / ordem relativa (quem está à frente / atrás) mesmo sem múltiplas câmeras.
 
-3.1. Modelos Recomendados
+**🎯 Segmentação**: estabiliza detecção e reduz ruído de fundo (melhora consistência espacial dos keypoints).
 
-Depth Anything 2: foco em generalização ampla, bom equilíbrio velocidade/qualidade.
+**🎬 Video Embeddings**: capturam padrões temporais (aceleração, ritmo) e textura (mãos parcialmente detectadas).
 
-Depth Pro: arquitetura otimizada para performance; checar licença e suporte.
+**👁️ Multi‑View**: reduz ambiguidades estruturais, melhora triangulação implícita, reforça correspondência inter-vistas.
 
-3.2. Integração no Pipeline
+## 3. Monocular Depth como Proxy
 
-Inferir mapa de depth por frame (RGB→Depth).
+### 3.1. Modelos Recomendados
 
-Normalizar (ex.: min-max local por sequência ou z-score).
+- **Depth Anything 2**: foco em generalização ampla, bom equilíbrio velocidade/qualidade
+- **Depth Pro**: arquitetura otimizada para performance; checar licença e suporte
 
-Extrair features: CNN leve → embedding por frame (Dd).
+### 3.2. Integração no Pipeline
 
-Broadcast + soma aos tokens de juntas ou concatenar em atenção multi-token.
+1. Inferir mapa de depth por frame (RGB→Depth)
+2. Normalizar (ex.: min-max local por sequência ou z-score)
+3. Extrair features: CNN leve → embedding por frame (Dd)
+4. Broadcast + soma aos tokens de juntas ou concatenar em atenção multi-token
 
-3.3. Estratégias de Feature Engineering
+### 3.3. Estratégias de Feature Engineering
 
-Estratégia Vantagem Custo Média global + desvio Barato Perde estrutura espacial Patches alinhados a bounding box corporal Preserva regiões Moderado CNN + AdaptiveAvgPool Captura padrões médias + robusto Moderado ViT pequeno sobre depth Maior capacidade Alto
+| Estratégia | Vantagem | Custo |
+|------------|----------|-------|
+| Média global + desvio | Barato | Perde estrutura espacial |
+| Patches alinhados a bounding box corporal | Preserva regiões | Moderado |
+| CNN + AdaptiveAvgPool | Captura padrões médias + robusto | Moderado |
+| ViT pequeno sobre depth | Maior capacidade | Alto |
 
-3.4. Normalizações Possíveis
+### 3.4. Normalizações Possíveis
 
-Depth relativo: d' = (d - median(seq)) / MAD.
+- **Depth relativo**: `d' = (d - median(seq)) / MAD`
+- **Clipping percentílico**: (ex.: [2%,98%]) para mitigar outliers
+- **Máscara humana**: aplicada antes da média para remover fundo distante
 
-Clipping percentílico (ex.: [2%,98%]) para mitigar outliers.
+## 4. Segmentação Humana
 
-Máscara humana aplicada antes da média para remover fundo distante.
+### Modelos Disponíveis
+- **DeepLab v3**, **Mask2Former**, **SAM (Segment Anything)** para anotação offline
+- Para tempo real: usar rede leve (MobileNet backbone)
 
-4. Segmentação Humana
+### Benefícios da Máscara Binária
+A máscara final reduz ruído de background, permitindo:
 
-Modelos: DeepLab v3, Mask2Former, SAM (Segment Anything) para anotação offline. Para tempo real, usar rede leve (MobileNet backbone). Máscara binária final reduz ruído de background, permitindo:
+- ✅ Filtragem de keypoints instáveis fora da silhueta
+- ✅ Ativação de pesos de confiança (keypoint score × presença na máscara)
+- ✅ Foco de depth nas regiões relevantes (mask × depth)
 
-Filtragem de keypoints instáveis fora da silhueta.
+## 5. Embeddings de Vídeo
 
-Ativação de pesos de confiança (keypoint score * presença na máscara).
+### 5.1. Opções de Modelos
 
-Foco de depth nas regiões relevantes (mask * depth).
+**Rápidos (Prototipagem):**
+- 3D CNN leve (ex.: R(2+1)D / C3D simplificado)
 
-5. Embeddings de Vídeo
+**Robustos (Produção):**
+- VideoMAE, TimeSformer, X3D, SlowFast (pré‑treinados em Kinetics)
+- Transferência de dinâmica complexa
 
-5.1. Opções
+### 5.2. Extração de Features
 
-3D CNN leve (e.g., R(2+1)D / C3D simplificado) – rápido enquanto prototipa.
+- Janela deslizante (`T_clip`) com sobreposição (`stride < T_clip`) 
+- Output: média ou atenção temporal
+- **Estratégia**: congelar pesos pré‑treinados inicialmente; só treinar projeções
 
-VideoMAE, TimeSformer, X3D, SlowFast (pré‑treinados em Kinetics) – transferência de dinâmica complexa.
+### 5.3. Redução de Dimensão
 
-5.2. Extração
+- **PCA offline** ou **linear bottleneck** (`Linear Dv→D`)
+- **Ativação**: GELU + LayerNorm antes de fusão
 
-Janela deslizante (T_clip) com sobreposição (stride < T_clip) → média ou atenção temporal.
+## 6. Multi‑View
 
-Congelar pesos pré‑treinados inicialmente; só treinar projeções.
+### Pré-requisitos
+Múltiplas câmeras acessíveis com:
+- **Sincronização**: timestamps ou alinhamento por frame index
 
-5.3. Redução de Dimensão
+### Estratégias de Fusão
+1. **Concatenação** de tokens por vista + atenção global
+2. **Atenção hierárquica** (intra‑view → inter‑view)
+3. **Pooling espacial** 2D→token por vista + atenção cruzada
 
-PCA offline ou linear bottleneck (Linear Dv→D).
+### Regularização
+- **Consistência reprojetada**: pred 3D → projeção 2D deve aproximar keypoints originais por vista
 
-Ativação GELU + LayerNorm antes de fusão.
+### Dados Sintéticos
+- **AMASS + SMPL**: gerar cenas multi‑view (vide pipeline MPL) para pré‑treino
 
-6. Multi‑View
+## 7. Espaço Latente Unificado
 
-Quando múltiplas câmeras são acessíveis:
+### Tokens Multimodais
 
-Sincronização: timestamps ou alinhamento por frame index.
+- **k_{t,j}**: junta j no tempo t
+- **d_t**: embedding depth  
+- **s_t**: embedding segmentação
+- **v_t**: embedding vídeo (ou múltiplos patches)
+- **c_{t,v}**: token agregado por câmera (opcional)
 
-Fusão: (i) concatenação de tokens por vista e atenção global; (ii) atenção hierárquica (intra‑view → inter‑view); (iii) pooling espacial 2D→token por vista + atenção cruzada.
+### Arquitetura de Fusão
 
-Regularização: consistência reprojetada (pred 3D → projeção 2D deve aproximar keypoints originais por vista).
+$$z = \text{Transformer}([k] + f(d_t,s_t,v_t,c_{t,v}))$$
 
-Dados sintéticos (AMASS + SMPL): gerar cenas multi‑view (vide pipeline MPL) para pré‑treino.
+Com broadcasting ou cross‑attention.
 
-7. Espaço Latente Unificado
+### Perdas Auxiliares
 
-Tokens:
+- 🔄 **Reconstrução de depth** reduzido (autoencoder parcial)
+- ⏱️ **Consistência temporal** (|k_{t+1}-k_t| regularizado vs. velocidade derivada de vídeo)  
+- 👁️ **Consistência multi‑view** (projeção inversa)
 
-k_{t,j}: junta j no tempo t.
+## 8. Métricas de Avaliação
 
-d_t: embedding depth.
+| Categoria | Métricas | Observações |
+|-----------|----------|-------------|
+| **Lifting 3D** | MPJPE, PA-MPJPE | Avaliar por região (tronco, membros) |
+| **Robustez** | MPJPE sob ruído sintético | Injetar jitter gaussiano em 2D |
+| **Classificação** | F1 macro, Acurácia, Confusion Matrix | Avaliar cada ablação |
+| **Eficiência** | Latência (ms/frame), FPS, FLOPs estimados | Separar CPU vs. GPU |
+| **Ablation Gain** | ΔMPJPE, ΔF1 vs. baseline | Documentar incremental |
 
-s_t: embedding segmentação.
+## 9. Datasets Relevantes
 
-v_t: embedding vídeo (ou múltiplos patches).
+| Nome | Tipo | Uso | Observações |
+|------|------|-----|-------------|
+| **20BN-Jester** | RGB gestos mão/cotovelo | Classificação + lifting sintético | Não possui GT 3D |
+| **SHREC (Hand Gestures)** | Mão, sensor & RGB | Gestos de mão | Útil para generalização |
+| **Human3.6M** | Multi-view + 3D GT | Lifting supervisionado / multi-view | Licença restrita |
+| **CMU Panoptic** | Multi-view + 3D | Pré-treino / consistência espacial | Grande e pesado |
+| **AMASS** | MoCap agregado | Síntese 2D multi-view | Para gerar pares 2D–3D |
+| **MHP** | Sintético | Render multi-view, depth, máscara | Facilita supervisão completa |
+| **NTU RGB+D** | Ações multi-modal (RGB+D+S) | Transfer learning de dinâmica | Prever adaptação de embeddings |
+| **EgoSign / WLASL** | Sequências de sinais | Testar transferência de embeddings gesto | Pode requerer mapeamento de joints |
 
-(opcional) c_{t,v}: token agregado por câmera.
+## 10. Bases para Depth e Segmentação
 
-Fusão: ( z = \text{Transformer}([k] + f(d_t,s_t,v_t,c_{t,v})) ) com broadcasting ou cross‑attention.
+### Depth Estimation
+- **[Depth Anything 2](https://github.com/LiheYoung/Depth-Anything)** – checar v2 quando público
+- **MiDaS (Intel ISL)** – alternativa consolidada
 
-Perdas auxiliares possíveis:
+### Segmentação
+- **[Segment Anything (SAM)](https://github.com/facebookresearch/segment-anything)** – geração de máscaras offline
+- **DeepLab v3 (torchvision)** – inferência rápida
 
-Reconstrução de depth reduzido (autoencoder parcial).
+## 11. Repositórios de Referência
 
-Consistência temporal (|k_{t+1}-k_t| regularizado vs. velocidade derivada de vídeo).
+### Pose Estimation & Multi-Modal
+- **[MMPose (OpenMMLab)](https://github.com/open-mmlab/mmpose)**
+- **LiftPose3D** (paper / reimplementações diversas)
+- **MPL Multi-view Lifter** (ver paper na pasta de referências)
 
-Consistência multi‑view (projeção inversa).
+### Segmentação
+- **[Detectron2](https://github.com/facebookresearch/detectron2)** (infraestrutura segmentação)
+- **[Segment Anything](https://github.com/facebookresearch/segment-anything)**
 
-8. Métricas
+### Video Understanding
+- **[VideoMAE](https://github.com/MCG-NJU/VideoMAE)**
+- **[TimeSformer](https://github.com/facebookresearch/TimeSformer)**
+- **[SlowFast](https://github.com/facebookresearch/slowfast)**
+- **[X3D (via PyTorchVideo)](https://github.com/facebookresearch/pytorchvideo)**
 
-Categoria Métricas Observações Lifting 3D MPJPE, PA-MPJPE Avaliar por região (tronco, membros) Robustez MPJPE sob ruído sintético Injetar jitter gaussiano em 2D Classificação F1 macro, Acurácia, Confusion Matrix Avaliar cada ablação Eficiência Latência (ms/frame), FPS, FLOPs estimados Separar CPU vs. GPU Ablation Gain ΔMPJPE, ΔF1 vs. baseline Documentar incremental
+## 12. Exemplos de Pipelines / Inspiração
 
-9. Datasets Relevantes
+| Objetivo | Recurso |
+|----------|---------|
+| **Pose 2D tempo real** | MediaPipe Holistic |
+| **Lifting baseline** | MLP/TCN (repo atual lifter.py) |
+| **Depth monocular** | Depth Anything / MiDaS wrapper |
+| **Segmentation** | Deeplab (torchvision.models.segmentation) |
+| **Video embeddings** | VideoMAE fine-tune congelando backbone |
+| **Multi-view sintético** | Render SMPL (AMASS) + projeção para K vistas |
 
-Nome Tipo Uso Observações 20BN-Jester RGB gestos mão/cotovelo Classificação + lifting sintético Não possui GT 3D SHREC (Hand Gestures) Mão, sensor & RGB Gestos de mão Útil para generalização Human3.6M Multi-view + 3D GT Lifting supervisionado / multi-view Licença restrita CMU Panoptic Multi-view + 3D Pré-treino / consistência espacial Grande e pesado AMASS MoCap agregado Síntese 2D multi-view Para gerar pares 2D–3D MHP (Mesh-based Human Pose Generator) Sintético Render multi-view, depth, máscara Facilita supervisão completa NTU RGB+D Ações multi-modal (RGB+D+S) Transfer learning de dinâmica Prever adaptação de embeddings EgoSign / WLASL (língua de sinais) Sequências de sinais Testar transferência de embeddings gesto Pode requerer mapeamento de joints
+## 13. Estratégia de Treinamento
 
-10. Bases para Depth e Segmentação
+### Pipeline Incremental
 
-Depth Anything 2 (GitHub: https://github.com/LiheYoung/Depth-Anything) – checar v2 quando público.
+1. **🔧 Pré‑treino**: sintético AMASS→2D+ruído para inicializar regressor 3D
+2. **🎯 Ajuste**: dataset real (Human3.6M ou subset similar) se licença permitir  
+3. **📊 Adição incremental**: depth e segmentação (congelar pesos iniciais)
+4. **🎬 Video embeddings**: freezing + fine‑tune leve da projeção
+5. **👁️ Multi‑view**: atenção cruzada + regularização de reprojeção
+6. **🎪 Fine‑tune final**: classificação de gestos (cabeça separada ou pooling sobre 3D)
 
-MiDaS (Intel ISL) – alternativa consolidada.
+## 14. Considerações sobre Kinetic vs. Infravermelho
 
-Segment Anything (SAM) – geração de máscaras offline (https://github.com/facebookresearch/segment-anything).
+### 📷 Kinetic (RGB + inferred 3D)
+- ✅ **Vantagens**: mais versátil e barato (câmeras comuns)
+- ❌ **Limitações**: depende de iluminação
 
-DeepLab v3 (torchvision) – inferência rápida.
+### 🌡️ Infravermelho / Profundidade ativa (Kinect-like)  
+- ✅ **Vantagens**: fornece profundidade direta
+- ❌ **Limitações**: alcance limitado, ruído em superfícies brilhantes
 
-11. Repositórios de Referência (GitHub)
+### 💡 Decisão do Projeto
+Assumimos **cenário de custo reduzido** (RGB + depth monocular). Multi‑view mitiga parte da perda de fidelidade em comparação a sensores dedicados.
 
-MMPose (OpenMMLab): https://github.com/open-mmlab/mmpose
+## 15. Sinais para Língua de Sinais e Gestos Finos
 
-Detectron2 (infra segmentação): https://github.com/facebookresearch/detectron2
+### Datasets Especializados
+**Bases** (WLASL, EgoSign) usam keypoints detalhados de mãos. 
 
-Segment Anything: https://github.com/facebookresearch/segment-anything
+### Estratégias para Detecção Parcial
+**Integração de embeddings de vídeo** ajuda quando detecção de dedos é parcial.
 
-VideoMAE: https://github.com/MCG-NJU/VideoMAE
+### Transfer Learning
+Congelar backbone de vídeo pré‑treinado em Kinetics e adaptar projeção para gestos específicos.
 
-TimeSformer: https://github.com/facebookresearch/TimeSformer
+## 16. Roadmap Técnico Resumido
 
-SlowFast: https://github.com/facebookresearch/slowfast
+| Fase | Entrega | Modalidades |
+|------|---------|-------------|
+| **A** | Baseline 3D lifter | keypoints |
+| **B** | + Depth | keypoints + depth |
+| **C** | + Segmentação | + mask |
+| **D** | + Vídeo Embeddings | + vídeo |
+| **E** | + Multi‑View | + vistas |
+| **F** | Ablations & Otimizações | todos |
 
-X3D (via PyTorchVideo): https://github.com/facebookresearch/pytorchvideo
+## 17. YouTube – Material de Apoio
 
-LiftPose3D: (paper / reimplementações diversas)
+| Tema | Link |
+|------|------|
+| **Pose Estimation Overview** | [🔗](https://www.youtube.com/watch?v=pW6nZXeWlGM) |
+| **MediaPipe Holistic** | [🔗](https://www.youtube.com/watch?v=qV6e4l5JHJ8) |
+| **Monocular Depth (MiDaS)** | [🔗](https://www.youtube.com/watch?v=2lprC0yYeFw) |
+| **Segment Anything Explicação** | [🔗](https://www.youtube.com/watch?v=Jp0o8b0wJ6k) |
+| **VideoMAE Intro** | [🔗](https://www.youtube.com/watch?v=pFfCdf0JSpA) |
+| **SlowFast Networks** | [🔗](https://www.youtube.com/watch?v=YRhxdVk_sIs) |
+| **Multi-view Pose (ex. Panoptic)** | [🔗](https://www.youtube.com/watch?v=0hU6qQw1CwU) |
+| **Transformer for Vision** | [🔗](https://www.youtube.com/watch?v=TrdevFK_am4) |
 
-MPL Multi-view Lifter: (ver paper na pasta de referências)
+## 18. Referências Bibliográficas
 
-12. Exemplos de Pipelines / Inspiração
+> 📝 *Organizar futuramente em BibTeX; aqui em formato livre.*
 
-Objetivo Recurso Pose 2D tempo real MediaPipe Holistic Lifting baseline MLP/TCN (repo atual lifter.py) Depth monocular Depth Anything / MiDaS wrapper Segmentation Deeplab (torchvision.models.segmentation) Video embeddings VideoMAE fine-tune congelando backbone Multi-view sintético Render SMPL (AMASS) + projeção para K vistas
+### Pose Estimation
+- **Pavllo et al.** (LiftPose3D) – Lifting 2D human pose to 3D with temporal modeling and domain adaptation
+- **MPL**: Multi-view Pose Lifting using Transformers *(paper na pasta de referências)*
+- **Survey**: An In-Depth Analysis of 2D and 3D Pose Estimation Techniques *(PDF na pasta)*
 
-13. Estratégia de Treinamento
+### Depth & Segmentation  
+- **Depth Anything / Depth Pro** – repositórios e whitepapers
+- **Segment Anything Model (SAM)** – Meta AI
+- **DeepLab v3** – Chen et al.
 
-Pré‑treino (sintético AMASS→2D+ruído) para inicializar regressor 3D.
+### Video Understanding
+- **VideoMAE**: Masked Autoencoders are Data-Efficient Learners for Video Understanding
+- **TimeSformer**: Is Space-Time Attention All You Need for Video Understanding?
+- **SlowFast Networks** for Video Recognition
 
-Ajuste em dataset real (Human3.6M ou subset similar) se licença permitir.
+### Datasets
+- **AMASS**: Archive of Motion Capture as Surface Shapes
+- **Human3.6M** Dataset paper
+- **CMU Panoptic Studio**
+- **WLASL / EgoSign** (língua de sinais) – gesture/sign benchmarks
+- **Kinetics dataset** (pré-treinamento de vídeo)
 
-Adição incremental de depth e segmentação (congelar pesos iniciais).
+---
 
-Introdução de embeddings de vídeo (freezing + fine‑tune leve da projeção).
-
-Multi‑view: atenção cruzada + regularização de reprojeção.
-
-Fine‑tune final para classificação de gestos (cabeça separada ou pooling sobre 3D).
-
-14. Considerações sobre Kinetic vs. Infravermelho
-
-Kinetic (RGB + inferred 3D): depende de iluminação; mais versátil e barato (câmeras comuns).
-
-Infravermelho / Profundidade ativa (Kinect-like): fornece profundidade direta mas sofre com alcance limitado, ruído em superfícies brilhantes.
-
-O projeto assume cenário de custo reduzido (RGB + depth monocular). Multi‑view mitiga parte da perda de fidelidade em comparação a sensores dedicados.
-
-15. Sinais para Língua de Sinais e Gestos Finos
-
-Bases (WLASL, EgoSign) usam keypoints detalhados de mãos. Integração de embeddings de vídeo ajuda quando detecção de dedos é parcial.
-
-Transfer learning: congelar backbone de vídeo pré‑treinado em Kinetics e adaptar projeção para gestos específicos.
-
-16. Roadmap Técnico Resumido
-
-Fase Entrega Modalidades A Baseline 3D lifter keypoints B + Depth keypoints + depth C + Segmentação + mask D + Vídeo Embeddings + vídeo E + Multi‑View + vistas F Ablations & Otimizações todos
-
-17. YouTube – Material de Apoio
-
-Tema Link Pose Estimation Overview https://www.youtube.com/watch?v=pW6nZXeWlGM MediaPipe Holistic https://www.youtube.com/watch?v=qV6e4l5JHJ8 Monocular Depth (MiDaS) https://www.youtube.com/watch?v=2lprC0yYeFw Segment Anything Explicação https://www.youtube.com/watch?v=Jp0o8b0wJ6k VideoMAE Intro https://www.youtube.com/watch?v=pFfCdf0JSpA SlowFast Networks https://www.youtube.com/watch?v=YRhxdVk_sIs Multi-view Pose (ex. Panoptic) https://www.youtube.com/watch?v=0hU6qQw1CwU Transformer for Vision https://www.youtube.com/watch?v=TrdevFK_am4
-
-18. Referências Bibliográficas (Seleção)
-
-(Organizar futuramente em BibTeX; aqui em formato livre.)
-
-Pavllo et al. (LiftPose3D) – Lifting 2D human pose to 3D with temporal modeling and domain adaptation.
-
-MPL: Multi-view Pose Lifting using Transformers (paper na pasta de referências).
-
-Survey: An In-Depth Analysis of 2D and 3D Pose Estimation Techniques (PDF na pasta).
-
-Depth Anything / Depth Pro – repositórios e whitepapers.
-
-VideoMAE: Masked Autoencoders are Data-Efficient Learners for Video Understanding.
-
-TimeSformer: Is Space-Time Attention All You Need for Video Understanding?
-
-SlowFast Networks for Video Recognition.
-
-Segment Anything Model (SAM) – meta AI.
-
-DeepLab v3 – Chen et al.
-
-AMASS: Archive of Motion Capture as Surface Shapes.
-
-Human3.6M Dataset paper.
-
-CMU Panoptic Studio.
-
-WLASL / EgoSign (língua de sinais) – gesture/sign benchmarks.
-
-Kinetics dataset (pré-treinamento de vídeo).
+> *Estudo de caso desenvolvido para TCC - Espaço Latente Multimodal*  
+> *Última atualização: Setembro 2025*
