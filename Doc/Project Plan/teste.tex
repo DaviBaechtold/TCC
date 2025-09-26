@@ -1,0 +1,255 @@
+% filepath: /home/davs/Documents/TCC/Doc/Project Plan/teste.tex
+\documentclass[12pt, a4paper]{article}
+
+% --- PACOTES ---
+\usepackage[utf8]{inputenc}
+\usepackage[brazil]{babel}
+\usepackage{abntex2cite}
+\usepackage{graphicx}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{indentfirst}
+\usepackage{setspace}
+\usepackage{times}
+\usepackage{tikz}
+\usepackage{array}
+
+% --- MARGENS / FORMATAÇÃO ---
+\geometry{
+ a4paper,
+ left=3cm,
+ right=2cm,
+ top=3cm,
+ bottom=2cm
+}
+\onehalfspacing
+\setlength{\parindent}{1.25cm}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    urlcolor=blue,
+    citecolor=black
+}
+
+\begin{document}
+
+% --- CAPA ---
+\begin{titlepage}
+    \centering
+    {\large PLANO DE PROJETO \par}
+    \vspace{0.8cm}
+    {\bfseries ARQUITETURA EFICIENTE PARA ESTIMAÇÃO DE POSE COMPLETA (FULLBODY) EM AMBIENTE VEICULAR ATRAVÉS DE \textit{LIFTING} 2D-PARA-3D \par}
+    \vspace{2.2cm}
+
+    \begin{flushleft}
+    \textbf{Integrante:} Davi Baechtold Campos \\
+    \textbf{Orientador:} Prof. Dr. Alceu de Souza Brito Junior
+    \end{flushleft}
+
+    \vfill
+    \begin{flushleft}
+    \textbf{Assinaturas:}\\[1.4cm]
+    \makebox[9cm]{\hrulefill}\\
+    \small Orientador: Prof. Dr. Alceu de Souza Brito Junior \\[1.6cm]
+    \makebox[9cm]{\hrulefill}\\
+    \small Discente: Davi Baechtold Campos
+    \end{flushleft}
+
+    \vfill
+    {\small Curitiba, \today \par}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% --- RESUMO ---
+\section{RESUMO}
+Este projeto propõe o desenvolvimento de uma arquitetura eficiente para estimação de pose completa (\textit{fullbody}) em ambiente veicular utilizando técnicas de \textit{2D-to-3D lifting} baseadas em keypoints. O \textit{lifting} refere-se ao processo de inferir coordenadas tridimensionais (3D) a partir de pontos bidimensionais (2D) detectados em imagens, resolvendo a ambiguidade de profundidade através de modelos de aprendizado profundo. O foco principal será no desenvolvimento de métodos robustos para detecção e lifting de keypoints corporais, com expansão posterior para face e mãos. A pesquisa aborda a questão fundamental de como construir uma arquitetura computacionalmente eficiente que integre corpo, face e mãos em um sistema unificado de monitoramento veicular. O projeto utilizará pré-treinamento com datasets públicos, incluindo o dataset do RTMPose para 2D pose keypoints e validação no Drive\&Act dataset para cenários automotivos específicos.
+
+\textbf{Palavras-chave:} fullbody pose estimation; keypoints; arquitetura eficiente; ambiente veicular.
+
+% --- INTRODUÇÃO ---
+\section{INTRODUÇÃO}
+A estimação de pose completa (\textit{fullbody}) em tempo real representa um desafio crítico para sistemas de monitoramento veicular inteligente. Diferente de aplicações gerais, o contexto automotivo demanda eficiência computacional e robustez a oclusões específicas do ambiente de cabine.
+
+\subsection{Motivação}
+A crescente necessidade de sistemas de segurança e monitoramento em veículos torna a estimação de pose uma área de pesquisa relevante. A capacidade de entender a postura dos ocupantes pode melhorar a segurança e a experiência do usuário.
+
+\subsection{Objetivo Geral}
+Desenvolver e avaliar uma arquitetura eficiente para estimação de pose completa utilizando keypoints, com foco inicial em corpo e expansão progressiva para face e mãos.
+
+\subsection{Objetivos Específicos}
+\begin{itemize}
+    \item Implementar pipeline robusto para detecção de keypoints corporais 2D.
+    \item Desenvolver módulo de lifting 2D-para-3D otimizado para corpo.
+    \item Expandir arquitetura para integração de keypoints de face e mãos.
+    \item Avaliar eficiência computacional e precisão da arquitetura unificada.
+    \item Validar sistema em cenários automotivos reais (Drive\&Act dataset).
+\end{itemize}
+
+\subsection{Pergunta de Pesquisa}
+\textbf{Research Question:} Como construir uma arquitetura computacionalmente eficiente para estimação de pose completa (\textit{fullbody}) que integre corpo, face e mãos de forma unificada em ambiente veicular restrito?
+
+\subsection{Estrutura do Documento}
+O documento está estruturado da seguinte forma: a Seção 2 apresenta o detalhamento do problema; a Seção 3 discute o estado da arte; a Seção 4 descreve o trabalho a ser desenvolvido; a Seção 5 aborda as tecnologias que serão utilizadas; a Seção 6 apresenta os procedimentos de teste e validação; a Seção 7 analisa os riscos; a Seção 8 apresenta o cronograma do projeto; e, por fim, a Seção 9 traz as conclusões e referências bibliográficas.
+
+% --- DETALHAMENTO DO PROBLEMA ---
+\section{DETALHAMENTO DO PROBLEMA}
+A estimação de pose completa em ambiente veicular apresenta desafios únicos:
+
+\begin{itemize}
+    \item \textbf{Complexidade multimodal:} Integração eficiente de corpo (17 keypoints), face (68+ keypoints) e mãos (21 keypoints cada).
+    \item \textbf{Oclusões específicas:} Volante oculta mãos, painel limita visão corporal, postura de condução restringe movimentos.
+    \item \textbf{Eficiência computacional:} Necessidade de processamento em tempo real com recursos limitados.
+    \item \textbf{Variabilidade temporal:} Gestos e mudanças posturais rápidas durante condução.
+\end{itemize}
+
+% --- ESTADO DA ARTE ---
+\section{ESTADO DA ARTE}
+Esta seção apresenta um levantamento das soluções existentes para o problema de estimação de pose, incluindo uma análise crítica das abordagens mais relevantes.
+
+\subsection{Soluções Existentes}
+Diversas abordagens têm sido propostas para a estimação de pose, incluindo métodos baseados em redes neurais convolucionais (CNNs) e técnicas de aprendizado profundo. A maioria dessas soluções se concentra na detecção de keypoints em imagens 2D, mas enfrenta desafios em ambientes dinâmicos e com oclusões.
+
+\subsection{Análise Crítica}
+As melhores soluções atuais, como RTMPose e LiftPose3D, demonstram eficácia em ambientes controlados, mas apresentam limitações em cenários do mundo real, como veículos, onde a oclusão e a variabilidade de iluminação são comuns. A proposta deste projeto visa superar essas limitações através de uma arquitetura unificada que integra múltiplas modalidades.
+
+% --- TRABALHO A SER DESENVOLVIDO ---
+\section{TRABALHO A SER DESENVOLVIDO}
+Nesta seção, uma descrição funcional da solução proposta será feita.
+
+\subsection{Diagrama em blocos do sistema}
+A Figura \ref{fig:blocos} apresenta a visão geral do sistema e a interação entre os módulos propostos.
+
+\begin{figure}[h!]
+    \centering
+    \begin{tikzpicture}[
+        node distance=2cm,
+        block/.style={rectangle, draw, fill=blue!20, text width=2.5cm, text centered, minimum height=1cm},
+        camera/.style={rectangle, draw, fill=green!20, text width=1.8cm, text centered, minimum height=0.8cm},
+        arrow/.style={thick,->,>=stealth}
+    ]
+        % Câmeras
+        \node[camera] (cam1) {Câmera 1};
+        \node[camera, below of=cam1, node distance=1cm] (cam2) {Câmera 2};
+        
+        % Módulos
+        \node[block, right of=cam1, node distance=3.5cm, yshift=-0.5cm] (mod1) {Módulo 1:\\ Aquisição};
+        \node[block, right of=mod1, node distance=3.5cm] (mod2) {Módulo 2:\\ Detecção 2D};
+        \node[block, right of=mod2, node distance=3.5cm] (mod3) {Módulo 3:\\ Fusão e\\ Lifting 3D};
+        \node[block, right of=mod3, node distance=3.5cm] (mod4) {Módulo 4:\\ Visualização};
+        
+        % Setas
+        \draw[arrow] (cam1) -- (mod1);
+        \draw[arrow] (cam2) -- (mod1);
+        \draw[arrow] (mod1) -- (mod2);
+        \draw[arrow] (mod2) -- (mod3);
+        \draw[arrow] (mod3) -- (mod4);
+    \end{tikzpicture}
+    \caption{Diagrama em blocos do sistema proposto.}
+    \label{fig:blocos}
+\end{figure}
+
+\subsection{Arquitetura Proposta}
+\begin{itemize}
+    \item \textbf{Backbone compartilhado:} Extrator de features eficiente para múltiplas modalidades.
+    \item \textbf{Heads especializados:} Detectores específicos para corpo, face e mãos.
+    \item \textbf{Fusão temporal:} Módulo de atenção para consistência inter-frame.
+    \item \textbf{Lifting unificado:} Arquitetura baseada em Transformers para lifting conjunto.
+\end{itemize}
+
+\subsection{Módulos Funcionais}
+Cada módulo funcional será descrito individualmente, incluindo a implementação e as tecnologias utilizadas.
+
+\subsubsection{Módulo 1: Aquisição}
+Responsável pela captura de imagens das câmeras. Será implementado em Python utilizando bibliotecas como OpenCV.
+
+\subsubsection{Módulo 2: Detecção 2D}
+Utilizará modelos pré-treinados para detectar keypoints corporais em imagens 2D. A implementação será feita em PyTorch, utilizando o dataset do RTMPose para pré-treinamento.
+
+\subsubsection{Módulo 3: Fusão e Lifting 3D}
+Integrará os dados 2D e realizará o lifting para 3D. Este módulo será desenvolvido utilizando técnicas de aprendizado profundo.
+
+\subsubsection{Módulo 4: Visualização}
+Responsável pela apresentação dos resultados. Será implementado em uma interface gráfica utilizando Tkinter.
+
+% --- TECNOLOGIAS QUE SERÃO UTILIZADAS ---
+\section{TECNOLOGIAS QUE SERÃO UTILIZADAS}
+Descrição sucinta das tecnologias que podem ser utilizadas para desenvolver cada módulo do sistema.
+
+\subsection{Tecnologias de Implementação}
+\begin{itemize}
+    \item \textbf{Python:} Linguagem principal para desenvolvimento.
+    \item \textbf{OpenCV:} Para captura e processamento de imagens.
+    \item \textbf{PyTorch:} Para implementação de modelos de aprendizado profundo.
+    \item \textbf{Tkinter:} Para desenvolvimento da interface gráfica.
+\end{itemize}
+
+\subsection{Justificativa das Tecnologias}
+As tecnologias escolhidas são amplamente utilizadas na comunidade de visão computacional e aprendizado de máquina, oferecendo suporte robusto e uma vasta gama de bibliotecas e ferramentas.
+
+% --- PROCEDIMENTOS DE TESTE E VALIDAÇÃO DO PROJETO ---
+\section{PROCEDIMENTOS DE TESTE E VALIDAÇÃO DO PROJETO}
+Nesta seção, devem ser indicados como os diversos módulos do projeto serão testados e validados individualmente e em conjunto.
+
+\subsection{Critérios de Aceite}
+Os critérios de aceite da solução em termos de desempenho e cumprimento de seus aspectos funcionais serão estabelecidos com base em métricas como precisão, eficiência e robustez.
+
+% --- ANÁLISE DOS RISCOS ---
+\section{ANÁLISE DOS RISCOS}
+Esta seção deve conter uma análise dos problemas potenciais do projeto e do impacto desses problemas no sucesso ou fracasso do projeto.
+
+\subsection{Riscos Identificados}
+\begin{itemize}
+    \item \textbf{Complexidade arquitetural alta:} Desenvolvimento incremental para mitigar riscos.
+    \item \textbf{Limitações computacionais:} Estratégias de otimização e processamento hierárquico.
+    \item \textbf{Qualidade do Drive\&Act:} Complementação com dados sintéticos calibrados.
+\end{itemize}
+
+% --- CRONOGRAMA DO PROJETO ---
+\section{CRONOGRAMA DO PROJETO}
+Descrição de todas as fases do projeto, incluindo a sequência de desenvolvimento de cada módulo, o tempo de desenvolvimento e as fases de teste e documentação.
+
+\begin{table}[h!]
+\centering
+\caption{Cronograma detalhado do projeto.}
+\begin{tabular}{|c|p{6cm}|c|p{2.5cm}|}
+\hline
+\textbf{Fase} & \textbf{Atividades} & \textbf{Mês} & \textbf{Entrega} \\ \hline
+1 & Setup + dataset prep + body 2D detector & 1-2 & Pipeline corpo 2D \\ \hline
+2 & Body lifting 3D + baseline em Drive\&Act & 3-4 & Resultados corpo 3D \\ \hline
+3 & Paper corpo: escrita + submissão & 5 & \textbf{Publicação submetida} \\ \hline
+4 & Integração face: detector + lifting & 6-7 & Módulo face funcional \\ \hline
+5 & Integração mãos + arquitetura unificada & 8-9 & Sistema fullbody \\ \hline
+6 & Otimização + validação + TCC final & 10-12 & \textbf{TCC completo} \\ \hline
+\end{tabular}
+\end{table}
+
+% --- CONCLUSÃO ---
+\section{CONCLUSÃO}
+A conclusão deve destacar os principais aspectos do projeto, resumindo os objetivos do projeto, a solução proposta, as tecnologias que serão utilizadas e a estratégia de desenvolvimento.
+
+% --- REFERÊNCIAS BIBLIOGRÁFICAS ---
+\section{REFERÊNCIAS BIBLIOGRÁFICAS}
+\begin{thebibliography}{99}
+    \bibitem{martinez2017}
+    MARTINEZ, J. et al. \textbf{A simple yet effective baseline for 3D human pose estimation}. In: ICCV. 2017.
+
+    \bibitem{iskakov2019}
+    ISKAKOV, K. et al. \textbf{Learnable triangulation of human pose}. In: ICCV. 2019.
+
+    \bibitem{driveact2019}
+    MARTIN, M. et al. \textbf{Drive\&Act: A Multi-Modal Dataset for Fine-Grained Driver Behavior Recognition}. In: ICCV. 2019.
+
+    \bibitem{rtmpose2023}
+    JIANG, T. et al. \textbf{RTMPose: Real-Time Multi-Person Pose Estimation}. arXiv:2303.07399, 2023.
+
+    \bibitem{vaswani2017}
+    VASWANI, A. et al. \textbf{Attention is all you need}. In: NeurIPS. 2017.
+
+    \bibitem{zhang2020}
+    ZHANG, C. et al. \textbf{LiftPose3D: transforming 2D poses to 3D in real-time}. arXiv:2008.02945, 2020.
+\end{thebibliography}
+
+\end{document}
