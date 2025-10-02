@@ -1,122 +1,190 @@
-# TCC - Geração de Espaço Latente Multimodal
+# Real-Time 2D Full-Body Pose Estimation for Grayscale (Infrared) Images
 
-Projeto de TCC focado na geração de espaço latente combinando estimação de profundidade monocular, segmentação humana, processamento multi-view e análise temporal com video embeddings.
+## Objetivo
+Construir e treinar uma rede para detecção de pose 2D full body em imagens grayscale (infrared) em tempo real, focando em ambientes veiculares.
 
-## Visão Geral
+## Arquitetura
+- **Bottom-up approach**: Detecta todos os keypoints primeiro, depois agrupa em pessoas
+- **Top-down approach**: Detecta pessoas primeiro (bounding boxes) com RTMDet, depois estima pose com RTMPose
 
-Este projeto implementa uma arquitetura modular inspirada no MMPose/RTMPose que integra:
+Este projeto utiliza a abordagem **top-down** (RTMDet + RTMPose) para melhor precisão.
 
-- **Estimação de Profundidade Monocular**: Depth Anything 2 ou Depth Pro
-- **Segmentação Humana**: Segmentação semântica para isolamento de pessoas
-- **Processamento Multi-view**: Análise de múltiplas perspectivas
-- **Video Embeddings**: Extração de features temporais para análise de vídeo
-- **Keypoints MediaPipe**: Integração de pontos-chave para pose estimation
+## Pipeline
+1. **Coleta de dados**: COCO-WholeBody dataset (base principal)
+2. **Conversão para Grayscale**: Simular imagens infrared
+3. **Data Augmentation**: 
+   - Vignetting (simulação de características de câmeras IR)
+   - Ruído gaussiano
+   - Blur
+   - Ajustes de contraste
+   - Rotação e flip
+4. **Treinamento**: Fine-tuning do RTMPose para entradas grayscale
+5. **Avaliação**: Métricas PCK, AP, AR
 
 ## Estrutura do Projeto
-
 ```
 Project/
+├── data/
+│   ├── raw/              # Dados brutos (COCO-WholeBody)
+│   ├── processed/        # Dados processados (grayscale + augmentation)
+│   └── annotations/      # Anotações em formato COCO
 ├── src/
-│   ├── models/
-│   │   ├── depth/           # Modelos de estimação de profundidade
-│   │   ├── segmentation/    # Modelos de segmentação humana
-│   │   ├── pose/           # Modelos de pose estimation
-│   │   ├── fusion/         # Redes de fusão multimodal
-│   │   └── embeddings/     # Video embeddings e feature extraction
 │   ├── data/
-│   │   ├── loaders/        # Data loaders e preprocessamento
-│   │   ├── transforms/     # Transformações de dados
-│   │   └── datasets/       # Classes de dataset customizadas
-│   ├── utils/
-│   │   ├── visualization/  # Utilitários de visualização
-│   │   ├── metrics/        # Métricas de avaliação
-│   │   └── io/            # Utilitários de I/O
-│   └── training/
-│       ├── trainers/       # Classes de treinamento
-│       ├── schedulers/     # Learning rate schedulers
-│       └── losses/         # Funções de loss customizadas
-├── configs/                # Arquivos de configuração
-├── scripts/               # Scripts de treinamento e avaliação
-├── notebooks/            # Jupyter notebooks para experimentação
-├── tests/               # Testes unitários
-└── docs/               # Documentação do projeto
+│   │   ├── download_coco.py       # Download do dataset
+│   │   ├── convert_to_gray.py     # Conversão RGB → Grayscale
+│   │   └── augmentation.py        # Data augmentation
+│   ├── models/
+│   │   ├── rtmdet.py              # Detector de pessoas
+│   │   ├── rtmpose.py             # Estimador de pose
+│   │   └── pipeline.py            # Pipeline completo
+│   ├── training/
+│   │   ├── train_detector.py      # Treino do detector
+│   │   ├── train_pose.py          # Treino do pose estimator
+│   │   └── config.py              # Configurações
+│   ├── evaluation/
+│   │   ├── metrics.py             # Métricas (PCK, AP, AR)
+│   │   └── visualize.py           # Visualização de resultados
+│   └── utils/
+│       ├── visualization.py       # Funções de visualização
+│       └── transforms.py          # Transformações de imagem
+├── notebooks/
+│   ├── 01_data_exploration.ipynb
+│   ├── 02_augmentation_tests.ipynb
+│   └── 03_model_evaluation.ipynb
+├── configs/
+│   ├── rtmdet_tiny.py             # Config RTMDet tiny
+│   └── rtmpose_m.py               # Config RTMPose medium
+├── scripts/
+│   ├── prepare_dataset.sh         # Script de preparação
+│   └── train_full_pipeline.sh     # Script de treinamento
+├── requirements.txt
+└── README.md
 ```
 
-## Instalação
+## Datasets
 
+### Principal: COCO-WholeBody
+- **Descrição**: Extensão do COCO com anotações de corpo completo (133 keypoints)
+- **Link**: https://github.com/jin-s13/COCO-WholeBody
+- **Keypoints**:
+  - Body: 17 keypoints (COCO padrão)
+  - Face: 68 keypoints
+  - Hands: 42 keypoints (21 cada mão)
+  - Feet: 6 keypoints
+
+### Complementares
+- **MPII**: Para validação adicional
+- **CrowdPose**: Para cenários com múltiplas pessoas
+- **3DPW**: Para validação 3D (futuro)
+
+## Conceitos Importantes
+
+### Bottom-Up vs Top-Down
+
+**Bottom-Up**:
+- Detecta TODOS os keypoints da imagem primeiro
+- Depois agrupa os keypoints em pessoas
+- Vantagem: Mais rápido com muitas pessoas
+- Desvantagem: Menos preciso
+- Exemplo: OpenPose
+
+**Top-Down** (usado neste projeto):
+- Detecta pessoas primeiro (bounding boxes)
+- Para cada pessoa, estima a pose
+- Vantagem: Mais preciso
+- Desvantagem: Tempo de processamento cresce com número de pessoas
+- Exemplo: RTMDet + RTMPose
+
+### RTMPose Architecture
+1. **RTMDet**: Detector de objetos (pessoas) em tempo real
+2. **RTMPose**: Estimador de pose de alta precisão
+3. **Pipeline**: RTMDet → crop pessoa → RTMPose → keypoints
+
+## Ambiente de Desenvolvimento
+
+### Requisitos
+- Python 3.8+
+- PyTorch 2.0+
+- CUDA 11.8+ (para GPU)
+- MMPose / MMDetection
+
+### Instalação
 ```bash
 # Criar ambiente virtual
 python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# ou
-venv\Scripts\activate     # Windows
+source venv/bin/activate
 
 # Instalar dependências
 pip install -r requirements.txt
 ```
 
-## Dependências Principais
+## Roadmap
 
-- **PyTorch**: Framework principal de deep learning
-- **OpenCV**: Processamento de imagem e vídeo
-- **MediaPipe**: Extração de keypoints e pose estimation
-- **Transformers**: Para modelos de depth estimation
-- **Albumentations**: Augmentações de dados
-- **Weights & Biases**: Logging e monitoramento de experimentos
-- **NumPy, SciPy**: Computação científica
-- **Matplotlib, Seaborn**: Visualização
+### Fase 1: Setup e Preparação de Dados (Semanas 1-2)
+- [ ] Download do COCO-WholeBody
+- [ ] Conversão para grayscale
+- [ ] Implementação de data augmentation
+- [ ] Análise exploratória dos dados
 
-## Uso Rápido
+### Fase 2: Baseline Model (Semanas 3-4)
+- [ ] Setup RTMDet para detecção de pessoas
+- [ ] Setup RTMPose para estimação de pose
+- [ ] Treinamento baseline com imagens RGB
+- [ ] Avaliação baseline
 
-```python
-from src.models.fusion import MultiModalFusionNetwork
-from src.data.loaders import VideoDataLoader
-from src.utils.visualization import visualize_results
+### Fase 3: Adaptação para Grayscale (Semanas 5-7)
+- [ ] Fine-tuning RTMDet para grayscale
+- [ ] Fine-tuning RTMPose para grayscale
+- [ ] Data augmentation específica para IR
+- [ ] Avaliação comparativa RGB vs Grayscale
 
-# Carregar dados
-data_loader = VideoDataLoader(config_path='configs/default.yaml')
+### Fase 4: Otimização e Tempo Real (Semanas 8-10)
+- [ ] Otimização de inferência
+- [ ] Quantização do modelo
+- [ ] Testes de performance
+- [ ] Deployment para tempo real
 
-# Criar modelo de fusão
-model = MultiModalFusionNetwork(
-    depth_model='depth_anything_v2',
-    segmentation_model='deeplabv3',
-    pose_model='mediapipe'
-)
+### Fase 5: Validação e Documentação (Semanas 11-12)
+- [ ] Testes em ambiente veicular
+- [ ] Documentação completa
+- [ ] Artigo científico
+- [ ] Apresentação TCC
 
-# Processar vídeo
-results = model.process_video(video_path='path/to/video.mp4')
+## Métricas de Avaliação
 
-# Visualizar resultados
-visualize_results(results)
-```
+### Object Keypoint Similarity (OKS)
+- Métrica padrão do COCO
+- Similar ao IoU, mas para keypoints
 
-## Configuração
+### PCK (Percentage of Correct Keypoints)
+- Porcentagem de keypoints corretamente detectados
+- Threshold geralmente em 0.2 (20% da distância torso)
 
-Os experimentos são configurados através de arquivos YAML em `configs/`. Exemplo:
+### AP (Average Precision)
+- AP@0.5, AP@0.75, AP@0.5:0.95
+- Para diferentes thresholds de OKS
 
-```yaml
-model:
-  depth:
-    name: "depth_anything_v2"
-    pretrained: true
-  segmentation:
-    name: "deeplabv3_resnet50"
-    num_classes: 21
-  fusion:
-    hidden_dim: 512
-    num_layers: 3
+### AR (Average Recall)
+- AR@0.5, AR@0.75, AR@0.5:0.95
 
-training:
-  batch_size: 8
-  learning_rate: 1e-4
-  num_epochs: 100
-  device: "cuda"
-```
+### Tempo de Inferência
+- FPS (Frames Per Second)
+- Latência média (ms)
+- Throughput
 
-## Contribuição
+## Referências
 
-Este é um projeto de TCC. Para questões ou sugestões, entre em contato através do repositório.
+### Papers
+- RTMPose: Real-Time Multi-Person Pose Estimation (2023)
+- COCO-WholeBody: COCO with Whole-Body Keypoint Annotations (2020)
+- OpenPose: Realtime Multi-Person 2D Pose Estimation (2018)
 
-## Licença
+### Repositories
+- MMPose: https://github.com/open-mmlab/mmpose
+- RTMPose: https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose
+- COCO-WholeBody: https://github.com/jin-s13/COCO-WholeBody
 
-Este projeto é desenvolvido para fins acadêmicos como parte de um Trabalho de Conclusão de Curso.
+## Contato
+- **Autor**: Davi Baechtold Campos
+- **Orientador**: Prof. Dr. Alceu de Souza Brito Junior
+- **Instituição**: PUCPR
