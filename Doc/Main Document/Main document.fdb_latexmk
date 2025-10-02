@@ -1,16 +1,16 @@
 # Fdb version 4
-["bibtex Main document"] 1757430127.49775 "Main document.aux" "Main document.bbl" "Main document" 1757430128.76541 0
-  "./referencias.bib" 1757430096.44967 1234 fa22fc85f5f78bdde005f164595f84c1 ""
+["bibtex Main document"] 1758805529.19666 "Main document.aux" "Main document.bbl" "Main document" 1758805530.57433 0
+  "./referencias.bib" 1758805527.59243 1234 fa22fc85f5f78bdde005f164595f84c1 ""
   "/usr/share/texlive/texmf-dist/bibtex/bib/abntex2/abntex2-options.bib" 1357081713 5396 4eb260dac60f150ae608d45252853090 ""
   "/usr/share/texlive/texmf-dist/bibtex/bst/abntex2/abntex2-alf.bst" 1543183680 60064 0819ac8568f9a482510a46e3a8a6f605 ""
-  "Main document.aux" 1757430128.29667 6514 17dcec35d2e39b5cd8dfa44405f08292 "pdflatex"
+  "Main document.aux" 1758805530.07743 6514 17dcec35d2e39b5cd8dfa44405f08292 "pdflatex"
   (generated)
   "Main document.bbl"
   "Main document.blg"
   (rewritten before read)
-["pdflatex"] 1757430127.63529 "/home/davs/Documents/TCC/Doc/Main Document/Main document.tex" "Main document.pdf" "Main document" 1757430128.76559 0
+["pdflatex"] 1758805529.35526 "/home/davs/Documents/TCC/Doc/Main Document/Main document.tex" "Main document.pdf" "Main document" 1758805530.57456 0
   "/etc/texmf/web2c/texmf.cnf" 1756909339.28251 475 c0e671620eb5563b2130f56340a5fde8 ""
-  "/home/davs/Documents/TCC/Doc/Main Document/Main document.tex" 1757430124.39467 12079 09fe252dd7a7cca85a5c40c789da10a2 ""
+  "/home/davs/Documents/TCC/Doc/Main Document/Main document.tex" 1757433582.79855 12079 09fe252dd7a7cca85a5c40c789da10a2 ""
   "/usr/share/texlive/texmf-dist/fonts/map/fontname/texfonts.map" 1577235249 3524 cb3e574dea2d1052e39280babc910dc8 ""
   "/usr/share/texlive/texmf-dist/fonts/tfm/jknappen/ec/ecrm1200.tfm" 1136768653 3584 f80ddd985bd00e29e9a6047ebd9d4781 ""
   "/usr/share/texlive/texmf-dist/fonts/tfm/public/cm/cmr10.tfm" 1136768653 1296 45809c5a464d5f32c8f98ba97c1bb47f ""
@@ -124,11 +124,11 @@
   "/usr/share/texmf/web2c/texmf.cnf" 1707919699 40399 f2c302f7d2af602abb742093540a5834 ""
   "/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map" 1756910950.35046 5472669 54eaf61a88b6b7896ebd0dac973cb29c ""
   "/var/lib/texmf/web2c/pdftex/pdflatex.fmt" 1756911045 8213752 dbae272b22f854078b0bdedbc1c0f6a5 ""
-  "Main document.aux" 1757430128.29667 6514 17dcec35d2e39b5cd8dfa44405f08292 "pdflatex"
-  "Main document.bbl" 1757430127.63067 1120 14d0de2acd0db9b843a2e570834d3eb4 "bibtex Main document"
-  "Main document.brf" 1757430128.29967 268 e49e21a5625db9a71b8f267e4868f501 "pdflatex"
-  "Main document.tex" 1757430124.39467 12079 09fe252dd7a7cca85a5c40c789da10a2 ""
-  "Main document.toc" 1757430128.30067 1304 55bdbdfab4f4f21b98eb6c49e5eb14ea "pdflatex"
+  "Main document.aux" 1758805530.07743 6514 17dcec35d2e39b5cd8dfa44405f08292 "pdflatex"
+  "Main document.bbl" 1758805529.34843 1120 14d0de2acd0db9b843a2e570834d3eb4 "bibtex Main document"
+  "Main document.brf" 1758805530.08143 268 e49e21a5625db9a71b8f267e4868f501 "pdflatex"
+  "Main document.tex" 1757433582.79855 12079 09fe252dd7a7cca85a5c40c789da10a2 ""
+  "Main document.toc" 1758805530.08243 1304 55bdbdfab4f4f21b98eb6c49e5eb14ea "pdflatex"
   (generated)
   "Main document.aux"
   "Main document.brf"

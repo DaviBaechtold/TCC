@@ -1,39 +1,78 @@
 # Proposta de Projeto de TCC
 
-Título (provisório): Análise de Lifting de Dados 2D para 3D para Reconhecimento de Gestos
+**Título**: 2D-to-3D Lifting for In-Cabin Occupant Posture Monitoring: A Comparative Analysis of Multi-View and Monocular Depth Fusion Approaches
 
-Autor: Davi Baechtold
-Data: 2025-09-18
+**Autor**: Davi Baechtold Campos  
+**Orientador**: Prof. Dr. Alceu de Souza Brito Junior  
+**Banca**: Prof. Joed Zimmer, Prof. Alessandro Zimmer  
+**Data**: Setembro 2025
+
+---
+
+> **📝 Contexto**: Esta proposta reflete o direcionamento estratégico definido na reunião de alinhamento, onde o foco evoluiu do reconhecimento de gestos genérico para o **problema fundamental do 2D-to-3D lifting** em ambientes com oclusões severas. O objetivo é produzir uma **contribuição científica mensurável** com potencial para publicação.
 
 ## 1. Motivação e Objetivo
 
-Reconhecer gestos de forma robusta em cenários do mundo real (indústria, veículos, robótica, XR) requer representações espaciais e temporais consistentes. Abordagens 2D (keypoints) são leves e generalistas, mas perdem profundidade e sofrem com oclusões. Este trabalho investiga o lifting 2D→3D (a partir de keypoints 2D) para melhorar a discriminação e a estabilidade temporal no reconhecimento de gestos, explorando também sinais auxiliares (depth monocular e segmentação humana) e cenários multi-view quando possível.
+### Contexto: Monitoramento de Ocupantes em Cabine Veicular
 
-Objetivos:
-- O1: Comparar reconhecimento de gestos usando sequências 2D vs. 3D (pós-lifting), mantendo o mesmo classificador temporal.
-- O2: Avaliar métricas de estimação 3D (MPJPE, PA-MPJPE, MPVE quando aplicável) e o impacto na acurácia/F1 da classificação de gestos.
-- O3: Estudar integração de sinais auxiliares (depth monocular, segmentação humana) e de múltiplas visões (quando disponível) no processo de lifting.
-- O4: Demonstrar um protótipo em tempo real com webcam Logitech C922 Pro Stream.
+O monitoramento preciso da postura de ocupantes em cabines veiculares é fundamental para sistemas de segurança, detecção de sonolência e interfaces gestuais avançadas. **O principal desafio técnico** reside na reconstrução 3D robusta em ambientes com severas oclusões (volante, painel, bancos) e condições de iluminação variáveis.
 
-## 2. Escopo e Questões de Pesquisa
+Abordagens tradicionais baseadas apenas em keypoints 2D são insuficientes para este cenário, pois perdem informação crítica de profundidade e sofrem com ambiguidades espaciais. Este trabalho foca no problema fundamental: **como obter estimação de pose 3D precisa e robusta** que serve como base para qualquer aplicação subsequente de reconhecimento de gestos.
 
-- Q1: Em que condições o lifting 2D→3D reduz ambiguidades e melhora a classificação de gestos em relação ao uso apenas de 2D?
-- Q2: Qual o ganho de qualidade do lifting com uma única câmera (LiftPose3D-style) vs. múltiplas câmeras (MPL/Transformer multi-view)?
-- Q3: Sinais auxiliares (depth monocular, segmentação) ajudam o lifting em cenários desafiadores (oclusões, iluminação, fundo complexo)?
-- Q4: Como técnicas de domain adaptation linear (LiftPose3D) facilitam transferir modelos para novos ambientes com poucos dados?
+### Objetivos Científicos
+
+**Principal**: Realizar análise comparativa quantitativa de técnicas de 2D-to-3D lifting para determinação da abordagem mais eficaz em ambiente veicular.
+
+**Específicos**:
+- **O1**: Comparar precisão de lifting monocular vs. multi-view em cenários com oclusão
+- **O2**: Quantificar ganho de performance com fusão de profundidade monocular 
+- **O3**: Avaliar métricas de estimação 3D (MPJPE, PA-MPJPE) e impacto na classificação de gestos
+- **O4**: Desenvolver pipeline em tempo real para validação prática (webcam C922)
+
+### Potencial de Publicação
+
+Este trabalho visa contribuição científica original através da **análise metódica de diferentes soluções técnicas** para um problema específico e relevante. Os resultados quantitativos (ex.: "fusão com profundidade monocular reduz erro de posicionamento em X% em ambiente veicular") constituem contribuição publicável para a área.
+
+## 2. Questões de Pesquisa e Hipóteses
+
+### Questões Centrais
+
+**Q1**: **Oclusões Severas** - Qual a degradação de precisão do lifting 2D→3D sob oclusões típicas de cabine veicular (volante, painel, bancos)?
+
+**Q2**: **Multi-view vs. Monocular** - Quantitativamente, qual o ganho de precisão ao usar múltiplas câmeras sincronizadas vs. uma única câmera com fusão de profundidade?
+
+**Q3**: **Profundidade como Proxy** - A informação de profundidade monocular consegue compensar parcialmente a ausência de múltiplas vistas?
+
+**Q4**: **Generalização** - Como técnicas de domain adaptation (LiftPose3D) facilitam transferência para o ambiente veicular com dados limitados?
+
+### Hipóteses de Trabalho
+
+- **H1**: Multi-view reduz significativamente ambiguidades espaciais (>20% melhoria em MPJPE)
+- **H2**: Fusão com profundidade monocular oferece ganho intermediário (10-15% melhoria)  
+- **H3**: Qualidade do lifting 3D correlaciona diretamente com precisão de classificação gestual
+- **H4**: Pipeline em tempo real é viável com latência <60ms em hardware consumer
 
 ## 3. Metodologia
 
-Pipeline geral:
-1) Extração de keypoints 2D (MediaPipe: pose/mãos) de vídeos ou webcam.
-2) Lifting 2D→3D:
-   - Monocular (single-view): baseline LiftPose3D-like (MLP/TCN) sobre joints 2D normalizados.
-   - Multi-view (opcional): fusão via Transformer (MPL-like) de esqueleto 2D por câmera para um único esqueleto 3D.
-3) Enriquecimento opcional do espaço latente com:
-   - Depth monocular por frame (ex.: MiDaS/Torch Hub) resumido por estatísticas regionais alinhadas ao esqueleto.
-   - Segmentação humana (máscara binária/contornos) para robustez a fundos complexos.
-4) Classificação temporal de gestos (Transformer encoder; baselines LSTM/MLP) sobre sequências 2D vs. 3D vs. 3D+auxiliares.
-5) Avaliação offline (manifests) e em tempo real (webcam C922).
+### Pipeline Comparativo
+
+**Foco**: Análise quantitativa de precisão de lifting (não aplicação final de reconhecimento)
+
+**Etapas**:
+1. **Extração 2D**: MediaPipe Holistic (pose + mãos) com tratamento de oclusões
+2. **Lifting Comparativo**:
+   - **Baseline**: Single-view LiftPose3D-style (MLP/TCN)  
+   - **Multi-view**: Fusão Transformer (MPL-inspired) para múltiplas câmeras
+   - **Depth-Enhanced**: Single-view + fusão profundidade monocular
+3. **Validação 3D**: Métricas MPJPE/PA-MPJPE para análise quantitativa
+4. **Prova de Conceito**: Classificação gestual para validar utilidade prática
+5. **Demo Real-time**: Pipeline otimizado com webcam C922
+
+### Dados Sintéticos e Reais
+
+**Sintéticos**: Pipeline AMASS + renderização multi-view para ground-truth 3D controlado  
+**Reais**: Datasets públicos + coleta própria para domain adaptation  
+**Foco Veicular**: Simulação de oclusões e constraints típicos de cabine
 
 ### 3.1. Lifting Single-View (LiftPose3D)
 - Entrada: joints 2D normalizados por root e escala (e.g., centro do quadril + normalização por distância ombro).
@@ -66,37 +105,56 @@ Classificação de Gestos:
 - Coleta própria (opcional): conjunto pequeno de gestos alvo gravados com a C922 para avaliar domain adaptation.
 - Manifestos `.csv` no formato `path,label` apontando para `.npz` com sequências de keypoints (2D) e, quando disponível, variantes com 3D.
 
-## 6. Protocolo Experimental
+## 6. Protocolo Experimental e Cronograma
 
-- P1: Treinar classificador com 2D (baseline atual do repositório); avaliar em `manifest_val.csv` e `manifest_test.csv`.
-- P2: Treinar lifter 2D→3D com MPJPE em dados sintéticos ou pares 2D↔3D de dataset público; converter sequências 2D para 3D; re-treinar classificador no 3D.
-- P3: Ablations: 2D vs. 3D vs. 3D+depth/seg; LSTM vs. Transformer; normalização por-junta vs. global.
-- P4: Domain adaptation linear (LiftPose3D) para pequena coleta própria (C922) e comparação.
-- P5: Demo tempo real com pipeline on-device; medir latência e robustez.
+### Fases de Desenvolvimento
 
-Critérios de sucesso:
-- +ΔF1 macro de X% ao migrar 2D→3D em pelo menos N classes.
-- MPJPE ≤ baseline simples do lifter monocular; redução adicional sob PA-MPJPE.
-- Latência do demo ≤ 60 ms/frame em CPU (objetivo; ajustar conforme hardware).
+| Fase | Entrega | Duração | Modalidades |
+|------|---------|---------|-------------|
+| **A** | Baseline 3D lifter | 3 semanas | keypoints 2D→3D |
+| **B** | Multi-view pipeline | 4 semanas | múltiplas câmeras |  
+| **C** | Depth fusion | 3 semanas | + profundidade monocular |
+| **D** | Análise comparativa | 2 semanas | métricas quantitativas |
+| **E** | Demo real-time | 2 semanas | validação prática |
+| **F** | Documentação final | 2 semanas | artigo + relatório |
 
-## 7. Implementação no Repositório (Roadmap)
+### Critérios de Sucesso Quantitativos
 
-- `scripts/`:
-  - `train_lifter.py`: treinar MLP/TCN 2D→3D com MPJPE.
-  - `lift_sequences.py`: converter `.npz` 2D em `.npz` 3D.
-  - `evaluate_3d_metrics.py`: calcular MPJPE/PA-MPJPE (e MPVE se aplicável).
-  - `depth_segment_features.py` (opcional): extrair features de depth/segmentação alinhadas aos joints.
-- `src/models/lifter.py`, `src/models/temporal_tcn.py`.
-- `configs/lifter.yaml`.
+**Técnicos**:
+- Multi-view: **MPJPE < 80mm** vs. baseline monocular >100mm  
+- Depth fusion: **MPJPE < 90mm** (ganho intermediário)
+- Real-time: **Latência ≤ 60ms/frame** em hardware consumer
 
-Integração mínima ao README: link para esta proposta e checklist de experimentos.
+**Científicos**:  
+- **Contribuição mensurável**: quantificação precisa de trade-offs entre abordagens
+- **Reprodutibilidade**: código e dados sintéticos disponibilizados
+- **Publicabilidade**: resultados com significância estatística e relevância prática
 
-## 8. Riscos, Limitações e Ética
 
-- Ambiguidade de profundidade em monocular; dependência de normalização e qualidade 2D.
-- Datasets com bias de domínio; validar com domain adaptation.
-- Privacidade: evitar armazenar vídeos crus; preferir sequências de keypoints/mascaras.
-- Uso de CPU: priorizar modelos leves para demo.
+## 7. Impacto e Aplicações
+
+### Contribuição Científica
+- **Análise comparativa rigorosa** de técnicas state-of-the-art em contexto específico
+- **Quantificação de trade-offs** entre precisão, complexidade e custo computacional  
+- **Metodologia replicável** para avaliação de lifting em ambientes com restrições
+
+### Aplicações Práticas
+- **Automotiva**: sistemas avançados de assistência ao motorista (ADAS)
+- **Segurança**: detecção de sonolência e postura inadequada
+- **HMI**: interfaces gestuais naturais para controle veicular
+- **Robótica**: monitoramento de ocupantes em veículos autônomos
+
+## 8. Riscos e Limitações
+
+### Técnicas
+- **Ambiguidade monocular**: inerente à reconstrução 3D de vista única
+- **Qualidade 2D**: dependência crítica da detecção de keypoints robusta  
+- **Domain gap**: diferenças entre dados sintéticos e cenários reais
+
+### Mitigação
+- **Dados sintéticos controlados**: AMASS para ground-truth preciso
+- **Domain adaptation**: técnicas lineares para transferência
+- **Validação múltipla**: datasets públicos + coleta própria
 
 ## 9. Referências (anexas na pasta Doc/References/2D to 3D)
 - LiftPose3D: mapeamento 2D→3D com domain adaptation linear.
