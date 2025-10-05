@@ -50,20 +50,27 @@ fi
 
 # 3. Aguardar anotações manuais
 print_warning "Please download WholeBody annotations manually:"
-echo "  1. Training: https://drive.google.com/file/d/1thErEToRbmM9uLNi1JXXfOsaS5VK2FXf"
-echo "  2. Validation: https://drive.google.com/file/d/1N6VgwKnj8DeyGXCvp1eYgGk0dCTj8xxt"
+TRAIN_URL=${WHOLEBODY_TRAIN_URL:-"https://drive.google.com/file/d/1thErEToRbmM9uLNi1JXXfOsaS5VK2FXf"}
+VAL_URL=${WHOLEBODY_VAL_URL:-"https://drive.google.com/file/d/1N6VgwKnj8DeyGXCvp1eYgGk0dCTj8xxt"}
+echo "  1. Training:   ${TRAIN_URL}"
+echo "  2. Validation: ${VAL_URL}"
 echo "  Save them to: ${RAW_DIR}/annotations/"
 echo ""
 read -p "Press Enter when annotations are ready..."
 
 # Verificar anotações
-if [ ! -f "${RAW_DIR}/annotations/coco_wholebody_train_v1.0.json" ] || \
-   [ ! -f "${RAW_DIR}/annotations/coco_wholebody_val_v1.0.json" ]; then
-    print_error "Annotations not found!"
+ONLY_TRAIN=0
+if [ ! -f "${RAW_DIR}/annotations/coco_wholebody_train_v1.0.json" ]; then
+    print_error "Training annotations not found!"
     exit 1
 fi
 
-print_status "Annotations found!"
+if [ ! -f "${RAW_DIR}/annotations/coco_wholebody_val_v1.0.json" ]; then
+    print_warning "Validation annotations not found. Proceeding with TRAIN-only setup (temporary)."
+    ONLY_TRAIN=1
+else
+    print_status "Annotations found!"
+fi
 
 # 4. Converter para grayscale
 print_status "Step 2: Converting to grayscale (IR simulation)..."
@@ -112,7 +119,12 @@ echo ""
 print_status "Dataset preparation completed!"
 echo ""
 echo "Next steps:"
-echo "  1. Review the dataset: jupyter notebook notebooks/01_data_exploration.ipynb"
-echo "  2. Test augmentations: python src/data/augmentation.py"
-echo "  3. Start training: bash scripts/train_full_pipeline.sh"
+echo "  1. Verify data structure: python src/data/download_coco.py --data-dir data/processed/grayscale --verify-only"
+echo "  2. Test augmentations (optional): python src/data/augmentation.py"
+if [ "$ONLY_TRAIN" -eq 1 ]; then
+    echo "  3. Start training (TEMP train-only): bash -lc \"CONFIG=configs/rtmpose_m_wholebody_train_is_val.py bash scripts/train_full_pipeline.sh\""
+    echo "     Note: using train set as validation temporarily; replace with real val JSON when available."
+else
+    echo "  3. Start training: bash scripts/train_full_pipeline.sh"
+fi
 echo ""

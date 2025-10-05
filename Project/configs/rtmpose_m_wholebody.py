@@ -1,6 +1,9 @@
 # Configuração para RTMPose (Real-Time Multi-Person Pose Estimation)
 # Modelo: RTMPose-m (medium) para full-body pose estimation
 
+# Ensure components are resolved from the mmpose registry
+default_scope = 'mmpose'
+
 # Model settings
 model = dict(
     type='TopdownPoseEstimator',

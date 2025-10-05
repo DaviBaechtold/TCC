@@ -92,15 +92,22 @@ def download_coco_wholebody(data_dir: str = "data/raw"):
     annotations_path = data_path / "annotations"
     annotations_path.mkdir(exist_ok=True)
     
+    # Permitir sobrescrever os links via variáveis de ambiente
+    env_train = os.environ.get('WHOLEBODY_TRAIN_URL')
+    env_val = os.environ.get('WHOLEBODY_VAL_URL')
+
+    default_train = 'https://drive.google.com/file/d/1thErEToRbmM9uLNi1JXXfOsaS5VK2FXf'
+    default_val = 'https://drive.google.com/file/d/1N6VgwKnj8DeyGXCvp1eYgGk0dCTj8xxt'
+
     print("\n" + "=" * 80)
     print("Anotações WholeBody")
     print("=" * 80)
     print("\nNOTA: As anotações WholeBody estão no Google Drive.")
     print("Você precisa baixá-las manualmente:")
     print("\n1. Training annotations:")
-    print("   https://drive.google.com/file/d/1thErEToRbmM9uLNi1JXXfOsaS5VK2FXf")
+    print(f"   {env_train or default_train}")
     print("\n2. Validation annotations:")
-    print("   https://drive.google.com/file/d/1N6VgwKnj8DeyGXCvp1eYgGk0dCTj8xxt")
+    print(f"   {env_val or default_val}")
     print(f"\nSalve os arquivos .json em: {annotations_path}/")
     print("\nEstrutura esperada:")
     print(f"""
