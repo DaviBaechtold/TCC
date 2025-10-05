@@ -10,7 +10,7 @@
 ### Software
 - Ubuntu 20.04+ ou Windows 10/11 com WSL2
 - Python 3.8+
-- CUDA 11.8+
+- CUDA 12.6+ (driver NVIDIA 560+ recomendado)
 - Git
 
 ## 🚀 Instalação
@@ -33,14 +33,24 @@ venv\Scripts\activate  # Windows
 # Upgrade pip
 pip install --upgrade pip
 
-# Instalar PyTorch com CUDA
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
+# Instalar PyTorch com CUDA 12.6
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126
 
 # Instalar outras dependências
 pip install -r requirements.txt
 
 # Instalar MMPose e MMDetection
+pip install -U openmim
 mim install mmengine mmcv mmdet mmpose
+
+# Verificar instalação CUDA + PyTorch
+python - << 'PY'
+import torch
+print('PyTorch:', torch.__version__)
+print('CUDA available:', torch.cuda.is_available())
+print('CUDA version:', torch.version.cuda)
+print('GPU:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'None')
+PY
 ```
 
 ## 📊 Preparação dos Dados

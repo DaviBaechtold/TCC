@@ -1,16 +1,34 @@
-# Configuração para RTMPose (Real-Time Multi-Person Pose Estimation)
-# Modelo: RTMPose-m (medium) para full-body pose estimation
+# Minimal RTMPose configuration for troubleshooting
+# This version bypasses problematic components
 
-# Ensure components are resolved from the mmpose registry
+"""
+Minimal RTMPose configuration for troubleshooting
+- Avoids importing mmpose.visualization (which triggers mmcv.ops)
+- Imports only the required mmpose submodules explicitly
+"""
+
 default_scope = 'mmpose'
+
+custom_imports = dict(
+    imports=[
+        # Import only the modules needed to register what we use
+        'mmpose.models.detectors.topdown_pose_estimator',
+        'mmpose.models.backbones.cspnext',
+        'mmpose.models.heads.rtmcc_head',
+        # Dataset + metrics
+        'mmpose.datasets',
+        'mmpose.evaluation',
+    ],
+    allow_failed_imports=True,
+)
 
 # Model settings
 model = dict(
     type='TopdownPoseEstimator',
     data_preprocessor=dict(
         type='PoseDataPreprocessor',
-        mean=[123.675, 116.28, 103.53],  # ImageNet mean
-        std=[58.395, 57.12, 57.375],     # ImageNet std
+        mean=[123.675, 116.28, 103.53],
+        std=[58.395, 57.12, 57.375],
         bgr_to_rgb=True),
     backbone=dict(
         type='CSPNeXt',
@@ -24,7 +42,7 @@ model = dict(
     head=dict(
         type='RTMCCHead',
         in_channels=768,
-        out_channels=133,  # WholeBody: 133 keypoints
+        out_channels=133,
         input_size=(192, 256),
         in_featuremap_size=(6, 8),
         simcc_split_ratio=2.0,
@@ -55,38 +73,17 @@ model = dict(
         shift_heatmap=False,
         align_corners=False))
 
-# Dataset settings for COCO-WholeBody
+# Dataset settings
 dataset_type = 'CocoWholeBodyDataset'
 data_mode = 'topdown'
-
-# Data paths
 data_root = 'data/processed/grayscale/'
 
-# Pipeline for training
+# Simple pipelines
 train_pipeline = [
     dict(type='LoadImage'),
     dict(type='GetBBoxCenterScale'),
     dict(type='RandomFlip', direction='horizontal'),
-    dict(type='RandomHalfBody'),
-    dict(
-        type='RandomBBoxTransform', scale_factor=[0.6, 1.4], rotate_factor=80),
     dict(type='TopdownAffine', input_size=(192, 256)),
-    dict(type='PhotometricDistortion'),
-    dict(
-        type='Albumentation',
-        transforms=[
-            dict(type='Blur', p=0.1),
-            dict(type='MedianBlur', p=0.1),
-            dict(
-                type='CoarseDropout',
-                max_holes=1,
-                max_height=0.4,
-                max_width=0.4,
-                min_holes=1,
-                min_height=0.2,
-                min_width=0.2,
-                p=1.0),
-        ]),
     dict(
         type='GenerateTarget',
         encoder=dict(
@@ -99,7 +96,6 @@ train_pipeline = [
     dict(type='PackPoseInputs')
 ]
 
-# Pipeline for validation
 val_pipeline = [
     dict(type='LoadImage'),
     dict(type='GetBBoxCenterScale'),
@@ -107,13 +103,12 @@ val_pipeline = [
     dict(type='PackPoseInputs')
 ]
 
-# Data loaders
+# Data loaders with reduced batch size for safety
 train_dataloader = dict(
-    batch_size=80,  # otimizado para RTX 5060 8GB
-    num_workers=10,  # i5-14400F (10C/16T)
+    batch_size=32,  # Reduced from 80
+    num_workers=4,  # Reduced from 10
     persistent_workers=True,
     pin_memory=True,
-    prefetch_factor=2,
     sampler=dict(type='DefaultSampler', shuffle=True),
     dataset=dict(
         type=dataset_type,
@@ -125,8 +120,8 @@ train_dataloader = dict(
     ))
 
 val_dataloader = dict(
-    batch_size=64,
-    num_workers=8,
+    batch_size=32,  # Reduced from 64
+    num_workers=4,  # Reduced from 8
     persistent_workers=True,
     pin_memory=True,
     drop_last=False,
@@ -141,34 +136,22 @@ val_dataloader = dict(
         pipeline=val_pipeline,
     ))
 
-test_dataloader = val_dataloader
-
 # Evaluators
 val_evaluator = dict(
     type='CocoWholeBodyMetric',
     ann_file=data_root + 'annotations/coco_wholebody_val_v1.0.json')
 
-test_evaluator = val_evaluator
-
 # Training settings
 train_cfg = dict(
     by_epoch=True,
-    max_epochs=420,
-    val_interval=10)
+    max_epochs=50,  # Reduced for testing
+    val_interval=5)
 
-# Validation settings
 val_cfg = dict()
-
-# Test settings
-test_cfg = dict()
 
 # Optimization
 optim_wrapper = dict(
-    type='AmpOptimWrapper',  # ativa FP16/mixed precision
-    loss_scale='dynamic',
-    optimizer=dict(type='AdamW', lr=4e-3, weight_decay=0.05),
-    paramwise_cfg=dict(
-        norm_decay_mult=0, bias_decay_mult=0, bypass_duplicate=True))
+    optimizer=dict(type='AdamW', lr=2e-3, weight_decay=0.05))  # Removed AMP for now
 
 # Learning rate scheduler
 param_scheduler = [
@@ -177,17 +160,14 @@ param_scheduler = [
         start_factor=1.0e-5,
         by_epoch=False,
         begin=0,
-        end=1000),
+        end=500),
     dict(
         type='CosineAnnealingLR',
-        eta_min=4e-5,
+        eta_min=2e-5,
         by_epoch=True,
-        begin=150,
-        end=420)
+        begin=10,
+        end=50)
 ]
-
-# Automatically scaling LR based on the actual training batch size
-auto_scale_lr = dict(base_batch_size=1024)
 
 # Hooks
 default_hooks = dict(
@@ -195,35 +175,15 @@ default_hooks = dict(
         type='CheckpointHook',
         save_best='coco-wholebody/AP',
         rule='greater',
-        max_keep_ckpts=3),
-    logger=dict(type='LoggerHook', interval=50))
+        max_keep_ckpts=2),
+    logger=dict(type='LoggerHook', interval=10))
 
-# Logging
+# Simplified logging
 log_processor = dict(
     type='LogProcessor',
-    window_size=50,
-    by_epoch=True,
-    num_digits=6)
+    window_size=10,
+    by_epoch=True)
 
-# Visualization
-visualizer = dict(
-    type='PoseLocalVisualizer',
-    vis_backends=[
-        dict(type='LocalVisBackend'),
-        dict(type='TensorboardVisBackend'),
-    ],
-    name='visualizer')
-
-# Custom hooks for grayscale adaptation
-custom_hooks = [
-    dict(
-        type='EMAHook',
-        ema_type='ExpMomentumEMA',
-        momentum=0.0002,
-        update_buffers=True,
-        priority=49),
-    dict(
-        type='mmdet.PipelineSwitchHook',
-        switch_epoch=390,
-        switch_pipeline=train_pipeline)
-]
+# Minimal visualizer - no 3D components
+# Use mmengine's simple Visualizer to avoid importing mmpose.visualization
+visualizer = dict(type='Visualizer')

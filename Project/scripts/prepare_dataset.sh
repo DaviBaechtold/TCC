@@ -40,7 +40,7 @@ mkdir -p ${PROCESSED_DIR}
 
 # 2. Download COCO-WholeBody
 print_status "Step 1: Downloading COCO-WholeBody dataset..."
-python src/data/download_coco.py --data-dir ${RAW_DIR}
+python3 src/data/download_coco.py --data-dir ${RAW_DIR}
 
 # Verificar se download foi bem sucedido
 if [ $? -ne 0 ]; then
@@ -74,7 +74,7 @@ fi
 
 # 4. Converter para grayscale
 print_status "Step 2: Converting to grayscale (IR simulation)..."
-python src/data/convert_to_gray.py \
+python3 src/data/convert_to_gray.py \
     --input-dir ${RAW_DIR} \
     --output-dir ${PROCESSED_DIR}/grayscale \
     --method luminosity \
@@ -88,7 +88,7 @@ fi
 
 # 5. Verificar dataset final
 print_status "Step 3: Verifying processed dataset..."
-python src/data/download_coco.py \
+python3 src/data/download_coco.py \
     --data-dir ${PROCESSED_DIR}/grayscale \
     --verify-only
 
