@@ -103,20 +103,104 @@ Project/
 ## Ambiente de Desenvolvimento
 
 ### Requisitos
-- Python 3.8+
-- PyTorch 2.0+
-- CUDA 11.8+ (para GPU)
-- MMPose / MMDetection
+- Python 3.8+ (recomendado 3.10-3.12)
+- GPU com drivers NVIDIA compatíveis (recomendado CUDA 12.x para as instruções abaixo)
+- Espaço livre em disco: >= 100GB (datasets + checkpoints)
 
-### Instalação
+### Instalação (passos testados)
+As instruções abaixo foram testadas neste repositório e funcionaram em um ambiente Linux com CUDA 12.6.
+
 ```bash
-# Criar ambiente virtual
-python -m venv venv
+# Entre no diretório do projeto
+cd /home/davs/Documents/TCC/Project
+
+# 1) Criar e ativar o ambiente virtual
+python3 -m venv venv
 source venv/bin/activate
 
-# Instalar dependências
+# 2) Atualizar pip
+pip install --upgrade pip
+
+# 3) Instalar PyTorch + CUDA (exemplo para CUDA 12.6 / PyTorch 2.8)
+# Ajuste a URL conforme sua CUDA/PyTorch alvo: https://pytorch.org/get-started/locally/
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126
+
+# 4) Instalar openmim (helper do OpenMMLab) e dependências principais
+pip install -U openmim
+mim install mmengine
+mim install "mmcv>=2.0.0,<2.2.0"
+mim install "mmdet>=3.0.0,<3.3.0"
+mim install mmpose
+
+# 5) Instalar bibliotecas do requirements (opcional/auxiliar)
 pip install -r requirements.txt
+
+# 6) Verificar instalação básica
+python -c "import torch, mmcv, mmdet, mmpose, mmengine; print(torch.__version__, mmcv.__version__, mmdet.__version__, mmpose.__version__, mmengine.__version__)"
 ```
+
+Observação: trocas de versão entre `mmcv`, `mmdet`, `mmengine` e `mmpose` são sensíveis — use as faixas recomendadas acima. Se você preferir uma alternativa isolada, usar uma imagem Docker oficial do OpenMMLab (quando disponível) evita problemas de compilação local.
+
+## Execução rápida (exemplos)
+
+Ative o venv (`source venv/bin/activate`) e use o Python do ambiente. Exemplos:
+
+1) Testar importações (sanity check):
+
+```bash
+python -c "import torch, mmcv, mmdet, mmpose, mmengine; print('OK')"
+```
+
+2) Treinar / fine-tune (com checkpoint pré-baixado):
+
+```bash
+# Coloque o checkpoint em checkpoints/
+python src/training/train_pose.py \
+  --config configs/rtmpose_m_wholebody.py \
+  --load-from checkpoints/rtmpose-m_simcc-body7_pt-body7_420e-256x192-e48f03d0_20230504.pth \
+  --work-dir work_dirs/finetune_grayscale \
+  --amp
+```
+
+3) Rodar um dry-run (teste rápido) com a configuração mínima que acompanha o projeto:
+
+```bash
+python src/training/train_pose.py \
+  --config configs/rtmpose_m_wholebody_minimal.py \
+  --work-dir work_dirs/test_minimal
+```
+
+Se quiser forçar o uso da GPU verifique que o venv Python reconhece a GPU (veja `python -c "import torch; print(torch.cuda.is_available())"`) e rode os comandos com o venv ativado; o script seleciona GPUs automaticamente (pela configuração).
+
+## Troubleshooting (erros comuns e correções)
+
+- Erro: "ModuleNotFoundError: No module named 'mmcv._ext'"
+  - Causa: MMCV precisa de extensões compiladas (ops CUDA) que nem sempre estão presentes na instalação pip genérica.
+  - Soluções:
+    1. Instale uma build do MMCV compatível com sua versão do PyTorch/CUDA. Use `mim install "mmcv>=2.0.0,<2.2.0"` para cu126/torch2.8 conforme mostrado acima.
+    2. Para produção, instale `mmcv-full` pré-compilado que corresponde exatamente ao seu CUDA/PyTorch (procure a wheel no site do OpenMMLab) — isso habilita `mmcv._ext`.
+    3. Como último recurso temporário (somente para desenvolvimento), é possível usar um stub `mmcv._ext` para evitar crashes de import; porém esse stub não fornece acelerações nem as operações CUDA e deve ser removido em produção.
+
+- Erro: incompatibilidade entre `mmcv`, `mmdet` e `mmpose` (assertions sobre versões)
+  - Mantenha os pacotes nas faixas compatíveis: `mmcv>=2.0.0,<2.2.0`; `mmdet>=3.0.0,<3.3.0`; `mmpose` compatível com `mmengine` (o `mim` costuma resolver isso automaticamente).
+
+- Aviso GPU (exemplo RTX 5060 / Ada Lovelace)
+  - GPUs muito novas (compute capability >= 12.0) eventualmente não são suportadas por algumas builds oficiais do PyTorch/MMCV e podem emitir avisos do tipo "not compatible with the current PyTorch installation".
+  - Se ocorrerem avisos de compatibilidade, duas opções:
+    1. Instalar uma build do PyTorch que suporte sua GPU (ex.: PyTorch com suporte a cu128) seguindo https://pytorch.org/get-started/locally/;
+    2. Executar no CPU ou em uma GPU compatível até obter uma build apropriada.
+
+## Dicas úteis
+- Sempre ative o `venv` antes de rodar os comandos: `source venv/bin/activate`.
+- Use `mim install` para gerenciar pacotes do ecossistema OpenMMLab — ele cuida de dependências binárias quando possível.
+- Se precisar de uma instalação imutável e reproduzível, considere usar Docker (imagem OpenMMLab) ou um ambiente Conda com canais binários apropriados.
+
+## Contato / Ajuda
+Se encontrar um erro que você não consegue resolver, cole o traceback e eu (ou o seu orientador) posso ajudar a diagnosticar a dependência específica.
+
+---
+
+Pequena nota: este README foi atualizado para refletir os passos testados neste repositório (Python 3.12 + PyTorch 2.8.0+cu126) e incluir instruções práticas de resolução de problemas com `mmcv`/`mmcv._ext`.
 
 ## Roadmap
 

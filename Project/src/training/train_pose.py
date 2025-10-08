@@ -10,15 +10,10 @@ import argparse
 from pathlib import Path
 from datetime import datetime
 
-import torch
-import torch.nn as nn
-from torch.utils.data import DataLoader
-from torch.optim import AdamW
-from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR
+# Delay heavy ML imports until we know the requested device. This allows
+# falling back to CPU when CUDA/PyTorch binaries are incompatible with the
+# local GPU (avoids import-time CUDA errors).
 
-from mmengine.config import Config
-from mmengine.runner import Runner
-from mmengine.logging import print_log
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -75,6 +70,12 @@ def parse_args():
         action='store_true',
         help='Enable automatic mixed precision training'
     )
+    parser.add_argument(
+        '--device',
+        choices=['cpu', 'cuda'],
+        default='cuda',
+        help='Device to run on; set to cpu to avoid CUDA mismatches',
+    )
     
     return parser.parse_args()
 
@@ -82,6 +83,49 @@ def parse_args():
 def main():
     """Main training function."""
     args = parse_args()
+    # If user requested CPU, disable CUDA visible devices before importing
+    # heavy ML libraries to avoid import-time CUDA errors.
+    if args.device == 'cpu':
+        # use module-level `os` (imported at top) to avoid creating a local
+        # variable via an inner import which leads to UnboundLocalError.
+        os.environ['CUDA_VISIBLE_DEVICES'] = ''
+
+    # Now import ML libraries (after device decision)
+    import torch
+    import numpy as _np
+    # Allow torch.load to unpickle certain numpy objects safely when loading
+    # older checkpoints that rely on numpy internals. PyTorch 2.6+ defaults to
+    # weights_only=True which restricts globals; we proactively register both
+    # numpy._core.multiarray._reconstruct and numpy.core.multiarray._reconstruct
+    # to cover different numpy versions/aliases. This must run before any
+    # checkpoint is loaded by mmengine/Runner.
+    try:
+        if hasattr(torch.serialization, 'add_safe_globals'):
+            safe_items = []
+            # try both possible locations for _reconstruct
+            for mod_path in ('_core', 'core'):
+                try:
+                    candidate = getattr(getattr(_np, mod_path), 'multiarray')._reconstruct
+                    safe_items.append(candidate)
+                except Exception:
+                    # ignore missing variants
+                    pass
+            if safe_items:
+                torch.serialization.add_safe_globals(safe_items)
+                print('Debug: registered numpy _reconstruct in torch safe globals:', [str(x) for x in safe_items])
+            else:
+                print('Debug: no numpy _reconstruct found to register')
+    except Exception as _e:
+        # Non-fatal; loading may still fail but we surface the original error.
+        print('Warning: could not add numpy reconstruct to torch safe globals:', _e)
+    import torch.nn as nn
+    from torch.utils.data import DataLoader
+    from torch.optim import AdamW
+    from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR
+
+    from mmengine.config import Config
+    from mmengine.runner import Runner
+    from mmengine.logging import print_log
     
     # Load config
     cfg = Config.fromfile(args.config)
@@ -107,8 +151,11 @@ def main():
     
     # Set AMP
     if args.amp:
-        cfg.optim_wrapper.type = 'AmpOptimWrapper'
-        cfg.optim_wrapper.loss_scale = 'dynamic'
+        if args.device == 'cpu':
+            print('Warning: AMP requested but running on CPU; disabling AMP.')
+        else:
+            cfg.optim_wrapper.type = 'AmpOptimWrapper'
+            cfg.optim_wrapper.loss_scale = 'dynamic'
     
     # Set resume and load_from
     if args.resume_from:
@@ -116,6 +163,27 @@ def main():
         cfg.load_from = args.resume_from
     elif args.load_from:
         cfg.load_from = args.load_from
+
+    # If a checkpoint path is provided and may require full unpickling of
+    # numpy internals, mmengine's internal torch.load may call with
+    # weights_only=True which rejects some globals. If the user explicitly
+    # provided a checkpoint, monkeypatch torch.load to use weights_only=False
+    # for local files. This is potentially unsafe for untrusted checkpoints;
+    # do this only when the user passed --load-from or --resume-from.
+    try:
+        if cfg.get('load_from'):
+            _orig_torch_load = torch.load
+
+            def _torch_load_allow_full(*args_, **kwargs_):
+                # Ensure we set weights_only=False unless explicitly provided.
+                if 'weights_only' not in kwargs_:
+                    kwargs_['weights_only'] = False
+                return _orig_torch_load(*args_, **kwargs_)
+
+            torch.load = _torch_load_allow_full
+            print('Debug: monkeypatched torch.load to use weights_only=False for checkpoint loading (trusted mode)')
+    except Exception as _e:
+        print('Warning: could not monkeypatch torch.load for trusted checkpoint loading:', _e)
     
     # Print config
     print("=" * 80)
