@@ -37,7 +37,12 @@ def extract_kps(result):
     if hasattr(pred_inst, 'pred_instances'):
         instances = pred_inst.pred_instances
         if hasattr(instances, 'keypoints'):
-            return instances.keypoints.cpu().numpy()
+            keypoints = instances.keypoints
+            if hasattr(keypoints, 'cpu'):
+                keypoints = keypoints.cpu().numpy()
+            else:
+                keypoints = np.asarray(keypoints)
+            return keypoints
     
     return None
 
@@ -115,8 +120,8 @@ def main():
         
         h, w = rgb_img.shape[:2]
         
-        # Use full image as bounding box
-        bbox = np.array([[0, 0, w, h, 1.0]])
+        # Use full-image bounding box in xyxy format
+        bbox = np.array([[0.0, 0.0, float(w - 1), float(h - 1)]], dtype=np.float32)
         
         # Run inference with manual bbox
         try:

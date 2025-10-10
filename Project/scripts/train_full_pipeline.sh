@@ -4,7 +4,7 @@
 
 set -e
 
-CONFIG=${CONFIG:-"configs/rtmpose_m_wholebody.py"}
+CONFIG=${CONFIG:-"configs/rtmpose_s_grayscale_rt.py"}
 WORK_DIR=${WORK_DIR:-"work_dirs/baseline_grayscale"}
 AMP=${AMP:-1}
 LOAD_FROM=${LOAD_FROM:-""}
