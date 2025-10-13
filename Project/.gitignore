@@ -30,6 +30,7 @@ wheels/
 # Data
 data/raw/
 data/processed/
+data/video/
 *.jpg
 *.png
 *.jpeg

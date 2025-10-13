@@ -3,10 +3,11 @@
 import os
 import sys
 import argparse
+from pathlib import Path
+
 import numpy as np
 import cv2
 import torch
-from pathlib import Path
 
 # Register safe globals for torch.load
 for typ in [np.core.multiarray._reconstruct, np.ndarray, np.dtype, np.str_]:
@@ -26,25 +27,41 @@ except ImportError as e:
     print("Please install mmpose")
     sys.exit(1)
 
+try:
+    from mmdet.apis import init_detector, inference_detector
+except ImportError:
+    init_detector = None
+    inference_detector = None
+
+try:
+    from pycocotools.coco import COCO
+except ImportError:
+    COCO = None
+
 
 def extract_kps(result):
     """Extract keypoints from PoseDataSample."""
     if not result or len(result) == 0:
         return None
-    
-    pred_inst = result[0]
-    
-    if hasattr(pred_inst, 'pred_instances'):
-        instances = pred_inst.pred_instances
-        if hasattr(instances, 'keypoints'):
-            keypoints = instances.keypoints
-            if hasattr(keypoints, 'cpu'):
-                keypoints = keypoints.cpu().numpy()
-            else:
-                keypoints = np.asarray(keypoints)
-            return keypoints
-    
-    return None
+    collected = []
+
+    for sample in result:
+        if hasattr(sample, 'pred_instances'):
+            instances = sample.pred_instances
+            if hasattr(instances, 'keypoints'):
+                keypoints = instances.keypoints
+                if hasattr(keypoints, 'cpu'):
+                    keypoints = keypoints.cpu().numpy()
+                else:
+                    keypoints = np.asarray(keypoints)
+                if keypoints.ndim == 2:
+                    keypoints = keypoints[None, ...]
+                collected.append(keypoints)
+
+    if not collected:
+        return None
+
+    return np.concatenate(collected, axis=0)
 
 
 def normalized_keypoint_distance(kp1, kp2):
@@ -76,11 +93,39 @@ def main():
                         default='work_dirs/test_minimal5/best_coco-wholebody_AP_epoch_50.pth')
     parser.add_argument('--rgb-dir', type=str, default='data/raw/val2017')
     parser.add_argument('--ir-dir', type=str, default='data/processed/grayscale/val2017')
+    parser.add_argument('--ann-file', type=str,
+                        default='data/processed/grayscale/annotations/coco_wholebody_val_v1.0.json',
+                        help='COCO-format annotation file with bboxes')
+    parser.add_argument('--det-cfg', type=str, default=None,
+                        help='Detector config (e.g. RTMDet) for bbox generation')
+    parser.add_argument('--det-ckpt', type=str, default=None,
+                        help='Detector checkpoint path')
+    parser.add_argument('--det-score-thr', type=float, default=0.4,
+                        help='Score threshold for detector boxes')
     parser.add_argument('--out-dir', type=str, default='work_dirs/eval_results')
     parser.add_argument('--n', type=int, default=20)
     parser.add_argument('--device', type=str, default='cuda:0')
     
     args = parser.parse_args()
+
+    if args.det_cfg and args.det_ckpt:
+        if init_detector is None or inference_detector is None:
+            print('❌ mmdet is required for detector-based bboxes, but it is not installed.')
+            sys.exit(1)
+        det_model = init_detector(args.det_cfg, args.det_ckpt, device=args.device)
+        use_detector = True
+    else:
+        det_model = None
+        use_detector = False
+
+    if not use_detector:
+        if args.ann_file and not Path(args.ann_file).is_file():
+            print(f"❌ Annotation file not found: {args.ann_file}")
+            sys.exit(1)
+
+        if args.ann_file and COCO is None:
+            print('❌ pycocotools not installed; please install it or omit --ann-file')
+            sys.exit(1)
     
     # Create output directories
     os.makedirs(os.path.join(args.out_dir, 'rgb'), exist_ok=True)
@@ -92,13 +137,37 @@ def main():
     model = init_model(args.cfg, args.ckpt, device=args.device)
     print("Model loaded successfully!")
     
+    # Build bbox lookup from annotations if available
+    bbox_lookup = {}
+    if not use_detector and args.ann_file:
+        coco = COCO(args.ann_file)
+        img_ids = coco.getImgIds()
+        name_to_id = {}
+        for img_id in img_ids:
+            info = coco.loadImgs(img_id)[0]
+            name_to_id[info['file_name']] = img_id
+        for fname, img_id in name_to_id.items():
+            ann_ids = coco.getAnnIds(imgIds=[img_id], iscrowd=False)
+            anns = coco.loadAnns(ann_ids)
+            boxes = []
+            for ann in anns:
+                x, y, w, h = ann['bbox']
+                if w <= 1 or h <= 1:
+                    continue
+                boxes.append([x, y, x + w, y + h])
+            if boxes:
+                bbox_lookup[fname] = np.array(boxes, dtype=np.float32)
+
     # Get image list
     rgb_images = sorted([f for f in os.listdir(args.rgb_dir) if f.endswith(('.jpg', '.png'))])
+    if not use_detector and args.ann_file:
+        rgb_images = [f for f in rgb_images if f in bbox_lookup]
     rgb_images = rgb_images[:args.n]
     
     print(f"Processing {len(rgb_images)} images...")
     
     distances = []
+    per_person_distances = []
     
     for i, img_name in enumerate(rgb_images):
         print(f"[{i+1}/{len(rgb_images)}] Processing {img_name}...")
@@ -118,15 +187,37 @@ def main():
             print(f"  Warning: Could not read images")
             continue
         
-        h, w = rgb_img.shape[:2]
-        
-        # Use full-image bounding box in xyxy format
-        bbox = np.array([[0.0, 0.0, float(w - 1), float(h - 1)]], dtype=np.float32)
+        if use_detector:
+            det_result = inference_detector(det_model, rgb_img)
+            boxes = []
+            if hasattr(det_result, 'pred_instances'):
+                inst = det_result.pred_instances
+                b = inst.bboxes.cpu().numpy()
+                s = inst.scores.cpu().numpy()
+                keep = s >= args.det_score_thr
+                boxes = b[keep]
+            else:
+                det_array = det_result[0]  # person class
+                if det_array.size > 0:
+                    keep = det_array[:, 4] >= args.det_score_thr
+                    boxes = det_array[keep, :4]
+            if len(boxes) == 0:
+                print('  Warning: detector found no valid boxes; skipping image')
+                continue
+            bboxes = np.array(boxes, dtype=np.float32)
+        elif args.ann_file:
+            if img_name not in bbox_lookup:
+                print("  Warning: No annotations for this image")
+                continue
+            bboxes = bbox_lookup[img_name]
+        else:
+            h, w = rgb_img.shape[:2]
+            bboxes = np.array([[0.0, 0.0, float(w - 1), float(h - 1)]], dtype=np.float32)
         
         # Run inference with manual bbox
         try:
-            rgb_result = inference_topdown(model, rgb_img, bboxes=bbox)
-            ir_result = inference_topdown(model, ir_img, bboxes=bbox)
+            rgb_result = inference_topdown(model, rgb_img, bboxes=bboxes)
+            ir_result = inference_topdown(model, ir_img, bboxes=bboxes)
         except Exception as e:
             print(f"  Error during inference: {e}")
             continue
@@ -134,12 +225,21 @@ def main():
         # Extract keypoints
         rgb_kps = extract_kps(rgb_result)
         ir_kps = extract_kps(ir_result)
-        
+
         # Compute distance
         if rgb_kps is not None and ir_kps is not None:
-            dist = normalized_keypoint_distance(rgb_kps, ir_kps)
-            distances.append(dist)
-            print(f"  Normalized distance: {dist:.4f}")
+            if rgb_kps.ndim == 2:
+                rgb_kps = rgb_kps[np.newaxis, ...]
+            if ir_kps.ndim == 2:
+                ir_kps = ir_kps[np.newaxis, ...]
+
+            num_instances = min(len(rgb_kps), len(ir_kps))
+            for inst_idx in range(num_instances):
+                dist = normalized_keypoint_distance(rgb_kps[inst_idx], ir_kps[inst_idx])
+                per_person_distances.append(dist)
+            mean_inst_dist = np.mean(per_person_distances[-num_instances:]) if num_instances > 0 else float('inf')
+            distances.append(mean_inst_dist)
+            print(f"  Mean normalized distance (per person): {mean_inst_dist:.4f} over {num_instances} instances")
         else:
             print(f"  Warning: Could not extract keypoints")
         
@@ -148,17 +248,29 @@ def main():
             # Draw keypoints on RGB
             rgb_vis = rgb_img.copy()
             if rgb_kps is not None:
-                kp = rgb_kps[0] if rgb_kps.ndim == 3 else rgb_kps
-                for j, (x, y) in enumerate(kp[:, :2]):
-                    cv2.circle(rgb_vis, (int(x), int(y)), 3, (0, 255, 0), -1)
+                for inst_idx, kp in enumerate(rgb_kps):
+                    color_rng = np.random.default_rng(seed=hash((img_name, inst_idx)) & 0xFFFFFFFF)
+                    color = tuple(int(c) for c in color_rng.integers(0, 255, size=3))
+                    if args.ann_file and inst_idx < len(bboxes):
+                        box = bboxes[inst_idx]
+                        cv2.rectangle(rgb_vis, (int(box[0]), int(box[1])),
+                                      (int(box[2]), int(box[3])), color, 2)
+                    for x, y in kp[:, :2]:
+                        cv2.circle(rgb_vis, (int(x), int(y)), 3, color, -1)
             cv2.imwrite(os.path.join(args.out_dir, 'rgb', img_name), rgb_vis)
             
             # Draw keypoints on IR
             ir_vis = ir_img.copy()
             if ir_kps is not None:
-                kp = ir_kps[0] if ir_kps.ndim == 3 else ir_kps
-                for j, (x, y) in enumerate(kp[:, :2]):
-                    cv2.circle(ir_vis, (int(x), int(y)), 3, (0, 255, 0), -1)
+                for inst_idx, kp in enumerate(ir_kps):
+                    color_rng = np.random.default_rng(seed=hash((img_name, inst_idx)) & 0xFFFFFFFF)
+                    color = tuple(int(c) for c in color_rng.integers(0, 255, size=3))
+                    if args.ann_file and inst_idx < len(bboxes):
+                        box = bboxes[inst_idx]
+                        cv2.rectangle(ir_vis, (int(box[0]), int(box[1])),
+                                      (int(box[2]), int(box[3])), color, 2)
+                    for x, y in kp[:, :2]:
+                        cv2.circle(ir_vis, (int(x), int(y)), 3, color, -1)
             cv2.imwrite(os.path.join(args.out_dir, 'ir', img_name), ir_vis)
             
         except Exception as e:
@@ -170,11 +282,18 @@ def main():
     print("="*60)
     print(f"Total images processed: {len(distances)}")
     if distances:
-        print(f"Mean normalized distance: {np.mean(distances):.4f}")
-        print(f"Median normalized distance: {np.median(distances):.4f}")
-        print(f"Std normalized distance: {np.std(distances):.4f}")
-        print(f"Min distance: {np.min(distances):.4f}")
-        print(f"Max distance: {np.max(distances):.4f}")
+        print(f"Mean image distance: {np.mean(distances):.4f}")
+        print(f"Median image distance: {np.median(distances):.4f}")
+        print(f"Std image distance: {np.std(distances):.4f}")
+        print(f"Min image distance: {np.min(distances):.4f}")
+        print(f"Max image distance: {np.max(distances):.4f}")
+    if per_person_distances:
+        print("\nPer-person statistics:")
+        print(f"  Mean:   {np.mean(per_person_distances):.4f}")
+        print(f"  Median: {np.median(per_person_distances):.4f}")
+        print(f"  Std:    {np.std(per_person_distances):.4f}")
+        print(f"  Min:    {np.min(per_person_distances):.4f}")
+        print(f"  Max:    {np.max(per_person_distances):.4f}")
     else:
         print("No valid distance measurements obtained")
     print(f"\nVisualizations saved to:")
