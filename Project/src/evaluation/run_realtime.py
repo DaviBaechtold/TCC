@@ -9,21 +9,17 @@ import numpy as np
 import torch
 
 # Allow loading checkpoints that rely on numpy internals.
-try:
-    import numpy as _np
+# Monkey-patch torch.load to use weights_only=False by default (for compatibility with old checkpoints)
+_original_torch_load = torch.load
 
-    if hasattr(torch.serialization, "add_safe_globals"):
-        safe_items: List[object] = []
-        for mod_name in ("_core", "core"):
-            try:
-                candidate = getattr(getattr(_np, mod_name), "multiarray")._reconstruct
-                safe_items.append(candidate)
-            except Exception:
-                pass
-        if safe_items:
-            torch.serialization.add_safe_globals(safe_items)
-except Exception:
-    pass
+
+def _patched_torch_load(f, *args, **kwargs):
+    if "weights_only" not in kwargs:
+        kwargs["weights_only"] = False
+    return _original_torch_load(f, *args, **kwargs)
+
+
+torch.load = _patched_torch_load
 
 from mmpose.apis import init_model, inference_topdown  # type: ignore
 
@@ -97,7 +93,12 @@ def draw_keypoints(frame: np.ndarray, keypoints: np.ndarray, scores: Optional[np
     skeleton: Sequence
     skeleton = meta.get("skeleton", [])
     if "skeleton_links" in meta and meta["skeleton_links"]:
-        skeleton = [link["link"] for link in meta["skeleton_links"]]
+        # Handle both dict format (link["link"]) and tuple/list format
+        links = meta["skeleton_links"]
+        if links and isinstance(links[0], dict):
+            skeleton = [link["link"] for link in links]
+        else:
+            skeleton = links
     point_radius = 3
     thickness = 2
     pts = keypoints[:, :2]
@@ -107,7 +108,12 @@ def draw_keypoints(frame: np.ndarray, keypoints: np.ndarray, scores: Optional[np
             continue
         cv2.circle(frame, (int(x), int(y)), point_radius, color, -1)
     for link in skeleton:
-        i, j = link
+        if isinstance(link, (list, tuple)) and len(link) >= 2:
+            i, j = link[0], link[1]
+        else:
+            continue
+        if i >= len(kp_scores) or j >= len(kp_scores):
+            continue
         if kp_scores[i] < score_thr or kp_scores[j] < score_thr:
             continue
         pt1 = (int(pts[i, 0]), int(pts[i, 1]))

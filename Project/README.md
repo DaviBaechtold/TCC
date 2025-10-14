@@ -1,778 +1,431 @@
-# Real-Time 2D Full-Body Pose Estimation para Imagens Grayscale (Infrared)# Real-Time 2D Full-Body Pose Estimation for Grayscale (Infrared) Images
+# Real-Time 2D Full-Body Pose Estimation for Grayscale (Infrared) Images
 
+Sistema de estimação de pose 2D full-body (133 keypoints) em imagens grayscale/infrared em tempo real para aplicações veiculares.
 
-
-## 🎯 Objetivo## Objetivo
-
-Construir e treinar uma rede para detecção de pose 2D full body em imagens grayscale (infrared) em tempo real, focando em ambientes veiculares.
-
-Desenvolver um sistema de estimação de pose 2D full-body (133 keypoints) em imagens grayscale/infrared em tempo real, focando em ambientes veiculares.
-
-## Arquitetura
-
-**Status atual**: Fases 1-3 concluídas. Treinamento completo em `work_dirs/test_minimal5` com AP 0.4373 (epoch 50).- **Bottom-up approach**: Detecta todos os keypoints primeiro, depois agrupa em pessoas
-
-- **Top-down approach**: Detecta pessoas primeiro (bounding boxes) com RTMDet, depois estima pose com RTMPose
+**Status**: Treinamento completo | AP 0.4373 | Checkpoint: `work_dirs/test_minimal5/best_coco-wholebody_AP_epoch_50.pth`
 
 ---
-
-Este projeto utiliza a abordagem **top-down** (RTMDet + RTMPose) para melhor precisão.
 
 ## 📋 Índice
 
-## Pipeline
-
-1. [Visão Geral](#visão-geral)1. **Coleta de dados**: COCO-WholeBody dataset (base principal)
-
-2. [Arquitetura e Pipeline](#arquitetura-e-pipeline)2. **Conversão para Grayscale**: Simular imagens infrared
-
-3. [Estrutura do Projeto](#estrutura-do-projeto)3. **Data Augmentation**: 
-
-4. [Instalação](#instalação)   - Vignetting (simulação de características de câmeras IR)
-
-5. [Uso](#uso)   - Ruído gaussiano
-
-6. [Avaliação](#avaliação)   - Blur
-
-7. [Datasets](#datasets)   - Ajustes de contraste
-
-8. [Resultados](#resultados)   - Rotação e flip
-
-9. [Troubleshooting](#troubleshooting)4. **Treinamento**: Fine-tuning do RTMPose para entradas grayscale
-
-10. [Roadmap](#roadmap)5. **Avaliação**: Métricas PCK, AP, AR
-
-11. [Referências](#referências)
-
-## Estrutura do Projeto
-
----```
-
-Project/
-
-## Visão Geral├── data/
-
-│   ├── raw/              # Dados brutos (COCO-WholeBody)
-
-### Problema│   ├── processed/        # Dados processados (grayscale + augmentation)
-
-Detectar pose 2D full-body em imagens grayscale/infrared (simulando câmeras IR veiculares) para aplicações de monitoramento de motorista e passageiros.│   └── annotations/      # Anotações em formato COCO
-
-├── src/
-
-### Solução│   ├── data/
-
-Sistema baseado em **RTMPose** (abordagem top-down):│   │   ├── download_coco.py       # Download do dataset
-
-1. **RTMDet**: Detecta pessoas (bounding boxes)│   │   ├── convert_to_gray.py     # Conversão RGB → Grayscale
-
-2. **RTMPose**: Estima pose de cada pessoa (133 keypoints)│   │   └── augmentation.py        # Data augmentation
-
-3. **Fine-tuning**: Adaptação para imagens grayscale│   ├── models/
-
-│   │   ├── rtmdet.py              # Detector de pessoas
-
-### Por que Grayscale/IR?│   │   ├── rtmpose.py             # Estimador de pose
-
-- Simula câmeras infravermelhas (comuns em veículos modernos)│   │   └── pipeline.py            # Pipeline completo
-
-- Funciona em baixa luminosidade e à noite│   ├── training/
-
-- Preserva privacidade (não captura cores/detalhes faciais)│   │   ├── train_detector.py      # Treino do detector
-
-- Mais robusto para monitoramento interno de veículos│   │   ├── train_pose.py          # Treino do pose estimator
-
-│   │   └── config.py              # Configurações
-
----│   ├── evaluation/
-
-│   │   ├── metrics.py             # Métricas (PCK, AP, AR)
-
-## Arquitetura e Pipeline│   │   └── visualize.py           # Visualização de resultados
-
-│   └── utils/
-
-### Bottom-Up vs Top-Down│       ├── visualization.py       # Funções de visualização
-
-│       └── transforms.py          # Transformações de imagem
-
-Este projeto utiliza **abordagem top-down** para melhor precisão:├── notebooks/
-
-│   ├── 01_data_exploration.ipynb
-
-| Característica | Bottom-Up | Top-Down (Usado) |│   ├── 02_augmentation_tests.ipynb
-
-|----------------|-----------|------------------|│   └── 03_model_evaluation.ipynb
-
-| **Método** | Detecta todos keypoints → agrupa pessoas | Detecta pessoas → estima pose |├── configs/
-
-| **Precisão** | Menor | ✅ Maior |│   ├── rtmdet_tiny.py             # Config RTMDet tiny
-
-| **Velocidade** | Rápida (crowds) | Depende de #pessoas |│   └── rtmpose_m.py               # Config RTMPose medium
-
-| **Exemplo** | OpenPose | RTMDet + RTMPose |├── scripts/
-
-│   ├── prepare_dataset.sh         # Script de preparação
-
-### Pipeline Completo│   └── train_full_pipeline.sh     # Script de treinamento
-
-├── requirements.txt
-
-```└── README.md
-
-1. Coleta de dados → COCO-WholeBody dataset```
-
-                ↓
-
-2. Conversão   → RGB → Grayscale + simulação IR## Datasets
-
-                ↓
-
-3. Augmentation → Vignetting, ruído, blur, contraste### Principal: COCO-WholeBody
-
-                ↓- **Descrição**: Extensão do COCO com anotações de corpo completo (133 keypoints)
-
-4. Treinamento → Fine-tuning RTMPose para grayscale- **Link**: https://github.com/jin-s13/COCO-WholeBody
-
-                ↓- **Keypoints**:
-
-5. Avaliação   → Métricas PCK, AP, AR  - Body: 17 keypoints (COCO padrão)
-
-```  - Face: 68 keypoints
-
-  - Hands: 42 keypoints (21 cada mão)
-
-### Modelo RTMPose  - Feet: 6 keypoints
-
-
-
-```### Complementares
-
-Arquitetura:- **MPII**: Para validação adicional
-
-- Backbone: CSPNeXt (P5, widen=0.75, deepen=0.67)- **CrowdPose**: Para cenários com múltiplas pessoas
-
-- Head: RTMCCHead (SimCC decoder)- **3DPW**: Para validação 3D (futuro)
-
-- Input: 256x192 pixels
-
-- Output: 133 keypoints (x, y, visibility)## Conceitos Importantes
-
-```
-
-### Bottom-Up vs Top-Down
+- [Visão Geral](#visão-geral)
+- [Dataset](#dataset)
+- [Data Augmentation](#data-augmentation)
+- [Instalação](#instalação)
+- [Como Usar](#como-usar)
+- [Estrutura do Projeto](#estrutura-do-projeto)
+- [Troubleshooting](#troubleshooting)
+- [Resultados](#resultados)
+- [Referências](#referências)
 
 ---
 
-**Bottom-Up**:
+## Visão Geral
 
-## Estrutura do Projeto- Detecta TODOS os keypoints da imagem primeiro
+### Objetivo
 
-- Depois agrupa os keypoints em pessoas
+Desenvolver um sistema de estimação de pose 2D full-body em imagens grayscale/infrared em tempo real, focando em aplicações de monitoramento veicular (motoristas e passageiros).
 
-```- Vantagem: Mais rápido com muitas pessoas
+### Por que Grayscale/Infrared?
 
-Project/- Desvantagem: Menos preciso
+- **Privacidade**: Não captura cores/detalhes faciais sensíveis
+- **Robustez**: Funciona em baixa luminosidade e à noite
+- **Aplicação prática**: Câmeras IR são padrão em sistemas de monitoramento interno de veículos modernos
 
-├── data/- Exemplo: OpenPose
+### Arquitetura: Top-Down Approach
 
-│   ├── raw/                      # Dados RGB originais (COCO-WholeBody)
+**RTMPose** com abordagem top-down para máxima precisão:
 
-│   ├── processed/grayscale/      # Imagens convertidas para grayscale**Top-Down** (usado neste projeto):
+1. **RTMDet** (opcional): Detecta pessoas na imagem → bounding boxes
+2. **RTMPose**: Estima pose de cada pessoa → 133 keypoints
 
-│   ├── test_conversion/          # (duplicado - pode remover)- Detecta pessoas primeiro (bounding boxes)
+**Alternativa bottom-up**: Detecta todos keypoints primeiro, depois agrupa em pessoas (menos preciso, mas mais rápido para multidões).
 
-│   └── test_gray/                # (duplicado - pode remover)- Para cada pessoa, estima a pose
+### Pipeline
 
-│- Vantagem: Mais preciso
+\`\`\`
+COCO-WholeBody (RGB) → Conversão Grayscale + Simulação IR → 
+Data Augmentation → Fine-tuning RTMPose → Avaliação
+\`\`\`
 
-├── src/- Desvantagem: Tempo de processamento cresce com número de pessoas
+---
 
-│   ├── data/- Exemplo: RTMDet + RTMPose
+## Dataset
 
-│   │   ├── download_coco.py      # Download do dataset
+### COCO-WholeBody
 
-│   │   ├── convert_to_gray.py    # Conversão RGB → Grayscale + IR### RTMPose Architecture
+Dataset principal utilizado para treinamento e avaliação.
 
-│   │   └── augmentation.py       # Data augmentation1. **RTMDet**: Detector de objetos (pessoas) em tempo real
+- **Fonte**: [COCO-WholeBody GitHub](https://github.com/jin-s13/COCO-WholeBody)
+- **Tamanho**: 
+  - Training: ~118,000 imagens
+  - Validation: ~5,000 imagens
+  
+#### 133 Keypoints por Pessoa
 
-│   ├── training/2. **RTMPose**: Estimador de pose de alta precisão
+| Região | Keypoints | Descrição |
+|--------|-----------|-----------|
+| **Body** | 17 | nose, eyes, ears, shoulders, elbows, wrists, hips, knees, ankles |
+| **Face** | 68 | facial landmarks completos |
+| **Hands** | 42 | 21 pontos por mão (dedos, palma, pulso) |
+| **Feet** | 6 | pontos de apoio dos pés |
 
-│   │   └── train_pose.py         # Script de treinamento3. **Pipeline**: RTMDet → crop pessoa → RTMPose → keypoints
+**Formato**: Anotações COCO JSON com coordenadas (x, y) e flag de visibilidade para cada keypoint.
 
-│   └── evaluation/
+### Conversão RGB → Grayscale
 
-│       └── evaluate_pose.py      # Comparação RGB vs IR## Ambiente de Desenvolvimento
+Para simular câmeras infravermelhas:
 
-│
+\`\`\`python
+Gray = 0.299*R + 0.587*G + 0.114*B
+\`\`\`
 
-├── configs/### Requisitos
+Fórmula ponderada que preserva a luminância percebida e simula melhor sensores IR.
 
-│   ├── rtmpose_m_wholebody.py                # Config principal- Python 3.8+ (recomendado 3.10-3.12)
+---
 
-│   └── rtmpose_m_wholebody_minimal.py        # Config para testes rápidos- GPU com drivers NVIDIA compatíveis (recomendado CUDA 12.x para as instruções abaixo)
+## Data Augmentation
 
-│- Espaço livre em disco: >= 100GB (datasets + checkpoints)
+Técnicas aplicadas para aumentar robustez em condições reais de câmeras IR:
 
-├── work_dirs/
+### 1. Vignetting (Simulação de Lentes IR)
+Escurece as bordas da imagem (~30% de redução) para simular efeito de vinheta comum em lentes IR.
 
-│   ├── test_minimal5/                        # ⭐ Melhor modelo treinado### Instalação (passos testados)
+**Motivação**: Câmeras IR frequentemente apresentam perda de intensidade nas extremidades.
 
-│   │   ├── best_coco-wholebody_AP_epoch_50.pthAs instruções abaixo foram testadas neste repositório e funcionaram em um ambiente Linux com CUDA 12.6.
+### 2. Ruído Gaussiano
+Adiciona ruído aleatório (~1% de intensidade) para simular ruído térmico de sensores IR.
 
-│   │   └── 20251007_201644/                  # Logs de treinamento
+**Motivação**: Sensores IR têm características de ruído diferentes de câmeras RGB tradicionais.
 
-│   └── eval_results/                         # Resultados de avaliação```bash
+### 3. Gaussian Blur
+Desfoque suave (kernel 3×3 ou 5×5) para simular limitações ópticas.
 
-│# Entre no diretório do projeto
+**Motivação**: Câmeras IR podem ter menor resolução ou abertura limitada.
 
-├── checkpoints/                              # Checkpoints pré-treinadoscd /home/davs/Documents/TCC/Project
+### 4. Ajustes de Contraste
+Variação aleatória de ±20% no contraste.
 
-├── scripts/
+**Motivação**: Iluminação IR varia com fonte e distância ao objeto.
 
-│   ├── prepare_dataset.sh                    # Preparação automática# 1) Criar e ativar o ambiente virtual
+### 5. Ajustes de Brilho
+Variação aleatória de ±30 pontos no brilho global.
 
-│   ├── plot_training.py                      # Visualização de treinamentopython3 -m venv venv
+**Motivação**: Diferentes materiais refletem IR de forma distinta.
 
-│   └── train_full_pipeline.sh                # Pipeline completosource venv/bin/activate
+### 6. Rotação e Flip
+Rotação aleatória (±15°) e flip horizontal (50% chance).
 
-│
+**Motivação**: Aumenta invariância rotacional e bilateral do modelo.
 
-├── requirements.txt# 2) Atualizar pip
+### Pipeline de Augmentation
 
-└── README.md                                 # Este arquivopip install --upgrade pip
+\`\`\`python
+RGB → Grayscale → [Vignetting] → [Noise] → [Blur] → 
+[Contrast/Brightness] → [Rotation/Flip] → Training
+\`\`\`
 
-```
+Augmentações entre colchetes são aplicadas aleatoriamente durante o treinamento.
 
-# 3) Instalar PyTorch + CUDA (exemplo para CUDA 12.6 / PyTorch 2.8)
-
----# Ajuste a URL conforme sua CUDA/PyTorch alvo: https://pytorch.org/get-started/locally/
-
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126
+---
 
 ## Instalação
 
-# 4) Instalar openmim (helper do OpenMMLab) e dependências principais
+### Requisitos
 
-### Requisitospip install -U openmim
+- **OS**: Linux (testado em Ubuntu)
+- **GPU**: NVIDIA com driver/CUDA (testado RTX 5060, CUDA 12.6)
+- **Python**: 3.10–3.12
+- **Espaço**: ~100GB (datasets + checkpoints)
 
-- **Python**: 3.8+ (recomendado 3.10-3.12)mim install mmengine
+### Passo a Passo
 
-- **GPU**: NVIDIA com CUDA 12.x (testado com RTX 5060)mim install "mmcv>=2.0.0,<2.2.0"
-
-- **RAM**: ≥16GB (recomendado 32GB)mim install "mmdet>=3.0.0,<3.3.0"
-
-- **Disco**: ≥100GB livres (datasets + checkpoints)mim install mmpose
-
-
-
-### Passo a Passo (testado e funcionando)# 5) Instalar bibliotecas do requirements (opcional/auxiliar)
-
-pip install -r requirements.txt
-
-```bash
-
-# 1. Clone e entre no projeto# 6) Verificar instalação básica
-
-cd /home/davs/Documents/TCC/Projectpython -c "import torch, mmcv, mmdet, mmpose, mmengine; print(torch.__version__, mmcv.__version__, mmdet.__version__, mmpose.__version__, mmengine.__version__)"
-
-```
+\`\`\`bash
+# 1. Entre no diretório do projeto
+cd /home/davs/Documents/TCC/Project
 
 # 2. Crie e ative ambiente virtual
-
-python3 -m venv venvObservação: trocas de versão entre `mmcv`, `mmdet`, `mmengine` e `mmpose` são sensíveis — use as faixas recomendadas acima. Se você preferir uma alternativa isolada, usar uma imagem Docker oficial do OpenMMLab (quando disponível) evita problemas de compilação local.
-
+python3 -m venv venv
 source venv/bin/activate
 
-## Execução rápida (exemplos)
-
 # 3. Atualize pip
+pip install --upgrade pip
 
-pip install --upgrade pipAtive o venv (`source venv/bin/activate`) e use o Python do ambiente. Exemplos:
-
-
-
-# 4. Instale PyTorch com CUDA 12.61) Testar importações (sanity check):
-
+# 4. Instale PyTorch com CUDA 12.6 (ajuste conforme sua CUDA)
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126
 
-```bash
-
-# 5. Instale dependências OpenMMLabpython -c "import torch, mmcv, mmdet, mmpose, mmengine; print('OK')"
-
-pip install -U openmim```
-
+# 5. Instale OpenMMLab via openmim
+pip install -U openmim
 mim install mmengine
-
-mim install "mmcv>=2.0.0,<2.2.0"2) Treinar / fine-tune (com checkpoint pré-baixado):
-
+mim install "mmcv>=2.0.0,<2.2.0"
 mim install "mmdet>=3.0.0,<3.3.0"
+mim install mmpose
 
-mim install mmpose```bash
+# 6. Instale dependências auxiliares
+pip install -r requirements.txt
 
-# Coloque o checkpoint em checkpoints/
+# 7. Verifique instalação
+python -c "import torch, mmcv, mmdet, mmpose; print('✅ OK')"
+python -c "import torch; print('CUDA:', torch.cuda.is_available())"
+\`\`\`
 
-# 6. Instale dependências auxiliarespython src/training/train_pose.py \
+**Nota**: Ajuste a URL do PyTorch conforme sua versão CUDA em https://pytorch.org/get-started/locally/
 
-pip install -r requirements.txt  --config configs/rtmpose_m_wholebody.py \
+---
 
-  --load-from checkpoints/rtmpose-m_simcc-body7_pt-body7_420e-256x192-e48f03d0_20230504.pth \
-
-# 7. Verifique instalação  --work-dir work_dirs/finetune_grayscale \
-
-python -c "import torch, mmcv, mmdet, mmpose, mmengine; print('✅ Tudo OK!')"  --amp
-
-python -c "import torch; print(f'GPU disponível: {torch.cuda.is_available()}')"```
-
-```
-
-3) Rodar um dry-run (teste rápido) com a configuração mínima que acompanha o projeto:
-
-**Nota sobre MMCV**: Se encontrar erros com `mmcv._ext`, instale a versão compilada completa para seu CUDA/PyTorch específico (consulte documentação do OpenMMLab).
-
-```bash
-
----python src/training/train_pose.py \
-
-  --config configs/rtmpose_m_wholebody_minimal.py \
-
-## Uso  --work-dir work_dirs/test_minimal
-
-```
+## Como Usar
 
 ### 1. Preparar Dataset
 
-Se quiser forçar o uso da GPU verifique que o venv Python reconhece a GPU (veja `python -c "import torch; print(torch.cuda.is_available())"`) e rode os comandos com o venv ativado; o script seleciona GPUs automaticamente (pela configuração).
-
-```bash
-
-# Executar script de preparação completo## Troubleshooting (erros comuns e correções)
-
+\`\`\`bash
+# Automático (recomendado)
 bash scripts/prepare_dataset.sh
 
-- Erro: "ModuleNotFoundError: No module named 'mmcv._ext'"
+# OU manual:
+python src/data/download_coco.py  # Download COCO-WholeBody
+python src/data/convert_to_gray.py \\
+  --input-dir data/raw \\
+  --output-dir data/processed/grayscale \\
+  --simulate-ir \\
+  --apply-augmentation
+\`\`\`
 
-# OU preparar manualmente:  - Causa: MMCV precisa de extensões compiladas (ops CUDA) que nem sempre estão presentes na instalação pip genérica.
+**Resultado**: Estrutura em \`data/processed/grayscale/{train2017,val2017,annotations}/\`
 
-# a) Download COCO-WholeBody  - Soluções:
+### 2. Treinar Modelo
 
-python src/data/download_coco.py    1. Instale uma build do MMCV compatível com sua versão do PyTorch/CUDA. Use `mim install "mmcv>=2.0.0,<2.2.0"` para cu126/torch2.8 conforme mostrado acima.
+\`\`\`bash
+# Fine-tuning completo (recomendado)
+python src/training/train_pose.py \\
+  --config configs/rtmpose_m_wholebody.py \\
+  --load-from checkpoints/rtmpose-m_simcc-body7_pt-body7_420e-256x192-e48f03d0_20230504.pth \\
+  --work-dir work_dirs/finetune_grayscale \\
+  --amp
 
-    2. Para produção, instale `mmcv-full` pré-compilado que corresponde exatamente ao seu CUDA/PyTorch (procure a wheel no site do OpenMMLab) — isso habilita `mmcv._ext`.
+# OU teste rápido (1 epoch, dry-run)
+python src/training/train_pose.py \\
+  --config configs/rtmpose_m_wholebody_minimal.py \\
+  --work-dir work_dirs/test_minimal
+\`\`\`
 
-# b) Converter para grayscale    3. Como último recurso temporário (somente para desenvolvimento), é possível usar um stub `mmcv._ext` para evitar crashes de import; porém esse stub não fornece acelerações nem as operações CUDA e deve ser removido em produção.
-
-python src/data/convert_to_gray.py \
-
-    --input-dir data/raw \- Erro: incompatibilidade entre `mmcv`, `mmdet` e `mmpose` (assertions sobre versões)
-
-    --output-dir data/processed/grayscale \  - Mantenha os pacotes nas faixas compatíveis: `mmcv>=2.0.0,<2.2.0`; `mmdet>=3.0.0,<3.3.0`; `mmpose` compatível com `mmengine` (o `mim` costuma resolver isso automaticamente).
-
-    --simulate-ir \
-
-    --apply-augmentation- Aviso GPU (exemplo RTX 5060 / Ada Lovelace)
-
-```  - GPUs muito novas (compute capability >= 12.0) eventualmente não são suportadas por algumas builds oficiais do PyTorch/MMCV e podem emitir avisos do tipo "not compatible with the current PyTorch installation".
-
-  - Se ocorrerem avisos de compatibilidade, duas opções:
-
-### 2. Treinar Modelo    1. Instalar uma build do PyTorch que suporte sua GPU (ex.: PyTorch com suporte a cu128) seguindo https://pytorch.org/get-started/locally/;
-
-    2. Executar no CPU ou em uma GPU compatível até obter uma build apropriada.
-
-```bash
-
-# Treinamento completo com fine-tuning (recomendado)## Dicas úteis
-
-python src/training/train_pose.py \- Sempre ative o `venv` antes de rodar os comandos: `source venv/bin/activate`.
-
-    --config configs/rtmpose_m_wholebody.py \- Use `mim install` para gerenciar pacotes do ecossistema OpenMMLab — ele cuida de dependências binárias quando possível.
-
-    --load-from checkpoints/rtmpose-m_simcc-body7_pt-body7_420e-256x192-e48f03d0_20230504.pth \- Se precisar de uma instalação imutável e reproduzível, considere usar Docker (imagem OpenMMLab) ou um ambiente Conda com canais binários apropriados.
-
-    --work-dir work_dirs/finetune_grayscale \
-
-    --amp## Contato / Ajuda
-
-Se encontrar um erro que você não consegue resolver, cole o traceback e eu (ou o seu orientador) posso ajudar a diagnosticar a dependência específica.
-
-# Teste rápido (dry-run) - 1 epoch
-
-python src/training/train_pose.py \---
-
-    --config configs/rtmpose_m_wholebody_minimal.py \
-
-    --work-dir work_dirs/test_minimalPequena nota: este README foi atualizado para refletir os passos testados neste repositório (Python 3.12 + PyTorch 2.8.0+cu126) e incluir instruções práticas de resolução de problemas com `mmcv`/`mmcv._ext`.
-
-```
-
-## Roadmap
+**Checkpoints pré-treinados**: Coloque em \`checkpoints/\` (veja seção Referências).
 
 ### 3. Avaliar Modelo
 
-### Fase 1: Setup e Preparação de Dados (Semanas 1-2)
+\`\`\`bash
+# Comparar RGB vs Grayscale
+python src/evaluation/evaluate_pose.py \\
+  --cfg work_dirs/test_minimal5/rtmpose_m_wholebody_minimal.py \\
+  --ckpt work_dirs/test_minimal5/best_coco-wholebody_AP_epoch_50.pth \\
+  --rgb-dir data/raw/val2017 \\
+  --ir-dir data/processed/grayscale/val2017 \\
+  --out-dir work_dirs/eval_results \\
+  --n 20
+\`\`\`
 
-```bash- [x] Download do COCO-WholeBody
+**Saída**: Imagens anotadas e métricas em \`work_dirs/eval_results/{rgb,ir}/\`
 
-# Comparar performance RGB vs IR- [x] Conversão para grayscale
+### 4. Inferência em Tempo Real
 
-python src/evaluation/evaluate_pose.py \- [x] Implementação de data augmentation
+#### Webcam
 
-    --cfg work_dirs/test_minimal5/rtmpose_m_wholebody_minimal.py \- [x] Análise exploratória dos dados
+\`\`\`bash
+python src/evaluation/run_realtime.py \\
+  --cfg work_dirs/test_minimal5/rtmpose_m_wholebody_minimal.py \\
+  --ckpt work_dirs/test_minimal5/best_coco-wholebody_AP_epoch_50.pth \\
+  --device cuda:0 \\
+  --source 0
+\`\`\`
 
-    --ckpt work_dirs/test_minimal5/best_coco-wholebody_AP_epoch_50.pth \
+#### Vídeo
 
-    --rgb-dir data/raw/val2017 \### Fase 2: Baseline Model (Semanas 3-4)
+\`\`\`bash
+python src/evaluation/run_realtime.py \\
+  --cfg work_dirs/test_minimal5/rtmpose_m_wholebody_minimal.py \\
+  --ckpt work_dirs/test_minimal5/best_coco-wholebody_AP_epoch_50.pth \\
+  --device cuda:0 \\
+  --source data/video/seu_video.mp4
+\`\`\`
 
-    --ir-dir data/processed/grayscale/val2017 \- [x] Setup RTMDet para detecção de pessoas
+#### Com Detector de Pessoas (Multi-Pessoa)
 
-    --out-dir work_dirs/eval_results \- [x] Setup RTMPose para estimação de pose
+\`\`\`bash
+python src/evaluation/run_realtime.py \\
+  --cfg work_dirs/test_minimal5/rtmpose_m_wholebody_minimal.py \\
+  --ckpt work_dirs/test_minimal5/best_coco-wholebody_AP_epoch_50.pth \\
+  --det-cfg configs/detectors/rtmdet_nano_person_infer.py \\
+  --det-ckpt checkpoints/rtmdet_nano_8xb32-100e_coco-obj365-person-05d8511e.pth \\
+  --bbox-thr 0.5 \\
+  --score-thr 0.4 \\
+  --device cuda:0 \\
+  --source 0
+\`\`\`
 
-    --n 20- [x] Treinamento baseline com imagens RGB
+**Controles**: Pressione \`q\` para sair | FPS exibido no canto superior esquerdo
 
-```- [x] Avaliação baseline
+### 5. Visualizar Treinamento
 
-
-
-### 4. Visualizar Treinamento### Fase 3: Adaptação para Grayscale (Semanas 5-7)
-
-- [x] Fine-tuning RTMDet para grayscale
-
-```bash- [x] Fine-tuning RTMPose para grayscale
-
-# Opção 1: TensorBoard- [x] Data augmentation específica para IR
-
-tensorboard --logdir work_dirs/test_minimal5 --port 6006- [x] Avaliação comparativa RGB vs Grayscale
-
+\`\`\`bash
+# TensorBoard
+tensorboard --logdir work_dirs/test_minimal5 --port 6006
 # Abra http://localhost:6006
 
-### Fase 4: Otimização e Tempo Real (Semanas 8-10)
-
-# Opção 2: Script de plotagem- [ ] Otimização de inferência
-
-python scripts/plot_training.py \- [ ] Quantização do modelo
-
-    --logdir work_dirs/test_minimal5 \- [ ] Testes de performance
-
-    --out plots/training_curves.png- [ ] Deployment para tempo real
-
-```
-
-### Fase 5: Validação e Documentação (Semanas 11-12)
-
----- [ ] Testes em ambiente veicular
-
-- [ ] Documentação completa
-
-## Avaliação- [ ] Artigo científico
-
-- [ ] Apresentação TCC
-
-### Script de Avaliação (`evaluate_pose.py`)
-
-## Status atual
-
-O script `src/evaluation/evaluate_pose.py` realiza:
-
-- Treinamento concluído (run: `work_dirs/test_minimal5`) — melhor checkpoint salvo em `best_coco-wholebody_AP_epoch_50.pth` (AP 0.4373 em epoch 50).
-
-1. **Inferência**: Aplica RTMPose em imagens RGB e IR- Checkpoints, logs e config estão em `work_dirs/test_minimal5`.
-
-2. **Visualização**: Salva imagens com keypoints desenhados- Scripts de pré-processamento (`src/data/convert_to_gray.py`, `scripts/prepare_dataset.sh`) e training (`src/training/train_pose.py`) prontos e usados.
-
-3. **Métrica**: Calcula distância normalizada entre keypoints RGB vs IR
-
-Próximos passos recomendados:
-
-**Saída**:
-
-- Imagens anotadas em `work_dirs/eval_results/rgb/` e `.../ir/`- Visualizar treino (TensorBoard ou script de plotagem) — recomendado primeiro passo para inspecionar curvas de perda e métricas.
-
-- Métrica: distância média normalizada (quanto menor, mais similar)- Rodar uma avaliação completa usando o checkpoint `best_coco-wholebody_AP_epoch_50.pth`.
-
-- Iniciar Fase 4: otimização e preparação para inferência em tempo real (quantização, ONNX, TensorRT).
-
-### Métricas COCO
-
-## Como visualizar o treinamento
-
-| Métrica | Descrição | Threshold |
-
-|---------|-----------|-----------|1) Usando TensorBoard (recomendado quando logs do runner foram salvos em formato compatível):
-
-| **AP** | Average Precision | OKS 0.5:0.95 |
-
-| **AP@0.5** | AP em OKS 0.5 | OKS 0.5 |```bash
-
-| **AP@0.75** | AP em OKS 0.75 | OKS 0.75 |# ative o venv
-
-| **PCK** | Percentage Correct Keypoints | 0.2 × torso |source venv/bin/activate
-
-| **AR** | Average Recall | OKS 0.5:0.95 |
-
-# rode tensorboard apontando para a pasta de logs (ajuste se necessário)
-
-**OKS** (Object Keypoint Similarity): Métrica padrão do COCO, similar ao IoU mas para keypoints.tensorboard --logdir work_dirs/test_minimal5 --port 6006
-
-
-
----# abra no navegador: http://localhost:6006
-
-```
-
-## Datasets
-
-2) Script rápido de plotagem (gerará PNGs com curvas de loss e métricas):
-
-### COCO-WholeBody (Principal)
-
-```bash
-
-- **Descrição**: Extensão do COCO com anotações de corpo completopython scripts/plot_training.py --logdir work_dirs/test_minimal5 --out plots/training_curves.png
-
-- **Link**: https://github.com/jin-s13/COCO-WholeBody```
-
-- **Training**: ~118,000 imagens
-
-- **Validation**: ~5,000 imagensO script `scripts/plot_training.py` acima analisa arquivos `*.log.json` (formato do MMEngine/MMCV logger) ou `events.out.tfevents.*` e plota curvas básicas.
-
-- **Test**: ~20,000 imagens
-
-
-
-#### Keypoints (133 total):## Métricas de Avaliação
-
-```
-
-├── Body: 17 keypoints (COCO padrão)### Object Keypoint Similarity (OKS)
-
-│   └── nose, eyes, ears, shoulders, elbows, wrists,- Métrica padrão do COCO
-
-│       hips, knees, ankles- Similar ao IoU, mas para keypoints
-
-├── Face: 68 keypoints (facial landmarks)
-
-├── Hands: 42 keypoints (21 por mão)### PCK (Percentage of Correct Keypoints)
-
-└── Feet: 6 keypoints (pontos dos pés)- Porcentagem de keypoints corretamente detectados
-
-```- Threshold geralmente em 0.2 (20% da distância torso)
-
-
-
-### Datasets Complementares (futuro)### AP (Average Precision)
-
-- **MPII**: Para validação adicional- AP@0.5, AP@0.75, AP@0.5:0.95
-
-- **CrowdPose**: Cenários com múltiplas pessoas- Para diferentes thresholds de OKS
-
-- **3DPW**: Validação 3D
-
-### AR (Average Recall)
-
----- AR@0.5, AR@0.75, AR@0.5:0.95
-
-
-
-## Resultados### Tempo de Inferência
-
-- FPS (Frames Per Second)
-
-### Status Atual (test_minimal5)- Latência média (ms)
-
-- Throughput
-
-**Treinamento concluído**:
-
-- Epochs: 50## Referências
-
-- Best checkpoint: `best_coco-wholebody_AP_epoch_50.pth`
-
-- **AP**: 0.4373 (COCO-WholeBody validation set)### Papers
-
-- GPU: NVIDIA RTX 5060 8GB- RTMPose: Real-Time Multi-Person Pose Estimation (2023)
-
-- Tempo: ~24h (50 epochs)- COCO-WholeBody: COCO with Whole-Body Keypoint Annotations (2020)
-
-- OpenPose: Realtime Multi-Person 2D Pose Estimation (2018)
-
-### Performance Esperada
-
-### Repositories
-
-| Métrica | Valor Esperado | Observação |- MMPose: https://github.com/open-mmlab/mmpose
-
-|---------|----------------|------------|- RTMPose: https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose
-
-| **AP (Grayscale)** | 60-65% | Com fine-tuning completo |- COCO-WholeBody: https://github.com/jin-s13/COCO-WholeBody
-
-| **FPS** | 35-50 | Single person, RTX 5060 |
-
-| **Latência** | <30ms | Por frame |## Contato
-
-| **VRAM** | ~4-6GB | Permite batch inference |- **Autor**: Davi Baechtold Campos
-
-| **Degradação RGB→IR** | <10% | Meta do projeto |- **Orientador**: Prof. Dr. Alceu de Souza Brito Junior
-
-- **Instituição**: PUCPR
-
-**Nota**: Resultados parciais (43.73% AP) são do treinamento intermediário (50 epochs). Fine-tuning completo e otimizações devem melhorar significativamente.
+# OU script de plotagem
+python scripts/plot_training.py \\
+  --logdir work_dirs/test_minimal5 \\
+  --out plots/training_curves.png
+\`\`\`
+
+---
+
+## Estrutura do Projeto
+
+\`\`\`
+Project/
+├── data/
+│   ├── raw/                          # COCO-WholeBody original (RGB)
+│   └── processed/grayscale/          # Convertido para grayscale + augmentation
+│
+├── src/
+│   ├── data/
+│   │   ├── download_coco.py          # Download do dataset
+│   │   ├── convert_to_gray.py        # Conversão RGB → Grayscale
+│   │   └── augmentation.py           # Data augmentation
+│   ├── training/
+│   │   └── train_pose.py             # Script de treinamento
+│   └── evaluation/
+│       ├── evaluate_pose.py          # Avaliação RGB vs Grayscale
+│       └── run_realtime.py           # Inferência em tempo real
+│
+├── configs/
+│   ├── rtmpose_m_wholebody.py        # Config principal (completa)
+│   ├── rtmpose_m_wholebody_minimal.py # Config rápida (testes)
+│   └── detectors/
+│       └── rtmdet_nano_person_infer.py # Config RTMDet
+│
+├── checkpoints/                      # Checkpoints pré-treinados
+├── work_dirs/                        # Outputs de treinamento
+│   ├── test_minimal5/                # ⭐ Melhor modelo atual
+│   │   └── best_coco-wholebody_AP_epoch_50.pth
+│   └── eval_results/                 # Resultados de avaliação
+│
+├── scripts/
+│   ├── prepare_dataset.sh            # Preparação automática
+│   ├── plot_training.py              # Visualização de curvas
+│   └── train_full_pipeline.sh        # Pipeline completo
+│
+├── requirements.txt
+└── README.md
+\`\`\`
 
 ---
 
 ## Troubleshooting
 
-### Erros Comuns
+### Erro: \`ModuleNotFoundError: No module named 'mmcv._ext'\`
 
-#### 1. `ModuleNotFoundError: No module named 'mmcv._ext'`
+**Causa**: MMCV precisa de extensões compiladas (ops CUDA).
 
-**Causa**: MMCV precisa de extensões compiladas (ops CUDA)
-
-**Soluções**:
-```bash
-# Opção 1: Reinstalar mmcv com mim (recomendado)
+**Solução**:
+\`\`\`bash
 mim install "mmcv>=2.0.0,<2.2.0"
+\`\`\`
 
-# Opção 2: Instalar mmcv-full pré-compilado para seu CUDA
-# Veja: https://mmcv.readthedocs.io/en/latest/get_started/installation.html
-```
+### Erro: Incompatibilidade de versões (mmcv, mmdet, mmpose)
 
-#### 2. Incompatibilidade de versões (mmcv, mmdet, mmpose)
-
-**Solução**: Manter versões compatíveis:
-```bash
-pip uninstall mmcv mmdet mmpose mmengine
+**Solução**: Reinstalar com versões compatíveis:
+\`\`\`bash
+pip uninstall mmcv mmdet mmpose mmengine -y
 mim install mmengine
 mim install "mmcv>=2.0.0,<2.2.0"
 mim install "mmdet>=3.0.0,<3.3.0"
 mim install mmpose
-```
+\`\`\`
 
-#### 3. CUDA Out of Memory
+### Erro: CUDA Out of Memory
 
 **Soluções**:
-- Reduzir `batch_size` em configs (ex: 32 → 16 → 8)
-- Usar `--amp` (mixed precision)
-- Reduzir resolução de entrada (não recomendado)
+- Reduzir \`batch_size\` no config (32 → 16 → 8)
+- Usar flag \`--amp\` (mixed precision)
+- Usar config minimal em vez de completa
 
-#### 4. Aviso GPU RTX 5060 / Ada Lovelace
+### Erro: PyTorch 2.6+ Weights Only Load Failed
 
-**Contexto**: GPUs Ada Lovelace (compute capability 12.0) podem não ser suportadas por builds antigas do PyTorch/MMCV
+**Causa**: PyTorch 2.6+ mudou padrão de \`weights_only\` para \`True\`.
 
-**Solução**:
-```bash
-# Usar PyTorch com suporte a CUDA 12.x
+**Solução**: Já corrigido no código (\`run_realtime.py\` faz monkey-patch do \`torch.load\`).
+
+### Aviso: GPU não compatível (RTX série 50 / Ada Lovelace)
+
+**Solução**: Instalar PyTorch com suporte CUDA 12.x:
+\`\`\`bash
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126
-```
-
-#### 5. AttributeError: 'ConfigDict' object has no attribute 'test_dataloader'
-
-**Causa**: Config não possui `test_dataloader` (script de avaliação precisa)
-
-**Solução**: O script `evaluate_pose.py` já contém fallback automático para `val_dataloader`. Se persistir:
-```python
-# Adicionar ao config:
-test_dataloader = val_dataloader.copy()
-```
+\`\`\`
 
 ---
 
-## Roadmap
+## Resultados
 
-### ✅ Fase 1: Setup e Preparação de Dados (Concluída)
-- [x] Download do COCO-WholeBody
-- [x] Conversão para grayscale
-- [x] Implementação de data augmentation
-- [x] Análise exploratória dos dados
+### Status Atual
 
-### ✅ Fase 2: Baseline Model (Concluída)
-- [x] Setup RTMDet para detecção de pessoas
-- [x] Setup RTMPose para estimação de pose
-- [x] Treinamento baseline
+- **Modelo**: RTMPose-M fine-tuned para grayscale
+- **Treinamento**: 50 epochs (~24h em RTX 5060 8GB)
+- **AP (COCO-WholeBody val)**: 0.4373
+- **Checkpoint**: \`work_dirs/test_minimal5/best_coco-wholebody_AP_epoch_50.pth\`
 
-### ✅ Fase 3: Adaptação para Grayscale (Concluída)
-- [x] Fine-tuning RTMPose para grayscale
-- [x] Data augmentation específica para IR
-- [x] Checkpoint best_coco-wholebody_AP_epoch_50.pth salvo
+### Performance Esperada (Fine-tuning Completo)
 
-### 📍 Fase 4: Otimização e Tempo Real (Em Progresso)
-- [x] Script de avaliação RGB vs IR (`evaluate_pose.py`)
-- [ ] Avaliação completa com métricas COCO
-- [ ] Otimização de inferência (quantização)
-- [ ] Exportação ONNX/TensorRT
-- [ ] Benchmark de performance
+| Métrica | Valor Alvo | Observação |
+|---------|------------|------------|
+| **AP (Grayscale)** | 60-65% | Com treinamento completo |
+| **FPS** | 35-50 | Single person, RTX 5060 |
+| **Latência** | <30ms | Por frame |
+| **VRAM** | ~4-6GB | Permite batch inference |
+| **Degradação RGB→IR** | <10% | Meta do projeto |
 
-### 🔜 Fase 5: Validação e Documentação
-- [ ] Testes em ambiente veicular (dados reais)
-- [ ] Análise de failure cases
-- [ ] Documentação completa
-- [ ] Artigo científico
-- [ ] Apresentação TCC
+### Métricas COCO
 
----
+| Métrica | Descrição | Threshold |
+|---------|-----------|-----------|
+| **AP** | Average Precision | OKS 0.5:0.95 |
+| **AP@0.5** | AP em OKS 0.5 | OKS 0.5 |
+| **AP@0.75** | AP em OKS 0.75 | OKS 0.75 |
+| **PCK** | Percentage Correct Keypoints | 0.2 × torso |
+| **AR** | Average Recall | OKS 0.5:0.95 |
 
-## Limpeza Recomendada
-
-### Arquivos Redundantes (podem ser removidos):
-
-#### Markdown duplicados:
-- `EXECUTIVE_SUMMARY.md` ← consolidado neste README
-- `PROJECT_SUMMARY.md` ← consolidado neste README
-- `START_HERE.md` ← consolidado neste README
-- `HARDWARE_SETUP.md` ← consolidado neste README
-- `QUICKSTART.md` ← consolidado neste README
-
-#### Configs não utilizados em `/configs/`:
-- `rtmpose_m_wholebody_train_is_val.py`
-- `rtmpose_m_wholebody_train_is_val_light.py`
-- `rtmpose_m_wholebody_ultra_minimal.py`
-
-**Manter apenas**:
-- `rtmpose_m_wholebody.py` (config principal)
-- `rtmpose_m_wholebody_minimal.py` (config de teste)
-
-#### Pastas vazias/intermediárias em `/work_dirs/`:
-```
-baseline_grayscale/       → pode remover (experimentos antigos)
-finetune_grayscale/       → pode remover (experimentos antigos)
-test_cpu/                 → pode remover (teste CPU)
-test_minimal/             → pode remover (testes intermediários)
-test_minimal2/            → pode remover (testes intermediários)
-test_minimal3/            → pode remover (testes intermediários)
-test_minimal4/            → pode remover (testes intermediários)
-test_minimal_run/         → pode remover (dry-run)
-```
-
-**Manter apenas**:
-- `test_minimal5/` (melhor modelo)
-- `eval_results/` (resultados de avaliação)
-
-#### Dados duplicados em `/data/`:
-- `test_conversion/` → pode remover (teste de conversão)
-- `test_gray/` → pode remover (teste de conversão)
-
-**Manter apenas**:
-- `raw/` (RGB original)
-- `processed/grayscale/` (conversão final usada no treinamento)
+**OKS** (Object Keypoint Similarity): Métrica padrão COCO, similar ao IoU mas para keypoints.
 
 ---
 
 ## Referências
 
 ### Papers
-- [RTMPose: Real-Time Multi-Person Pose Estimation (2023)](https://arxiv.org/abs/2303.07399)
-- [COCO-WholeBody: COCO with Whole-Body Keypoint Annotations (ECCV 2020)](https://link.springer.com/chapter/10.1007/978-3-030-58545-7_12)
-- [OpenPose: Realtime Multi-Person 2D Pose Estimation (2018)](https://arxiv.org/abs/1812.08008)
 
-### Repositories
+- [RTMPose: Real-Time Multi-Person Pose Estimation](https://arxiv.org/abs/2303.07399) (2023)
+- [COCO-WholeBody: COCO with Whole-Body Keypoint Annotations](https://link.springer.com/chapter/10.1007/978-3-030-58545-7_12) (ECCV 2020)
+- [OpenPose: Realtime Multi-Person 2D Pose Estimation](https://arxiv.org/abs/1812.08008) (2018)
+
+### Repositórios
+
 - [MMPose](https://github.com/open-mmlab/mmpose) - OpenMMLab Pose Estimation Toolbox
 - [RTMPose](https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose) - RTMPose implementation
 - [COCO-WholeBody](https://github.com/jin-s13/COCO-WholeBody) - Dataset oficial
 
 ### Documentação
+
 - [MMPose Docs](https://mmpose.readthedocs.io/)
 - [MMCV Docs](https://mmcv.readthedocs.io/)
 - [MMDetection Docs](https://mmdetection.readthedocs.io/)
+
+### Checkpoints Pré-Treinados
+
+**RTMPose-M (Body7)**:
+- Link: [Checkpoint oficial](https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/rtmpose-m_simcc-body7_pt-body7_420e-256x192-e48f03d0_20230504.pth)
+- Colocar em: \`checkpoints/rtmpose-m_simcc-body7_pt-body7_420e-256x192-e48f03d0_20230504.pth\`
+
+**RTMDet-Nano (Person Detection)**:
+- Link: [Checkpoint oficial](https://download.openmmlab.com/mmpose/v1/projects/rtmpose/rtmdet_nano_8xb32-100e_coco-obj365-person-05d8511e.pth)
+- Colocar em: \`checkpoints/rtmdet_nano_8xb32-100e_coco-obj365-person-05d8511e.pth\`
 
 ---
 
@@ -781,17 +434,14 @@ test_minimal_run/         → pode remover (dry-run)
 **Aluno**: Davi Baechtold Campos  
 **Orientador**: Prof. Dr. Alceu de Souza Brito Junior  
 **Instituição**: PUCPR  
-**Curso**: Engenharia de Computação
+**Curso**: Engenharia de Computação  
 
 ---
 
 ## Licença
 
-Este projeto é desenvolvido para fins acadêmicos (TCC).
-
-Bibliotecas utilizadas (MMPose, MMDetection, etc.) possuem suas próprias licenças (geralmente Apache 2.0).
+Este projeto é desenvolvido para fins acadêmicos (TCC). Bibliotecas utilizadas (MMPose, MMDetection, etc.) possuem suas próprias licenças (geralmente Apache 2.0).
 
 ---
 
-**Última atualização**: Outubro 2025  
-**Versão**: 1.0 (Consolidada)
+**Última atualização**: Outubro 2025 | **Versão**: 2.0 (Simplificada)
