@@ -229,22 +229,22 @@ python src/evaluation/evaluate_pose.py \\
 
 #### Webcam
 
-\`\`\`bash
-python src/evaluation/run_realtime.py \\
-  --cfg work_dirs/test_minimal5/rtmpose_m_wholebody_minimal.py \\
-  --ckpt work_dirs/test_minimal5/best_coco-wholebody_AP_epoch_50.pth \\
-  --device cuda:0 \\
+\`\`\`
+python src/evaluation/run_realtime.py \
+  --cfg work_dirs/test_minimal5/rtmpose_m_wholebody_minimal.py \
+  --ckpt work_dirs/test_minimal5/best_coco-wholebody_AP_epoch_50.pth \
+  --device cuda:0 \
   --source 0
 \`\`\`
 
 #### Vídeo
 
-\`\`\`bash
-python src/evaluation/run_realtime.py \\
-  --cfg work_dirs/test_minimal5/rtmpose_m_wholebody_minimal.py \\
-  --ckpt work_dirs/test_minimal5/best_coco-wholebody_AP_epoch_50.pth \\
-  --device cuda:0 \\
-  --source data/video/seu_video.mp4
+\`\`\`
+python src/evaluation/run_realtime.py \
+  --cfg work_dirs/test_minimal5/rtmpose_m_wholebody_minimal.py \
+  --ckpt work_dirs/test_minimal5/best_coco-wholebody_AP_epoch_50.pth \
+  --device cuda:0 \
+  --source SEU_VIDEO.mp4
 \`\`\`
 
 #### Com Detector de Pessoas (Multi-Pessoa)

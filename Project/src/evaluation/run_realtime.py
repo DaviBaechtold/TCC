@@ -45,6 +45,17 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def list_available_cameras(max_test: int = 10) -> list:
+    """List available camera indices."""
+    available = []
+    for i in range(max_test):
+        cap = cv2.VideoCapture(i)
+        if cap.isOpened():
+            available.append(i)
+            cap.release()
+    return available
+
+
 def open_source(source: str) -> cv2.VideoCapture:
     if len(source) == 1 and source.isdigit():
         cap = cv2.VideoCapture(int(source))
@@ -133,6 +144,20 @@ def main() -> None:
 
     cap = open_source(args.source)
     if not cap.isOpened():
+        print(f"❌ Could not open source {args.source}")
+        if args.source.isdigit():
+            print("\n🔍 Scanning for available cameras...")
+            available = list_available_cameras()
+            if available:
+                print(f"✅ Found cameras at indices: {available}")
+                print(f"\nTry running with: --source {available[0]}")
+            else:
+                print("❌ No cameras found!")
+                print("\nPossible solutions:")
+                print("  1. Check if camera is connected")
+                print("  2. Check if another program is using the camera")
+                print("  3. Try running: ls /dev/video*")
+                print("  4. Use a video file instead: --source path/to/video.mp4")
         raise RuntimeError(f"Could not open source {args.source}")
 
     if args.width > 0:
