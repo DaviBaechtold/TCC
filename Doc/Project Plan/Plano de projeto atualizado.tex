@@ -1,0 +1,565 @@
+\documentclass[12pt, a4paper]{article}
+
+% --- PACOTES ---
+\usepackage[utf8]{inputenc}
+\usepackage[brazil]{babel}
+\usepackage{abntex2cite}
+\usepackage{graphicx}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{indentfirst}
+\usepackage{setspace}
+\usepackage{times}
+\usepackage{tikz}
+\usepackage{array}
+\usetikzlibrary{shapes.geometric, arrows, positioning, fit}
+
+% --- MARGENS / FORMATAÇÃO ---
+\geometry{
+ a4paper,
+ left=3cm,
+ right=2cm,
+ top=3cm,
+ bottom=2cm
+}
+\onehalfspacing
+\setlength{\parindent}{1.25cm}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    urlcolor=blue,
+    citecolor=black
+}
+
+\begin{document}
+
+% --- CAPA ---
+\begin{titlepage}
+    \centering
+    {\large PLANO DE PROJETO \par}
+    \vspace{1.5cm}
+    {\bfseries\Large ARQUITETURA EFICIENTE PARA ESTIMAÇÃO DE POSE COMPLETA (\textit{FULL-BODY}) EM AMBIENTE VEICULAR ATRAVÉS DE \textit{LIFTING} 2D-PARA-3D \par}
+    \vspace{2.5cm}
+
+    \begin{flushleft}
+        \textbf{Integrante:} Davi Baechtold Campos \\
+        \textbf{Orientador:} Prof. Dr. Alceu de Souza Brito Junior \\
+        \textbf{Coorientador:} Prof. Dr. Alessandro Zimmer
+    \end{flushleft}
+
+    \vfill
+    \begin{flushleft}
+        \textbf{Assinaturas:}\\[1.4cm]
+        \makebox[9cm]{\hrulefill}\\
+        \small Orientador: Prof. Dr. Alceu de Souza Brito Junior 
+    \end{flushleft}
+
+    \vfill
+    {\large Curitiba, \today \par}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+\setcounter{page}{1}
+
+% --- RESUMO ---
+\section{RESUMO}
+Este projeto propõe o desenvolvimento de uma arquitetura eficiente para
+estimação de pose completa (\textit{full-body}) em ambiente veicular utilizando
+técnicas de \textit{2D-to-3D lifting} baseadas em \textit{keypoints}. O
+\textit{lifting} refere-se ao processo de inferir coordenadas tridimensionais
+(3D) a partir de pontos bidimensionais (2D) detectados em imagens, resolvendo a
+ambiguidade de profundidade através de modelos de aprendizado profundo. O foco
+principal será no desenvolvimento de métodos robustos para detecção e
+\textit{lifting} de \textit{keypoints} corporais, com expansão posterior para
+face e mãos. A pesquisa aborda a questão fundamental de como construir uma
+arquitetura computacionalmente eficiente que integre corpo, face e mãos em um
+sistema unificado de monitoramento veicular. O projeto utilizará
+pré-treinamento com datasets públicos, incluindo o dataset do RTMPose para
+\textit{2D pose keypoints}, e validação no Drive\&Act dataset para cenários
+automotivos específicos.
+
+\vspace{0.5cm}
+\noindent\textbf{Palavras-chave:} Estimação de Pose \textit{Full-Body}; \textit{Keypoints}; Arquitetura Eficiente; Ambiente Veicular; \textit{2D-to-3D Lifting}.
+
+% --- INTRODUÇÃO ---
+\section{INTRODUÇÃO}
+
+A indústria automotiva tem experimentado uma transformação significativa nas últimas décadas, impulsionada pela crescente demanda por segurança veicular e pela evolução tecnológica dos sistemas de assistência ao motorista. Os Sistemas Avançados de Assistência ao Condutor (ADAS - \textit{Advanced Driver Assistance Systems}) e o desenvolvimento de veículos autônomos representam marcos importantes nessa evolução, visando não apenas aumentar o conforto, mas principalmente reduzir o número de acidentes e fatalidades no trânsito.
+
+Neste contexto, o monitoramento preciso dos ocupantes de um veículo emerge como um componente essencial para a próxima geração de sistemas de segurança. A capacidade de conhecer a pose e a posição dos ocupantes em tempo real permite otimizar a atuação de sistemas de segurança passiva, como airbags e sistemas de retenção, bem como sistemas de segurança ativa, incluindo a detecção de distração, fadiga e comportamento inadequado do motorista. Compreender onde e como os ocupantes estão posicionados dentro do veículo possibilita uma resposta mais inteligente e adaptativa dos sistemas de segurança em situações críticas.
+
+Atualmente, a detecção precisa da pose completa (\textit{full-body keypoint}) dos ocupantes em ambientes veiculares internos, especialmente em tempo real e utilizando câmeras de baixo custo, ainda representa um desafio significativo. A maioria dos modelos de estimação de pose existentes foi desenvolvida e treinada para aplicações gerais, utilizando principalmente imagens coloridas (RGB) capturadas em ambientes abertos e bem iluminados. Essas soluções apresentam limitações consideráveis quando aplicadas ao contexto específico do interior de veículos, onde condições como iluminação variável, oclusões causadas por componentes do veículo (volante, painel, cintos de segurança) e posturas incomuns dos ocupantes são frequentes.
+
+Além disso, grande parte dos modelos de estimação de pose 2D disponíveis não opera satisfatoriamente com imagens infravermelhas ou em tons de cinza (\textit{grayscale}), que são fundamentais para aplicações veiculares. Câmeras infravermelhas oferecem robustez em diferentes condições de luminosidade, funcionando adequadamente tanto durante o dia quanto à noite, além de preservarem a privacidade dos ocupantes. Outro aspecto crítico é que muitos modelos de pose \textit{full-body} não englobam todas as partes do corpo de forma robusta, apresentando precisão limitada especialmente nas regiões das mãos e do rosto, que são essenciais para a detecção de distração e interação com o veículo.
+
+\subsection{Motivação}
+
+O objetivo final deste trabalho é desenvolver uma estimativa de pose 3D monocular eficiente que possa ser utilizada em sistemas de segurança veicular, com o propósito de detectar a posição dos ocupantes e adaptar a atuação de airbags e outros sistemas de retenção. A motivação para este projeto fundamenta-se em três pilares principais: segurança, monitoramento e custo-benefício.
+
+\subsubsection{Segurança}
+
+A capacidade de determinar a posição exata do ocupante em 3D permite uma adaptação inteligente dos sistemas de segurança. Em caso de colisão iminente, conhecer a distância do ocupante em relação ao airbag, sua postura e a posição de suas extremidades possibilita ajustar o tempo e a força de deflagração dos airbags, minimizando potenciais lesões. Por exemplo, um ocupante muito próximo do airbag ou em posição inadequada pode sofrer lesões graves caso o airbag seja acionado com força total. Da mesma forma, crianças ou pessoas de estatura reduzida requerem ajustes diferentes nos sistemas de retenção.
+
+\subsubsection{Monitoramento}
+
+Saber para onde o motorista está olhando, sua posição no assento e a que distância está do volante e dos controles são informações cruciais para múltiplos sistemas de monitoramento. Estes dados permitem detectar fadiga e sonolência através da análise da postura e movimentos da cabeça, identificar distração ao monitorar o direcionamento do olhar e movimentos das mãos, personalizar a experiência de condução ajustando automaticamente assentos, espelhos e sistemas de entretenimento, reconhecer gestos para controle de interfaces veiculares sem contato físico, e verificar o uso correto do cinto de segurança.
+
+\subsubsection{Custo-Benefício}
+
+Um aspecto determinante para a viabilidade comercial deste projeto é a diferença substancial de custo entre as tecnologias disponíveis. Câmeras \textit{Time-of-Flight} (ToF), que fornecem diretamente informações de profundidade e facilitam a estimação de pose 3D, custam atualmente mais de 300 euros por unidade. Em contraste, câmeras monoculares infravermelhas custam aproximadamente 20 euros, representando uma redução de custos de mais de 93\%.
+
+Esta diferença é crucial para a implementação em larga escala. Em um mercado de milhões de veículos produzidos anualmente, a redução de custos por unidade pode representar economias significativas para os fabricantes, tornando a tecnologia de monitoramento de ocupantes mais acessível e viável para implementação em veículos de diferentes segmentos de mercado, não apenas em modelos premium. O desenvolvimento de uma solução baseada em câmeras monoculares infravermelhas de baixo custo, mantendo níveis adequados de precisão e eficiência, contribui diretamente para a democratização da tecnologia de segurança veicular, permitindo que um número maior de pessoas se beneficie de sistemas avançados de proteção.
+
+\subsection{Pergunta de Pesquisa}
+
+Dado o contexto apresentado, este trabalho busca responder à seguinte questão: \textbf{Como construir uma arquitetura computacionalmente eficiente para estimação de pose completa (\textit{full-body}) que integre corpo, face e mãos de forma unificada em ambiente veicular restrito, utilizando apenas câmeras monoculares infravermelhas?}
+
+\subsection{Objetivo Geral}
+
+Desenvolver e avaliar uma arquitetura eficiente para estimação de pose completa utilizando keypoints, com foco inicial em corpo e expansão progressiva para face e mãos, operando em tempo real com imagens infravermelhas monoculares capturadas no interior de veículos.
+
+\subsection{Objetivos Específicos}
+
+Os objetivos específicos deste trabalho são: implementar um pipeline robusto para detecção de keypoints corporais 2D em imagens infravermelhas (\textit{grayscale}), desenvolver um módulo de \textit{lifting} 2D-para-3D otimizado para estimação de pose corporal, expandir a arquitetura para integração de keypoints de face e mãos de forma unificada, avaliar a eficiência computacional e a precisão da arquitetura proposta em diferentes condições de iluminação e oclusão, validar o sistema em cenários automotivos realistas utilizando o dataset Drive\&Act, e comparar a performance do sistema proposto com soluções baseadas em câmeras ToF em termos de custo-benefício.
+
+\subsection{Estrutura do Documento}
+
+Este documento está estruturado da seguinte forma: a Seção 3 detalha o problema a ser resolvido, apresentando os desafios específicos do ambiente veicular. A Seção 4 discute o estado da arte, analisando criticamente as soluções existentes e suas limitações no contexto deste trabalho. A Seção 5 descreve a solução proposta, incluindo a arquitetura do sistema e seus módulos funcionais. As tecnologias, datasets, procedimentos de teste, análise de riscos e cronograma são apresentados nas seções subsequentes, finalizando com as conclusões e referências bibliográficas.
+
+% --- DETALHAMENTO DO PROBLEMA ---
+\section{DETALHAMENTO DO PROBLEMA}
+\label{sec:problema}
+
+A estimação de pose completa em ambiente veicular apresenta desafios únicos que não são comumente encontrados em outros cenários de aplicação de visão computacional. Esta seção detalha as especificidades do problema, contextualizando o ambiente de operação e as restrições impostas pelo contexto automotivo.
+
+\subsection{Contexto do Ambiente Veicular}
+
+O interior de um veículo representa um ambiente altamente restrito e padronizado, mas ao mesmo tempo desafiador para sistemas de visão computacional. A Figura \ref{fig:camera_pos} ilustra o posicionamento típico da câmera de monitoramento no espelho retrovisor, que é a configuração atualmente adotada pela indústria automotiva. Esta posição oferece uma visão frontal do motorista e dos ocupantes dianteiros, mas impõe limitações significativas de campo de visão e ângulo de captura.
+
+\begin{figure}[h!]
+    \centering
+    \begin{tikzpicture}[scale=0.8]
+        % Desenho simplificado do interior do carro
+        \draw[thick] (0,0) rectangle (8,5); % Contorno do carro
+        
+        % Painel
+        \draw[thick, fill=gray!30] (0,0) rectangle (8,1);
+        
+        % Volante
+        \draw[thick, fill=gray!50] (2,1.5) circle (0.6);
+        \draw[thick, fill=white] (2,1.5) circle (0.4);
+        
+        % Assento motorista
+        \draw[thick, fill=blue!20] (1.5,1) rectangle (2.5,3);
+        \draw[thick, fill=blue!30] (1.5,3) rectangle (2.5,3.8);
+        
+        % Pessoa simplificada (motorista)
+        \draw[thick, fill=pink!30] (2,3.5) circle (0.3); % Cabeça
+        \draw[thick] (2,3.2) -- (2,2.5); % Corpo
+        \draw[thick] (2,2.8) -- (1.5,2.3); % Braço esquerdo
+        \draw[thick] (2,2.8) -- (2.4,2); % Braço direito
+        
+        % Assento passageiro
+        \draw[thick, fill=blue!20] (5.5,1) rectangle (6.5,3);
+        \draw[thick, fill=blue!30] (5.5,3) rectangle (6.5,3.8);
+        
+        % Espelho retrovisor com câmera
+        \draw[thick, fill=gray!40] (3.5,4.5) rectangle (4.5,4.8);
+        \draw[thick, fill=red!60] (3.9,4.5) circle (0.15); % Câmera
+        \node[above] at (4,4.9) {\small Câmera IR};
+        
+        % Campo de visão da câmera
+        \draw[dashed, thick, blue] (4,4.5) -- (1.2,1.5);
+        \draw[dashed, thick, blue] (4,4.5) -- (2.8,1.5);
+        \draw[dashed, thick, blue] (4,4.5) -- (5.2,1.5);
+        \draw[dashed, thick, blue] (4,4.5) -- (6.8,1.5);
+        
+        % Área de interesse
+        \draw[dotted, thick, green!60] (1,1) rectangle (7,4);
+        \node[below, green!60!black] at (4,0.8) {\small Área de Monitoramento};
+        
+        % Legenda de oclusões
+        \node[right, red] at (8.5,2.5) {\small Oclusões:};
+        \node[right, font=\footnotesize] at (8.5,2) {- Volante};
+        \node[right, font=\footnotesize] at (8.5,1.6) {- Painel};
+        \node[right, font=\footnotesize] at (8.5,1.2) {- Cinto};
+    \end{tikzpicture}
+    \caption{Posicionamento da câmera infravermelha no espelho retrovisor e campo de visão típico para monitoramento dos ocupantes.}
+    \label{fig:camera_pos}
+\end{figure}
+
+\subsection{Desafios Específicos}
+
+O ambiente veicular impõe uma série de desafios técnicos que distinguem este problema de aplicações gerais de estimação de pose. Estes desafios podem ser categorizados em quatro dimensões principais.
+
+\subsubsection{Complexidade Multimodal}
+
+A estimação de pose completa requer a integração eficiente de múltiplas partes do corpo com diferentes níveis de complexidade. O corpo humano é tipicamente representado por dezessete keypoints principais, incluindo articulações como ombros, cotovelos, punhos, quadris, joelhos e tornozelos. A face, por sua vez, demanda sessenta e oito ou mais keypoints para capturar adequadamente a expressão facial e o direcionamento do olhar. Cada mão adiciona vinte e um keypoints para representar a configuração dos dedos e a posição da palma.
+
+A integração dessas três modalidades em um sistema unificado apresenta desafios computacionais significativos. Cada modalidade opera em diferentes escalas espaciais e requer diferentes níveis de resolução para detecção precisa. Enquanto os keypoints corporais podem ser detectados em imagens de resolução mais baixa, a face e especialmente as mãos requerem maior resolução para capturar detalhes finos.
+
+\subsubsection{Oclusões Específicas do Ambiente}
+
+O ambiente veicular apresenta padrões de oclusão únicos e previsíveis que diferem substancialmente de outros cenários. O volante, elemento central da interface de condução, oculta consistentemente as mãos e parte do torso do motorista. O painel do veículo limita a visão das pernas e da parte inferior do corpo. O cinto de segurança atravessa o torso, criando oclusões parciais e alterando a aparência visual do corpo.
+
+Além das oclusões causadas por componentes do veículo, a própria postura de condução induz auto-oclusões significativas. O motorista tipicamente mantém os braços à frente do corpo, os ombros ligeiramente curvados e a cabeça inclinada para frente, posições que maximizam a sobreposição de diferentes partes do corpo quando vistas de um único ponto de vista frontal.
+
+\subsubsection{Restrições de Eficiência Computacional}
+
+Sistemas embarcados veiculares operam sob severas restrições de recursos computacionais. Diferentemente de aplicações de servidor ou desktop que podem utilizar GPUs de alto desempenho, os sistemas automotivos devem funcionar com processadores de potência limitada, consumo energético restrito e memória reduzida. Estas limitações são agravadas pela necessidade de processamento em tempo real, tipicamente exigindo taxas de pelo menos vinte frames por segundo para permitir resposta adequada dos sistemas de segurança.
+
+A eficiência computacional não é apenas uma questão de velocidade de processamento, mas também de custo, consumo de energia e geração de calor. Soluções que requerem hardware dedicado de alto desempenho aumentam significativamente o custo final do sistema e podem enfrentar desafios de gerenciamento térmico no ambiente confinado e frequentemente aquecido do interior de um veículo.
+
+\subsubsection{Variabilidade e Consistência Temporal}
+
+A condução envolve movimentos dinâmicos e gestos que ocorrem em escalas temporais variadas. Mudanças posturais para alcançar controles, ajustes de posição no assento e gestos de comunicação ou interação com sistemas de entretenimento podem ser rápidos e abruptos. Simultaneamente, o sistema deve manter consistência temporal, evitando flutuações erráticas nas estimativas de pose que poderiam levar a falsos positivos em sistemas de detecção de distração ou fadiga.
+
+A variabilidade temporal é exacerbada pelas condições de iluminação dinâmicas. A transição entre ambientes externos iluminados e túneis escuros, a variação entre condução diurna e noturna, e reflexos causados por luz solar direta através dos vidros criam desafios adicionais para a robustez temporal do sistema.
+
+\subsection{Requisitos do Sistema}
+
+Considerando os desafios apresentados, o sistema proposto deve atender aos seguintes requisitos fundamentais. Primeiro, deve operar exclusivamente com imagens monoculares infravermelhas em tons de cinza, mantendo funcionalidade em condições de iluminação variável. Segundo, deve alcançar precisão suficiente para aplicações de segurança, com erro médio de posição de juntas inferior a cinquenta milímetros no dataset Drive\&Act. Terceiro, deve processar frames a uma taxa mínima de vinte FPS em hardware de gama média. Quarto, deve ser robusto a oclusões parciais causadas por componentes do veículo e auto-oclusões. Quinto, deve integrar corpo, face e mãos em uma arquitetura unificada e eficiente.
+
+% --- ESTADO DA ARTE ---
+\section{ESTADO DA ARTE}
+\label{sec:estado_arte}
+
+Esta seção apresenta um levantamento crítico das soluções existentes para estimação de pose, analisando suas capacidades e limitações no contexto específico do ambiente veicular com câmeras infravermelhas monoculares.
+
+\subsection{Evolução da Estimação de Pose}
+
+A estimação de pose humana tem sido um tópico central em visão computacional nas últimas duas décadas. As abordagens iniciais baseavam-se em modelos pictóricos que representavam o corpo humano como uma estrutura articulada de partes conectadas. Com o advento do aprendizado profundo, as redes neurais convolucionais revolucionaram o campo, permitindo a detecção direta de keypoints em imagens.
+
+Os métodos modernos podem ser categorizados em duas abordagens principais. As abordagens \textit{top-down} primeiro detectam pessoas na imagem e então estimam a pose de cada pessoa individualmente, enquanto as abordagens \textit{bottom-up} detectam todos os keypoints na imagem simultaneamente e então os agrupam em instâncias individuais de pessoas. Ambas as abordagens têm vantagens e desvantagens em termos de precisão e eficiência computacional.
+
+\subsection{Soluções Existentes para Estimação 2D}
+
+\subsubsection{RTMPose}
+
+O RTMPose, proposto por Jiang et al. (2023), representa uma das arquiteturas mais eficientes atualmente disponíveis para estimação de pose multi-pessoa em tempo real. O modelo utiliza uma arquitetura baseada em transformadores com um backbone eficiente que compartilha features entre múltiplas escalas. O RTMPose demonstra excelente desempenho nos benchmarks padrão como COCO e MPII, alcançando um balanço favorável entre precisão e velocidade de inferência.
+
+No entanto, o RTMPose foi treinado primariamente em datasets coloridos (RGB) de ambientes abertos e bem iluminados. Testes preliminares indicam degradação significativa de performance quando aplicado diretamente a imagens infravermelhas ou em tons de cinza, particularmente em condições de baixa variação de contraste típicas do interior de veículos. Além disso, o modelo foca principalmente em keypoints corporais, com suporte limitado para detecção integrada de face e mãos com alta precisão.
+
+\subsubsection{Outros Modelos de Pose 2D}
+
+Modelos como OpenPose, HRNet e MediaPipe têm sido amplamente adotados na comunidade. O OpenPose, pioneiro na detecção bottom-up, oferece detecção de corpo, face e mãos, mas com requisitos computacionais substanciais que o tornam inadequado para sistemas embarcados. O HRNet mantém representações de alta resolução através de toda a rede, alcançando precisão superior, mas com custo computacional elevado. O MediaPipe do Google oferece uma solução eficiente para detecção em dispositivos móveis, mas foi otimizado principalmente para câmeras frontais em smartphones, não para o contexto veicular.
+
+\subsection{Abordagens de Lifting 2D para 3D}
+
+\subsubsection{Métodos de Regressão Direta}
+
+Martinez et al. (2017) propuseram uma arquitetura surpreendentemente simples mas eficaz para lifting 2D-3D, utilizando uma rede totalmente conectada que mapeia diretamente keypoints 2D para coordenadas 3D. Esta abordagem demonstrou que o lifting pode ser tratado como um problema de regressão relativamente simples quando as detecções 2D são precisas, estabelecendo uma baseline importante para o campo.
+
+Entretanto, métodos de regressão direta sofrem de limitações em ambientes com oclusões significativas, onde keypoints 2D podem estar ausentes ou imprecisos. A ausência de raciocínio espacial explícito sobre a estrutura corporal também limita a capacidade destes métodos de aproveitar informações contextuais.
+
+\subsubsection{Triangulação Aprendida}
+
+Iskakov et al. (2019) introduziram a triangulação aprendida, um método que combina informações de múltiplas câmeras através de um processo de triangulação diferenciável. Esta abordagem alcança precisão superior ao explorar explicitamente a geometria multi-vista, mas requer múltiplas câmeras sincronizadas, o que aumenta significativamente o custo e a complexidade do sistema.
+
+Para aplicações veiculares, onde o custo por unidade é crítico e o espaço para instalação de múltiplas câmeras é limitado, soluções baseadas em múltiplas vistas não são práticas para implementação em larga escala.
+
+\subsubsection{LiftPose3D e Abordagens Baseadas em Transformers}
+
+Zhang et al. (2020) propuseram o LiftPose3D, que utiliza mecanismos de atenção para capturar dependências de longo alcance entre keypoints durante o processo de lifting. A arquitetura baseada em transformers permite que o modelo aprenda implicitamente as restrições biomecânicas do corpo humano e resolva ambiguidades de profundidade considerando o contexto global da pose.
+
+Embora promissora, esta abordagem ainda enfrenta desafios com poses atípicas e auto-oclusões severas. No contexto de condução, onde a postura é restrita e as oclusões são sistemáticas, o modelo pode não generalizar adequadamente sem fine-tuning específico para o domínio.
+
+\subsection{Datasets e Benchmarks}
+
+\subsubsection{Datasets Gerais}
+
+Os datasets mais utilizados para estimação de pose incluem COCO, MPII e Human3.6M. O COCO contém mais de duzentas mil imagens com anotações de keypoints para múltiplas pessoas em cenários variados. O Human3.6M é o principal benchmark para pose 3D, contendo milhões de frames capturados em ambiente controlado com sistemas de captura de movimento como ground truth.
+
+Estes datasets, embora valiosos, apresentam limitações fundamentais para aplicações veiculares. Primeiro, são predominantemente coloridos, com distribuições de intensidade muito diferentes de imagens infravermelhas. Segundo, não capturam as posturas específicas e restrições de movimento do contexto de condução. Terceiro, não incluem os padrões sistemáticos de oclusão presentes em veículos.
+
+\subsubsection{Drive\&Act Dataset}
+
+O Drive\&Act, proposto por Martin et al. (2019), é um dataset multi-modal especificamente projetado para reconhecimento de comportamento de motorista. Contém mais de 9,6 milhões de frames capturados de múltiplos ângulos, incluindo câmeras infravermelhas, ToF e RGB. O dataset inclui anotações de atividades de condução e, crucialmente para este trabalho, anotações 3D de pose obtidas através de sensores de profundidade.
+
+O Drive\&Act representa o recurso mais relevante disponível para validação de sistemas de estimação de pose veicular. No entanto, suas limitações incluem anotações 3D que dependem de sensores ToF para ground truth, o que pode introduzir ruído, e cobertura limitada de variações de tipos corporais e estilos de condução comparado a datasets gerais de maior escala.
+
+\subsection{Soluções Comerciais e Sistemas Industriais}
+
+A indústria automotiva tem desenvolvido sistemas proprietários de monitoramento de motorista, frequentemente referidos como DMS (Driver Monitoring Systems). Estes sistemas tipicamente focam em tarefas específicas como detecção de direção do olhar, reconhecimento de distração e detecção de fadiga através de análise de piscadas e movimento da cabeça.
+
+A maioria das soluções comerciais utiliza câmeras infravermelhas para robustez em diferentes condições de iluminação, mas não fornece estimação completa de pose 3D. Sistemas que oferecem pose 3D mais precisa geralmente dependem de câmeras ToF ou múltiplas câmeras, aumentando significativamente o custo. Não há, no conhecimento atual, soluções comerciais amplamente disponíveis que ofereçam estimação de pose full-body 3D precisa utilizando exclusivamente câmeras monoculares infravermelhas de baixo custo.
+
+\subsection{Análise Crítica e Lacunas}
+
+A análise do estado da arte revela várias lacunas significativas que este projeto pretende abordar. A primeira lacuna fundamental é a ausência de modelos robustos treinados especificamente para imagens infravermelhas ou grayscale. A grande maioria dos modelos de estimação de pose foi desenvolvida para imagens RGB, e sua performance degrada consideravelmente quando aplicados a imagens monocromas. As características visuais que estes modelos aprenderam a detectar, incluindo gradientes de cor e texturas coloridas, não se transferem adequadamente para o domínio infravermelho.
+
+A segunda lacuna importante é a falta de soluções integradas para estimação full-body que combinem corpo, face e mãos de forma eficiente. Embora existam modelos especializados para cada modalidade, a execução de múltiplos modelos separados é computacionalmente proibitiva para sistemas embarcados. Abordagens que tentam unificar as modalidades frequentemente sacrificam precisão em favor de eficiência, ou vice-versa.
+
+A terceira lacuna crítica relaciona-se às restrições específicas do ambiente veicular. Os padrões sistemáticos de oclusão causados pelo volante, painel e cinto de segurança não são adequadamente representados em datasets gerais. Modelos treinados em datasets como COCO ou MPII não desenvolveram robustez específica para estes tipos de oclusão, resultando em performance degradada no contexto automotivo.
+
+Finalmente, há uma lacuna significativa na exploração de arquiteturas de lifting 2D-3D otimizadas especificamente para o contexto veicular monocular. Enquanto métodos existentes de lifting funcionam razoavelmente bem em cenários gerais, eles não aproveitam as restrições e regularidades específicas do ambiente veicular, onde a geometria do espaço é conhecida e as poses possíveis são mais restritas que em ambientes abertos.
+
+Este projeto busca preencher estas lacunas através do desenvolvimento de uma arquitetura unificada e eficiente, especificamente adaptada para imagens infravermelhas monoculares, robusta às oclusões veiculares, e otimizada para inferência em tempo real em hardware embarcado. A estratégia de desenvolvimento incremental, iniciando com o corpo e expandindo progressivamente para face e mãos, permitirá validação cuidadosa de cada componente antes da integração completa do sistema.
+
+% --- TRABALHO A SER DESENVOLVIDO ---
+\section{TRABALHO A SER DESENVOLVIDO}
+
+Esta seção descreve a arquitetura proposta e os módulos funcionais que compõem o sistema de estimação de pose completa para ambiente veicular.
+
+\subsection{Diagrama em Blocos do Sistema}
+
+A Figura \ref{fig:blocos} apresenta a visão geral do sistema e a interação entre os módulos propostos. O sistema é dividido em quatro módulos principais que processam sequencialmente os dados desde a captura até a visualização final.
+
+\begin{figure}[h!]
+    \centering
+    \begin{tikzpicture}[
+            node distance=2cm,
+            block/.style={rectangle, draw, fill=blue!20, text width=2.5cm, text centered, minimum height=1cm},
+            camera/.style={rectangle, draw, fill=green!20, text width=1.8cm, text centered, minimum height=0.8cm},
+            arrow/.style={thick,->,>=stealth}
+        ]
+        % Câmeras
+        \node[camera] (cam1) {Câmera IR 1};
+        \node[camera, below of=cam1, node distance=1cm] (cam2) {Câmera IR 2};
+
+        % Módulos
+        \node[block, right of=cam1, node distance=3.5cm, yshift=-0.5cm] (mod1) {Módulo 1:\\ Aquisição};
+        \node[block, right of=mod1, node distance=3.5cm] (mod2) {Módulo 2:\\ Detecção 2D};
+        \node[block, right of=mod2, node distance=3.5cm] (mod3) {Módulo 3:\\ Fusão e\\ Lifting 3D};
+        \node[block, right of=mod3, node distance=3.5cm] (mod4) {Módulo 4:\\ Visualização};
+
+        % Setas
+        \draw[arrow] (cam1) -- (mod1);
+        \draw[arrow] (cam2) -- (mod1);
+        \draw[arrow] (mod1) -- (mod2);
+        \draw[arrow] (mod2) -- (mod3);
+        \draw[arrow] (mod3) -- (mod4);
+    \end{tikzpicture}
+    \caption{Diagrama em blocos do sistema proposto para estimação de pose full-body.}
+    \label{fig:blocos}
+\end{figure}
+
+\subsection{Arquitetura Proposta}
+
+A arquitetura do sistema é projetada com foco em eficiência computacional e modularidade, permitindo desenvolvimento e validação incremental dos componentes. Os princípios arquiteturais fundamentais incluem o compartilhamento de computação entre diferentes modalidades através de um backbone comum, especialização através de heads dedicados para cada parte do corpo, incorporação de informação temporal para consistência e robustez, e unificação do processo de lifting 3D para todas as modalidades.
+
+O backbone compartilhado consiste em um extrator de features eficiente baseado em arquiteturas como EfficientNet ou MobileNet, adaptado para processamento de imagens grayscale. Este backbone processa a imagem de entrada uma única vez, gerando mapas de features multi-escala que são então utilizados por todos os heads especializados, evitando computação redundante.
+
+Os heads especializados são redes mais leves que tomam como entrada os mapas de features do backbone e produzem estimativas de keypoints 2D para suas respectivas modalidades. O head corporal detecta os dezessete keypoints principais do corpo, o head facial processa regiões de interesse da face para detectar keypoints faciais com maior resolução, e o head de mãos detecta keypoints das mãos, possivelmente utilizando atenção espacial para focar em regiões relevantes.
+
+O módulo de fusão temporal incorpora informações de frames anteriores através de mecanismos de atenção ou redes recorrentes leves, permitindo que o sistema mantenha consistência temporal e seja mais robusto a oclusões temporárias. Este módulo é crítico para evitar flutuações erráticas nas estimativas que poderiam gerar falsos alarmes em sistemas de segurança.
+
+O módulo de lifting unificado utiliza uma arquitetura baseada em transformers que processa conjuntamente todos os keypoints 2D detectados, considerando as relações espaciais e biomecânicas entre diferentes partes do corpo. Esta abordagem unificada é mais eficiente que liftar cada modalidade separadamente e permite que o modelo explore correlações entre as poses de diferentes partes do corpo.
+
+\subsection{Módulos Funcionais}
+
+\subsubsection{Módulo 1: Aquisição}
+
+O módulo de aquisição é responsável pela captura sincronizada de imagens das câmeras infravermelhas instaladas no veículo. Este módulo implementa o gerenciamento de múltiplos streams de vídeo, garantindo sincronização temporal entre câmeras, pré-processamento básico incluindo correção de distorção de lente e normalização de intensidade, e buffering adequado para permitir processamento temporal.
+
+A implementação será realizada em Python utilizando OpenCV para interface com as câmeras. Considerações especiais serão dadas ao gerenciamento eficiente de memória, evitando cópias desnecessárias de frames, e ao tratamento de latência e jitter na captura, que podem afetar a sincronização temporal.
+
+\subsubsection{Módulo 2: Detecção 2D}
+
+Este módulo implementa o núcleo da detecção de keypoints bidimensionais, processando frames de entrada através do backbone compartilhado e dos heads especializados. O desenvolvimento seguirá uma estratégia incremental, iniciando com a detecção corporal utilizando modelos pré-treinados como base, seguida por fine-tuning em imagens grayscale convertidas de datasets coloridos, e finalmente treinamento com o Drive\&Act dataset para adaptação ao domínio veicular.
+
+A expansão posterior incluirá integração de heads faciais e de mãos, com atenção especial à resolução espacial necessária para cada modalidade. A implementação utilizará PyTorch com otimizações para inferência, incluindo quantização e pruning quando apropriado.
+
+Técnicas de data augmentation específicas para o domínio serão aplicadas durante o treinamento, incluindo simulação de variações de iluminação típicas do ambiente veicular, augmentation de oclusões sintéticas representando volante e cinto, e variações de postura dentro das restrições físicas do assento.
+
+\subsubsection{Módulo 3: Fusão e Lifting 3D}
+
+O módulo de fusão e lifting é responsável por transformar as detecções 2D em estimativas de pose 3D. A fusão temporal considera informações de múltiplos frames através de uma janela deslizante, utilizando mecanismos de atenção para ponderar a contribuição de diferentes frames baseado em sua qualidade estimada. Quando múltiplas câmeras estão disponíveis, o módulo também realiza fusão espacial, combinando informações de diferentes viewpoints.
+
+O lifting 2D-3D será implementado utilizando uma arquitetura baseada em transformers que processa todos os keypoints conjuntamente. O modelo aprenderá implicitamente as restrições biomecânicas do corpo humano e as regularidades espaciais do ambiente veicular. Estratégias de treinamento incluirão pré-treinamento em datasets 3D gerais como Human3.6M, fine-tuning em dados sintéticos gerados para o contexto veicular, e validação final no Drive\&Act dataset.
+
+Técnicas para lidar com keypoints ausentes devido a oclusões serão incorporadas, incluindo predição probabilística com estimativas de incerteza e propagação temporal de informação de frames onde os keypoints estão visíveis.
+
+\subsubsection{Módulo 4: Visualização}
+
+O módulo de visualização apresenta os resultados de forma intuitiva para desenvolvimento, debug e demonstração. A implementação incluirá renderização 2D dos keypoints detectados sobre a imagem de entrada, visualização 3D interativa da pose estimada usando bibliotecas como Open3D ou Matplotlib 3D, gráficos de métricas de performance em tempo real incluindo FPS e latência, e overlays indicando níveis de confiança e regiões de oclusão.
+
+Durante o desenvolvimento, este módulo será essencial para análise qualitativa rápida e identificação de padrões de erro. A interface será implementada inicialmente em Python com Tkinter ou PyQt para prototipagem rápida, com possível transição para uma interface web utilizando frameworks como Flask ou Streamlit para demonstrações.
+
+% --- TECNOLOGIAS E DATASETS ---
+\section{TECNOLOGIAS E DATASETS}
+
+\subsection{Tecnologias de Implementação}
+
+O desenvolvimento do sistema utilizará Python 3.10 ou superior como linguagem principal, aproveitando seu ecossistema rico de bibliotecas para aprendizado de máquina e visão computacional. PyTorch será o framework de deep learning utilizado, selecionado por sua flexibilidade, suporte extensivo a operações customizadas e excelente desempenho em pesquisa e produção.
+
+Para processamento de imagem, OpenCV fornecerá funcionalidades essenciais de captura, pré-processamento e manipulação de vídeo. NumPy será utilizado para operações numéricas eficientes, particularmente no pós-processamento de resultados e cálculo de métricas.
+
+Os modelos base incluirão arquiteturas como RTMPose para detecção 2D inicial, EfficientNet ou MobileNet como backbones compartilhados visando eficiência, e transformers (arquitetura similar ao ViT) para o módulo de lifting 3D. Ferramentas de otimização incluirão TorchScript para compilação de modelos, ONNX Runtime para inferência otimizada, e técnicas de quantização pós-treinamento para redução de tamanho e aceleração.
+
+\subsection{Datasets para Treinamento e Validação}
+
+A estratégia de utilização de datasets seguirá uma abordagem hierárquica, começando com datasets gerais de larga escala e progressivamente incorporando dados mais específicos ao domínio alvo.
+
+Para pré-treinamento da detecção 2D, o dataset COCO fornecerá detecção de pose corporal com mais de duzentas mil imagens anotadas, o MPII complementará com poses em diversas atividades, o 300W fornecerá anotações faciais com 68 landmarks, e o FreiHAND oferecerá anotações detalhadas de mãos. Estes datasets serão convertidos para grayscale durante o treinamento para aproximar o domínio de imagens infravermelhas.
+
+Para treinamento do lifting 3D, o Human3.6M, o maior dataset de pose 3D disponível, fornecerá supervisão para pose corporal, enquanto o AMASS (Archive of Motion Capture as Surface Shapes) fornecerá dados sintéticos adicionais com poses variadas que podem ser renderizados em configurações similares ao interior de veículos.
+
+Para validação automotiva, o Drive\&Act será o dataset principal, fornecendo imagens infravermelhas reais capturadas em ambiente veicular com anotações 3D obtidas através de sensores ToF. Este dataset permitirá avaliar a transferência de conhecimento dos domínios gerais para o contexto veicular específico.
+
+Adicionalmente, será considerada a coleta de dados complementares em colaboração com instituições parceiras, particularmente para cenários não adequadamente cobertos pelo Drive\&Act, incluindo maior diversidade de tipos corporais, condições extremas de iluminação, e posturas específicas de interesse para aplicações de segurança.
+
+% --- PROCEDIMENTOS DE TESTE E VALIDAÇÃO ---
+\section{PROCEDIMENTOS DE TESTE E VALIDAÇÃO}
+
+\subsection{Métricas de Avaliação}
+
+A avaliação do sistema será realizada através de múltiplas métricas que capturam diferentes aspectos da performance. Para precisão da estimação 3D, o MPJPE (Mean Per Joint Position Error) medirá o erro médio euclidiano entre keypoints preditos e ground truth em milímetros, o PA-MPJPE (Procrustes Aligned MPJPE) medirá o erro após alinhamento de Procrustes, removendo efeitos de escala e translação global, e a PCK (Percentage of Correct Keypoints) dentro de limiares específicos (por exemplo, 50mm) fornecerá uma métrica mais interpretável de sucesso.
+
+Para eficiência computacional, serão medidos FPS (Frames Per Second) durante inferência em tempo real, latência end-to-end desde captura até saída final, uso de memória GPU e RAM durante processamento, e FLOPS e tamanho do modelo para caracterização da complexidade computacional.
+
+Para robustez, serão avaliadas degradação de precisão sob diferentes níveis de oclusão simulada, variação de performance com diferentes condições de iluminação, consistência temporal medida através de flutuação frame-a-frame (jitter), e taxa de detecção (recall) de keypoints em cenários desafiadores.
+
+\subsection{Procedimentos de Teste}
+
+Os testes serão organizados em três fases progressivas. A fase de teste unitário validará cada módulo individualmente, incluindo teste do backbone com imagens sintéticas variadas, validação de cada head especializado em subsets relevantes, e teste do módulo de lifting com keypoints 2D ground truth.
+
+A fase de teste de integração avaliará o pipeline completo end-to-end, incluindo teste com sequências de vídeo do Drive\&Act, validação de consistência temporal através de métricas de suavidade, e teste de robustez com oclusões sintéticas aplicadas.
+
+A fase de teste de sistema avaliará performance em condições realistas, incluindo teste em diferentes cenários de iluminação (dia, noite, túnel), avaliação com diferentes tipos corporais e posturas, e teste de latência e throughput sob carga sustentada.
+
+\subsection{Critérios de Aceite}
+
+Os critérios mínimos de aceite para o sistema incluem precisão com MPJPE inferior a 50mm para pose corporal no Drive\&Act, erro de keypoints faciais dentro de 5 pixels para direção de olhar estimada, e erro de keypoints de mãos permitindo distinção clara de gestos básicos.
+
+Para eficiência, o sistema deve alcançar no mínimo 20 FPS em GPU de gama média (por exemplo, NVIDIA RTX 3060), latência end-to-end inferior a 100ms, e footprint de memória compatível com sistemas embarcados (inferior a 2GB).
+
+Para robustez, o sistema deve manter MPJPE inferior a 75mm sob oclusões típicas do ambiente veicular, variação de performance inferior a 20\% entre condições de iluminação diurna e noturna, e jitter temporal inferior a 10mm entre frames consecutivos em sequências sem movimento abrupto.
+
+% --- ANÁLISE DE RISCOS ---
+\section{ANÁLISE DE RISCOS}
+
+\subsection{Riscos Técnicos}
+
+O risco de alta complexidade da arquitetura unificada é classificado como alto, pois a integração de corpo, face e mãos em um único modelo eficiente pode revelar trade-offs difíceis entre precisão e eficiência. A mitigação será através de desenvolvimento incremental, validando cada componente antes da integração, e estabelecimento de baselines separadas para cada modalidade como referência de performance máxima.
+
+O risco de limitações computacionais é médio, pois atingir tempo real em hardware embarcado com modelo unificado pode ser desafiador. A mitigação incluirá foco em arquiteturas eficientes desde o design inicial, exploração agressiva de técnicas de otimização (quantização, pruning, destilação), e consideração de soluções híbridas onde processos menos críticos rodam em frequência reduzida.
+
+O risco de transferência de domínio inadequada é médio, pois modelos treinados em datasets gerais podem não generalizar bem para o contexto veicular. A mitigação será através de estratégia cuidadosa de fine-tuning progressivo do domínio geral para o veicular, data augmentation específica simulando características do ambiente veicular, e coleta de dados complementares se necessário.
+
+\subsection{Riscos de Dados}
+
+O risco de qualidade dos dados do Drive\&Act é médio, pois as anotações 3D dependem de sensores ToF que podem ter ruído e imprecisões. A mitigação incluirá análise cuidadosa da qualidade das anotações e filtragem de exemplos suspeitos, validação cruzada com múltiplas fontes quando possível, e utilização de modelos probabilísticos que consideram incerteza nas anotações.
+
+O risco de cobertura limitada do dataset é médio, pois o Drive\&Act pode não cobrir adequadamente todas as variações relevantes. A mitigação será através de identificação precoce de gaps de cobertura através de análise exploratória, suplementação com dados sintéticos para cenários sub-representados, e consideração de coleta adicional em colaboração com parceiros.
+
+\subsection{Riscos de Cronograma}
+
+O risco de subestimação de tempo para integração full-body é médio. A mitigação incluirá buffers de tempo adequados no cronograma, priorização clara com core funcional definido (corpo 3D) como entrega garantida, e framework modular permitindo entregas parciais de valor.
+
+O risco de dependências externas é baixo, mas presente, relacionado a disponibilidade de recursos computacionais e acesso a dados. A mitigação será através de identificação precoce de recursos necessários, alternativas para limitações de recursos (cloud computing, colaborações), e comunicação proativa com orientadores sobre necessidades.
+
+% --- CRONOGRAMA DO PROJETO ---
+\section{CRONOGRAMA DO PROJETO}
+
+O cronograma do projeto está estruturado em seis fases principais, distribuídas ao longo de aproximadamente onze meses. A estratégia segue uma abordagem incremental, garantindo entregas parciais de valor e permitindo validação progressiva dos componentes antes da integração completa.
+
+\subsection{Fase 1: Fundação e Detecção Corporal 2D}
+
+A primeira fase, planejada para setembro e outubro de 2025, estabelecerá a infraestrutura fundamental do projeto. As atividades incluem configuração do ambiente de desenvolvimento com PyTorch, OpenCV e ferramentas auxiliares, preparação e análise exploratória dos datasets (COCO, MPII, Drive\&Act), implementação do módulo de aquisição e pré-processamento de imagens, adaptação e treinamento do detector 2D corporal para imagens grayscale, e validação inicial em subset do Drive\&Act.
+
+A entrega esperada é um pipeline funcional de detecção de pose corporal 2D operando em imagens infravermelhas, com resultados preliminares documentados. Esta fase estabelece a base sobre a qual todo o sistema será construído, e seu sucesso é crítico para o progresso subsequente.
+
+\subsection{Fase 2: Lifting 3D Corporal}
+
+A segunda fase, de novembro a dezembro de 2025, focará no desenvolvimento do módulo de lifting 2D-3D para pose corporal. As atividades incluem implementação da arquitetura de lifting baseada em transformers, treinamento em Human3.6M com pré-treinamento, fine-tuning com dados sintéticos adaptados ao contexto veicular, integração com o detector 2D e avaliação end-to-end, e estabelecimento de baseline completa no Drive\&Act com métricas detalhadas.
+
+A entrega esperada são resultados robustos de estimação de pose corporal 3D, com documentação completa de métricas (MPJPE, PA-MPJPE, FPS) e análise de casos de sucesso e falha. Esta fase representa a primeira entrega completa de um subsistema funcional.
+
+\subsection{Fase 3: Publicação Científica}
+
+A terceira fase, planejada para janeiro de 2026, dedicará tempo exclusivo à preparação de uma publicação científica sobre o trabalho de estimação de pose corporal 3D. As atividades incluem redação do artigo descrevendo a arquitetura e resultados corporais, preparação de visualizações e gráficos de alta qualidade, comparação detalhada com baselines e trabalhos relacionados, revisão e refinamento do texto, e submissão para conferência ou periódico relevante (por exemplo, CVPR, ICCV, ou workshop automotivo).
+
+Esta fase é estratégica para estabelecer contribuição científica do trabalho antes da expansão para o sistema completo, e fornecerá feedback valioso da comunidade que pode informar desenvolvimentos posteriores.
+
+\subsection{Fase 4: Integração Facial}
+
+A quarta fase, de fevereiro a março de 2026, expandirá o sistema para incluir detecção e estimação de pose facial. As atividades incluem implementação do head especializado para detecção facial 2D, treinamento em datasets faciais (300W) adaptados para grayscale, desenvolvimento de módulo de lifting para keypoints faciais, integração com o sistema corporal existente, e validação de direção de olhar e expressões básicas.
+
+A entrega esperada é um módulo facial funcional integrado ao sistema, com métricas de precisão específicas para face e demonstração de aplicações como detecção de direção de olhar.
+
+\subsection{Fase 5: Integração de Mãos e Sistema Unificado}
+
+A quinta fase, de abril a maio de 2026, completará o sistema full-body através da integração de detecção de mãos. As atividades incluem implementação do head especializado para detecção de mãos, treinamento em FreiHAND adaptado para contexto veicular, desenvolvimento de lifting para keypoints de mãos, integração das três modalidades (corpo, face, mãos) em arquitetura unificada, otimização end-to-end do sistema completo, e validação de reconhecimento de gestos básicos.
+
+A entrega esperada é o sistema full-body completo, com todas as modalidades integradas e operando em tempo real, documentado com métricas consolidadas de performance.
+
+\subsection{Fase 6: Otimização e Finalização}
+
+A sexta e última fase, de junho a agosto de 2026, focará em otimização, validação extensiva e documentação final. As atividades incluem aplicação de técnicas de otimização (quantização, pruning, destilação), testes extensivos em cenários variados do Drive\&Act, análise de robustez e casos limite, documentação técnica completa do sistema, redação do TCC com todos os capítulos, e preparação de apresentação final.
+
+A entrega final será o TCC completo, incluindo código documentado, resultados experimentais completos, análise comparativa com estado da arte, e discussão de limitações e trabalhos futuros.
+
+\begin{table}[!ht]
+    \centering
+    \caption{Cronograma detalhado do projeto com marcos principais.}
+    \label{tab:cronograma}
+    \begin{tabular}{|c|p{6cm}|c|p{2.8cm}|}
+        \hline
+        \textbf{Fase} & \textbf{Atividades Principais} & \textbf{Período} & \textbf{Entrega} \\ \hline
+        1 & Setup + preparação datasets + detector 2D corporal & set/2025--out/2025 & Pipeline corpo 2D \\ \hline
+        2 & Lifting 3D corporal + baseline Drive\&Act & nov/2025--dez/2025 & Resultados corpo 3D \\ \hline
+        3 & Escrita e submissão de paper & jan/2026 & \textbf{Paper submetido} \\ \hline
+        4 & Integração facial: detector + lifting & fev/2026--mar/2026 & Módulo face funcional \\ \hline
+        5 & Integração mãos + arquitetura unificada & abr/2026--mai/2026 & Sistema full-body \\ \hline
+        6 & Otimização + validação + TCC final & jun/2026--ago/2026 & \textbf{TCC completo} \\ \hline
+    \end{tabular}
+\end{table}
+
+\subsection{Marcos de Validação}
+
+Ao longo do projeto, marcos de validação específicos garantirão que o desenvolvimento está no caminho correto. O Marco 1, ao final de outubro de 2025, requer demonstração de detecção 2D corporal funcionando em imagens IR do Drive\&Act. O Marco 2, ao final de dezembro de 2025, requer MPJPE inferior a 70mm para corpo no Drive\&Act. O Marco 3, ao final de março de 2026, requer demonstração de sistema corpo mais face com aplicação de detecção de olhar. O Marco 4, ao final de maio de 2026, requer sistema full-body operando a mínimo 15 FPS. O Marco 5, ao final de agosto de 2026, requer TCC completo aprovado pelos orientadores.
+
+% --- CONCLUSÃO ---
+\section{CONCLUSÃO}
+
+Este projeto visa desenvolver uma arquitetura eficiente para estimação de pose completa (\textit{full-body}) em ambiente veicular, abordando um problema relevante e inovador na área de visão computacional aplicada à segurança automotiva. A motivação fundamental reside na necessidade de sistemas de monitoramento de ocupantes que sejam simultaneamente precisos, eficientes e economicamente viáveis para implementação em larga escala.
+
+A principal contribuição científica esperada é uma arquitetura unificada que integra detecção de corpo, face e mãos utilizando exclusivamente câmeras monoculares infravermelhas de baixo custo, superando as limitações de modelos existentes que foram desenvolvidos primariamente para imagens coloridas e ambientes não restritos. O desenvolvimento de técnicas robustas de lifting 2D-3D específicas para o contexto veicular, considerando suas restrições e regularidades únicas, representa uma contribuição adicional ao estado da arte.
+
+A estratégia de desenvolvimento incremental, iniciando com keypoints corporais para uma publicação científica e expandindo progressivamente para face e mãos, fornece uma trajetória clara de validação e permite entregas parciais de valor. O uso de datasets específicos como o Drive\&Act, complementado por pré-treinamento em datasets gerais de larga escala, estabelece uma metodologia sólida para transferência de conhecimento entre domínios.
+
+Do ponto de vista prático, o sistema desenvolvido contribuirá para a próxima geração de sistemas de segurança veicular, permitindo adaptação inteligente de airbags baseada na posição real dos ocupantes, detecção precisa de distração e fadiga através de análise de pose e olhar, e interfaces naturais baseadas em gestos para controle de sistemas veiculares. A redução de custos em relação a soluções baseadas em câmeras ToF democratizará o acesso a estas tecnologias de segurança avançadas.
+
+Os desafios identificados, incluindo a complexidade da integração multimodal, limitações computacionais e necessidade de robustez a oclusões específicas, são significativos mas abordáveis através da estratégia proposta. A análise de riscos cuidadosa e as estratégias de mitigação definidas aumentam a probabilidade de sucesso do projeto dentro do cronograma estabelecido.
+
+Em suma, este trabalho representa uma oportunidade de contribuir tanto para o avanço científico na área de estimação de pose em ambientes restritos quanto para aplicações práticas que podem impactar positivamente a segurança de milhões de usuários de veículos. O sucesso do projeto estabelecerá uma base sólida para pesquisas futuras em sistemas de monitoramento veicular inteligente e demonstrará a viabilidade de soluções de baixo custo para problemas complexos de visão computacional 3D.
+
+% --- REFERÊNCIAS ---
+\section{REFERÊNCIAS}
+
+\begin{thebibliography}{99}
+    \bibitem{martinez2017}
+    MARTINEZ, J. et al. \textbf{A simple yet effective baseline for 3D human pose estimation}. In: IEEE International Conference on Computer Vision (ICCV), 2017. p. 2640-2649.
+
+    \bibitem{iskakov2019}
+    ISKAKOV, K. et al. \textbf{Learnable triangulation of human pose}. In: IEEE International Conference on Computer Vision (ICCV), 2019. p. 7718-7727.
+
+    \bibitem{driveact2019}
+    MARTIN, M. et al. \textbf{Drive\&Act: A Multi-Modal Dataset for Fine-Grained Driver Behavior Recognition in Autonomous Vehicles}. In: IEEE International Conference on Computer Vision (ICCV), 2019. p. 2801-2810.
+
+    \bibitem{rtmpose2023}
+    JIANG, T. et al. \textbf{RTMPose: Real-Time Multi-Person Pose Estimation based on MMPose}. arXiv preprint arXiv:2303.07399, 2023.
+
+    \bibitem{vaswani2017}
+    VASWANI, A. et al. \textbf{Attention is all you need}. In: Advances in Neural Information Processing Systems (NeurIPS), 2017. p. 5998-6008.
+
+    \bibitem{zhang2020}
+    ZHANG, C. et al. \textbf{LiftPose3D: Transforming 2D poses to 3D in real-time}. arXiv preprint arXiv:2008.02945, 2020.
+
+    \bibitem{lin2014}
+    LIN, T.-Y. et al. \textbf{Microsoft COCO: Common Objects in Context}. In: European Conference on Computer Vision (ECCV), 2014. p. 740-755.
+
+    \bibitem{andriluka2014}
+    ANDRILUKA, M. et al. \textbf{2D Human Pose Estimation: New Benchmark and State of the Art Analysis}. In: IEEE Conference on Computer Vision and Pattern Recognition (CVPR), 2014. p. 3686-3693.
+
+    \bibitem{ionescu2014}
+    IONESCU, C. et al. \textbf{Human3.6M: Large Scale Datasets and Predictive Methods for 3D Human Sensing in Natural Environments}. IEEE Transactions on Pattern Analysis and Machine Intelligence, v. 36, n. 7, p. 1325-1339, 2014.
+
+    \bibitem{cao2019}
+    CAO, Z. et al. \textbf{OpenPose: Realtime Multi-Person 2D Pose Estimation using Part Affinity Fields}. IEEE Transactions on Pattern Analysis and Machine Intelligence, v. 43, n. 1, p. 172-186, 2019.
+\end{thebibliography}
+
+\end{document}

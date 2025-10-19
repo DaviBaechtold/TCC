@@ -34,18 +34,33 @@ data/video/
 *.jpg
 *.png
 *.jpeg
-*.json
-*.txt
 !requirements.txt
 !README.md
+!PROJECT_STRUCTURE.md
 
-# Models
+# Annotations (keep structure files only)
+data/**/*.json
+!data/**/person_keypoints_*.json
+
+# Models & Checkpoints
 *.pth
 *.ckpt
 *.pt
 *.onnx
-checkpoints/
-work_dirs/
+
+# Keep checkpoint directory structure but not the files
+checkpoints/*
+!checkpoints/.gitkeep
+
+# Work dirs - keep only test_minimal5 structure
+work_dirs/*
+!work_dirs/test_minimal5/
+work_dirs/test_minimal5/*.pth
+work_dirs/test_minimal5/2025*/
+
+# Keep config and structure docs
+!work_dirs/test_minimal5/rtmpose_m_wholebody_minimal.py
+!work_dirs/test_minimal5/last_checkpoint
 
 # Logs
 logs/
