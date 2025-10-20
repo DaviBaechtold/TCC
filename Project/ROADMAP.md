@@ -7,11 +7,11 @@
 
 ## 🎯 Objetivos Definidos
 
-### 1. ✅ Top-down Strategy para Inferência Real-Time
+### 1. ✅ Strategy para Inferência Real-Time
 **Status**: 🟡 A Implementar  
 **Prioridade**: ALTA
 
-**Abordagem Atual (Top-Down)**:
+**Abordagem Atual**:
 ```
 Detector (RTMDet) → Crop pessoas → Pose por pessoa
 ↑ Preciso mas mais lento para multidões
@@ -19,10 +19,10 @@ Detector (RTMDet) → Crop pessoas → Pose por pessoa
 
 
 **Implementação**:
-- [ ] Integrar modelo top-down com RTMDet
 - [ ] Sistema de agrupamento de keypoints
 - [ ] **Bounding boxes** detectadas automaticamente dos keypoints
-- [ ] Mode selector no `run_realtime.py` (`--mode topdown|bottomup`)
+- [ ] Pipeline otimizado para múltiplas pessoas (max 5)
+- [ ] Testes de latência e throughput em vídeo real-time
 
 **Métricas de Sucesso**:
 - Latência < 30ms para 2-5 pessoas (vs. ~50ms top-down)
@@ -921,7 +921,6 @@ loss = loss_kpt + 0.1*loss_seg + 0.1*loss_depth
 ## 🎯 Métricas de Sucesso
 
 ### Técnicas
-- [ ] Bottom-up implementado com latência < 30ms
 - [ ] Exportação 3D funcionando (formato JSON/NPZ)
 - [ ] Fine-tuning em Drive&Act com AP > 0.35
 - [ ] Melhoria de +5% no AP com otimizações
