@@ -131,7 +131,7 @@ class BatchedPoseEstimator:
             return []
         
         # Forward pass (single batch!)
-        with torch.cuda.amp.autocast(enabled=True):
+        with torch.amp.autocast('cuda', enabled=True):
             # Use MMPose's internal inference
             results = []
             for i in range(batch_tensor.shape[0]):
@@ -160,8 +160,19 @@ class BatchedPoseEstimator:
                 continue
                 
             pred_instances = result[0].pred_instances
-            keypoints = pred_instances.keypoints[0].cpu().numpy()  # (133, 2)
-            scores = pred_instances.keypoint_scores[0].cpu().numpy()  # (133,)
+            # Handle both tensor and numpy array formats
+            kps = pred_instances.keypoints[0]
+            scores = pred_instances.keypoint_scores[0]
+            
+            if hasattr(kps, 'cpu'):
+                keypoints = kps.cpu().numpy()  # (133, 2)
+            else:
+                keypoints = np.asarray(kps)
+            
+            if hasattr(scores, 'cpu'):
+                scores = scores.cpu().numpy()  # (133,)
+            else:
+                scores = np.asarray(scores)
             
             # Denormalize to original frame coordinates
             keypoints[:, 0] = keypoints[:, 0] * info['scale_x'] + info['offset_x']
