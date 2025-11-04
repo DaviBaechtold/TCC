@@ -1,5 +1,15 @@
-imagem
+========================================
+AVALIAÇÃO DO MODELO (MÉTRICAS COCO)
+========================================
 
+# Avaliação completa com métricas COCO-WholeBody (AP, AR)
+# Output: Whole AP, Whole AR, Body/Face/Hand/Foot métricas
+python src/evaluation/evaluate_simple.py \
+  --cfg work_dirs/test_minimal5/rtmpose_m_wholebody_minimal.py \
+  --ckpt work_dirs/test_minimal5/best_coco-wholebody_AP_epoch_50.pth \
+  --device cuda:0
+
+# Comparação visual RGB vs Grayscale (N=20 imagens)
 python src/evaluation/evaluate_pose.py \
   --cfg work_dirs/test_minimal5/rtmpose_m_wholebody_minimal.py \
   --ckpt work_dirs/test_minimal5/best_coco-wholebody_AP_epoch_50.pth \
@@ -8,18 +18,43 @@ python src/evaluation/evaluate_pose.py \
   --out-dir work_dirs/eval_results \
   --n 20
 
-webcam
+========================================
+INFERÊNCIA EM TEMPO REAL
+========================================
 
+# Webcam (single person)
 python src/evaluation/run_realtime.py \
   --cfg work_dirs/test_minimal5/rtmpose_m_wholebody_minimal.py \
   --ckpt work_dirs/test_minimal5/best_coco-wholebody_AP_epoch_50.pth \
   --device cuda:0 \
   --source 0
 
-
-video
+# Webcam (multi-person com detector)
 python src/evaluation/run_realtime.py \
   --cfg work_dirs/test_minimal5/rtmpose_m_wholebody_minimal.py \
   --ckpt work_dirs/test_minimal5/best_coco-wholebody_AP_epoch_50.pth \
+  --det-cfg configs/detectors/rtmdet_nano_person_infer.py \
+  --det-ckpt checkpoints/rtmdet_nano_8xb32-100e_coco-obj365-person-05d8511e.pth \
+  --bbox-thr 0.5 \
+  --score-thr 0.4 \
+  --device cuda:0 \
+  --source 0
+
+
+# Vídeo (single person)
+python src/evaluation/run_realtime.py \
+  --cfg work_dirs/test_minimal5/rtmpose_m_wholebody_minimal.py \
+  --ckpt work_dirs/test_minimal5/best_coco-wholebody_AP_epoch_50.pth \
+  --device cuda:0 \
+  --source data/video/videoteste.mp4
+
+# Vídeo (multi-person com detector)
+python src/evaluation/run_realtime.py \
+  --cfg work_dirs/test_minimal5/rtmpose_m_wholebody_minimal.py \
+  --ckpt work_dirs/test_minimal5/best_coco-wholebody_AP_epoch_50.pth \
+  --det-cfg configs/detectors/rtmdet_nano_person_infer.py \
+  --det-ckpt checkpoints/rtmdet_nano_8xb32-100e_coco-obj365-person-05d8511e.pth \
+  --bbox-thr 0.5 \
+  --score-thr 0.4 \
   --device cuda:0 \
   --source data/video/videoteste.mp4
