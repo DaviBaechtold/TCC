@@ -58,3 +58,19 @@ python src/evaluation/run_realtime.py \
   --score-thr 0.4 \
   --device cuda:0 \
   --source data/video/videoteste.mp4
+
+
+  cd /home/davs/Documents/TCC/Project
+source venv/bin/activate
+
+python src/evaluation/evaluate_pose.py \
+  --cfg work_dirs/test_minimal5/rtmpose_m_wholebody_minimal.py \
+  --ckpt work_dirs/test_minimal5/best_coco-wholebody_AP_epoch_50.pth \
+  --rgb-dir data/raw/val2017 \
+  --ir-dir data/processed/grayscale/val2017 \
+  --ann-file data/raw/annotations/coco_wholebody_val_v1.0.json \
+  --out-dir work_dirs/eval_results \
+  --n 80 \
+  --wholebody-eval \
+  --force-k 133 \
+  --device cuda:0

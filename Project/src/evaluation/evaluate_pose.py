@@ -224,6 +224,14 @@ def main():
                         help='Detector checkpoint path')
     parser.add_argument('--det-score-thr', type=float, default=0.4,
                         help='Score threshold for detector boxes')
+    parser.add_argument('--skip-no-person', action='store_true',
+                        help='Skip images where no person is detected/annotated (recommended).')
+    parser.add_argument('--min-person-area', type=float, default=0.0,
+                        help='Minimum person bbox area to keep. If 0<value<=1, treated as a fraction of the image area; if >1, treated as pixels^2.')
+    parser.add_argument('--max-people', type=int, default=5,
+                        help='Limit number of people per image (highest scores first). Use <=0 for no limit.')
+    parser.add_argument('--pose-score-thr', type=float, default=0.0,
+                        help='Filter pose instances with instance score below this threshold before visualization/metric export.')
     parser.add_argument('--out-dir', type=str, default='work_dirs/eval_results')
     parser.add_argument('--n', type=int, default=20)
     parser.add_argument('--device', type=str, default='cuda:0')
@@ -352,11 +360,19 @@ def main():
         for img_id in img_ids:
             info = coco.loadImgs(img_id)[0]
             name_to_id[info['file_name']] = img_id
+        # Consider only PERSON annotations to avoid non-human images
+        person_cat_ids = set(cat_ids) if 'cat_ids' in locals() and cat_ids else {1}
         for fname, img_id in name_to_id.items():
             ann_ids = coco.getAnnIds(imgIds=[img_id], iscrowd=False)
             anns = coco.loadAnns(ann_ids)
             boxes = []
             for ann in anns:
+                # Skip non-person categories
+                if ann.get('category_id') not in person_cat_ids:
+                    continue
+                # Optionally require at least one visible keypoint when GT provides them
+                if ann.get('num_keypoints', 0) <= 0 and gt_kpt_num is not None:
+                    continue
                 x, y, w, h = ann['bbox']
                 if w <= 1 or h <= 1:
                     continue
@@ -371,12 +387,12 @@ def main():
     if not use_detector and args.ann_file:
         rgb_images = [f for f in rgb_images if f in bbox_lookup]
     rgb_images = rgb_images[:args.n]
-    
+
     print(f"Processing {len(rgb_images)} images...")
-    
+
     distances = []
     per_person_distances = []
-    
+
     # Effective K: respect ann-file; honor --force-k only if it matches
     effective_k = gt_kpt_num
     if args.force_k is not None:
@@ -391,7 +407,6 @@ def main():
 
     for i, img_name in enumerate(rgb_images):
         print(f"[{i+1}/{len(rgb_images)}] Processing {img_name}...")
-        
         rgb_path = os.path.join(args.rgb_dir, img_name)
         ir_path = os.path.join(args.ir_dir, img_name)
         
@@ -408,28 +423,92 @@ def main():
             continue
         
         if use_detector:
+            # Ensure MMDetection registry scope is active before detector inference
+            try:
+                from mmengine.registry import init_default_scope
+                init_default_scope('mmdet')
+            except Exception:
+                pass
             det_result = inference_detector(det_model, rgb_img)
             boxes = []
+            scores = None
             if hasattr(det_result, 'pred_instances'):
                 inst = det_result.pred_instances
                 b = inst.bboxes.cpu().numpy()
                 s = inst.scores.cpu().numpy()
                 keep = s >= args.det_score_thr
-                boxes = b[keep]
+                b, s = b[keep], s[keep]
+                boxes, scores = b, s
             else:
                 det_array = det_result[0]  # person class
                 if det_array.size > 0:
                     keep = det_array[:, 4] >= args.det_score_thr
-                    boxes = det_array[keep, :4]
+                    det_array = det_array[keep]
+                    boxes = det_array[:, :4]
+                    scores = det_array[:, 4]
+
+            # Min area filtering
+            if len(boxes) > 0 and args.min_person_area > 0:
+                H, W = rgb_img.shape[:2]
+                img_area = float(H * W)
+                thr = args.min_person_area
+                thr_area = thr * img_area if 0 < thr <= 1.0 else thr
+                keep_boxes = []
+                keep_scores = []
+                for idx, b in enumerate(boxes):
+                    x1, y1, x2, y2 = b
+                    area = max(0.0, (x2 - x1)) * max(0.0, (y2 - y1))
+                    if area >= thr_area:
+                        keep_boxes.append(b)
+                        if scores is not None:
+                            keep_scores.append(scores[idx])
+                boxes = np.array(keep_boxes, dtype=np.float32) if keep_boxes else np.empty((0, 4), dtype=np.float32)
+                scores = np.array(keep_scores, dtype=np.float32) if keep_boxes and scores is not None else scores
+
+            # Top-N by score
+            if len(boxes) > 0 and args.max_people and args.max_people > 0 and scores is not None:
+                order = np.argsort(-scores)[:args.max_people]
+                boxes = boxes[order]
+
             if len(boxes) == 0:
-                print('  Warning: detector found no valid boxes; skipping image')
-                continue
+                if args.skip_no_person:
+                    print('  Info: detector found no valid boxes; skipping image')
+                    continue
+                else:
+                    h, w = rgb_img.shape[:2]
+                    boxes = np.array([[0.0, 0.0, float(w - 1), float(h - 1)]], dtype=np.float32)
             bboxes = np.array(boxes, dtype=np.float32)
         elif args.ann_file:
             if img_name not in bbox_lookup:
-                print("  Warning: No annotations for this image")
-                continue
-            bboxes = bbox_lookup[img_name]
+                if args.skip_no_person:
+                    print("  Info: No person annotations for this image; skipping")
+                    continue
+                h, w = rgb_img.shape[:2]
+                bboxes = np.array([[0.0, 0.0, float(w - 1), float(h - 1)]], dtype=np.float32)
+            else:
+                bboxes = bbox_lookup[img_name]
+                # Apply same filters to GT boxes
+                if args.min_person_area > 0:
+                    H, W = rgb_img.shape[:2]
+                    img_area = float(H * W)
+                    thr = args.min_person_area
+                    thr_area = thr * img_area if 0 < thr <= 1.0 else thr
+                    keep = []
+                    for b in bboxes:
+                        x1, y1, x2, y2 = b
+                        area = max(0.0, (x2 - x1)) * max(0.0, (y2 - y1))
+                        if area >= thr_area:
+                            keep.append(b)
+                    bboxes = np.array(keep, dtype=np.float32) if keep else np.empty((0, 4), dtype=np.float32)
+                if (args.max_people and args.max_people > 0) and len(bboxes) > args.max_people:
+                    bboxes = bboxes[:args.max_people]
+                if len(bboxes) == 0:
+                    if args.skip_no_person:
+                        print('  Info: no GT bboxes remain after filtering; skipping image')
+                        continue
+                    else:
+                        h, w = rgb_img.shape[:2]
+                        bboxes = np.array([[0.0, 0.0, float(w - 1), float(h - 1)]], dtype=np.float32)
         else:
             h, w = rgb_img.shape[:2]
             bboxes = np.array([[0.0, 0.0, float(w - 1), float(h - 1)]], dtype=np.float32)
@@ -445,6 +524,46 @@ def main():
         # Extract keypoints
         rgb_kps = extract_kps(rgb_result)
         ir_kps = extract_kps(ir_result)
+        
+        # Optional: filter instances by pose score threshold for visualization/metrics
+        def _filter_by_pose_score(result_list, kps_arr):
+            if args.pose_score_thr <= 0 or not result_list or kps_arr is None:
+                return result_list, kps_arr
+            kept = []
+            kept_kps = []
+            for idx, sample in enumerate(result_list):
+                inst = getattr(sample, 'pred_instances', None)
+                if inst is None:
+                    continue
+                scores = getattr(inst, 'scores', None)
+                if scores is None:
+                    kept.append(sample)
+                    kept_kps.append(kps_arr[idx])
+                    continue
+                try:
+                    sc = scores.cpu().numpy()
+                except Exception:
+                    sc = np.asarray(scores)
+                mask = sc >= args.pose_score_thr
+                if not np.any(mask):
+                    continue
+                # filter in-place structures for consistency
+                if hasattr(inst, 'keypoints'):
+                    inst.keypoints = inst.keypoints[mask]
+                if hasattr(inst, 'scores'):
+                    inst.scores = inst.scores[mask]
+                if hasattr(inst, 'bboxes') and inst.bboxes.shape[0] == mask.shape[0]:
+                    inst.bboxes = inst.bboxes[mask]
+                kept.append(sample)
+                kept_kps.append(kps_arr[idx][mask])
+            if kept and kept_kps:
+                return kept, np.concatenate(kept_kps, axis=0) if isinstance(kept_kps[0], np.ndarray) else kps_arr
+            return kept, None
+
+        if rgb_result is not None:
+            rgb_result, rgb_kps = _filter_by_pose_score(rgb_result, rgb_kps)
+        if ir_result is not None:
+            ir_result, ir_kps = _filter_by_pose_score(ir_result, ir_kps)
 
         # Collect COCO-style predictions for concise AP/AR
         if coco is not None and img_name in bbox_lookup:

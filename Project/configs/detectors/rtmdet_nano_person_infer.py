@@ -1,4 +1,6 @@
-# RTMDet-nano config for person detection inference
+# RTMDet-nano config for person detection inference (MMDet 3.x compatible)
+
+default_scope = 'mmdet'
 
 # Model settings
 model = dict(
@@ -14,14 +16,14 @@ model = dict(
         arch='P5',
         expand_ratio=0.5,
         deepen_factor=0.167,
-        widen_factor=0.375,
+        widen_factor=0.25,  # match nano checkpoint channel widths
         channel_attention=True,
         norm_cfg=dict(type='SyncBN'),
         act_cfg=dict(type='SiLU')),
     neck=dict(
         type='CSPNeXtPAFPN',
-        in_channels=[96, 192, 384],
-        out_channels=96,
+        in_channels=[64, 128, 256],
+        out_channels=64,
         num_csp_blocks=1,
         expand_ratio=0.5,
         norm_cfg=dict(type='SyncBN'),
@@ -29,9 +31,9 @@ model = dict(
     bbox_head=dict(
         type='RTMDetHead',
         num_classes=1,  # Only person class
-        in_channels=96,
+        in_channels=64,
         stacked_convs=2,
-        feat_channels=96,
+        feat_channels=64,
         anchor_generator=dict(
             type='MlvlPointGenerator', offset=0, strides=[8, 16, 32]),
         bbox_coder=dict(type='DistancePointBBoxCoder'),
@@ -69,3 +71,25 @@ test_pipeline = [
         meta_keys=('img_id', 'img_path', 'ori_shape', 'img_shape',
                    'scale_factor'))
 ]
+
+# Minimal dataloader definition required by init_detector in MMDet 3.x
+test_dataloader = dict(
+    batch_size=1,
+    num_workers=2,
+    persistent_workers=False,
+    pin_memory=False,
+    sampler=dict(type='DefaultSampler', shuffle=False),
+    dataset=dict(
+        type='CocoDataset',
+        data_root='.',
+        ann_file=None,  # not used by init_detector
+        data_prefix=dict(img='.'),
+        filter_cfg=None,
+        pipeline=test_pipeline,
+        metainfo=dict(classes=('person',), palette=[(220, 20, 60)]),
+        test_mode=True,
+    ),
+)
+
+# Optional evaluator stub (not used in init_detector)
+test_evaluator = dict(type='CocoMetric', ann_file=None)
