@@ -1,8 +1,20 @@
-# RTMDet-nano config for person detection inference (MMDet 3.x compatible)
+# RTMDet-nano para detecção de pessoas (inferência).
+#
+# Os hiperparâmetros aqui foram derivados do próprio checkpoint
+# `rtmdet_nano_8xb32-100e_coco-obj365-person`, e não devem ser ajustados sem
+# reconferir contra ele. A versão anterior deste arquivo declarava convoluções
+# densas e deepen_factor=0.167, o que fazia praticamente todo o backbone, o
+# neck e a head falharem ao carregar: o modelo rodava com pesos aleatórios e
+# ainda assim produzia caixas, apenas sem valor algum.
+#
+# Evidências extraídas do checkpoint:
+#   - chaves `depthwise_conv`/`pointwise_conv`            -> use_depthwise=True
+#   - stem 3->8->8->16 canais                             -> widen_factor=0.25
+#   - 1, 2, 2 e 1 bloco CSP nos quatro estágios           -> deepen_factor=0.33
+#   - `bbox_head.rtm_cls` indexado por nível (.0/.1/.2)   -> share_conv=False
 
 default_scope = 'mmdet'
 
-# Model settings
 model = dict(
     type='RTMDet',
     data_preprocessor=dict(
@@ -15,9 +27,10 @@ model = dict(
         type='CSPNeXt',
         arch='P5',
         expand_ratio=0.5,
-        deepen_factor=0.167,
-        widen_factor=0.25,  # match nano checkpoint channel widths
+        deepen_factor=0.33,
+        widen_factor=0.25,
         channel_attention=True,
+        use_depthwise=True,
         norm_cfg=dict(type='SyncBN'),
         act_cfg=dict(type='SiLU')),
     neck=dict(
@@ -26,28 +39,30 @@ model = dict(
         out_channels=64,
         num_csp_blocks=1,
         expand_ratio=0.5,
+        use_depthwise=True,
         norm_cfg=dict(type='SyncBN'),
         act_cfg=dict(type='SiLU')),
     bbox_head=dict(
-        type='RTMDetHead',
-        num_classes=1,  # Only person class
+        type='RTMDetSepBNHead',
+        num_classes=1,  # apenas a classe pessoa
         in_channels=64,
         stacked_convs=2,
         feat_channels=64,
+        share_conv=False,
+        exp_on_reg=False,
+        use_depthwise=True,
+        # O checkpoint não traz pesos de `rtm_obj`. Mantê-lo ligado criaria um
+        # ramo de objectness aleatório multiplicando os scores de classificação,
+        # o que zera as detecções sem qualquer erro visível.
+        with_objectness=False,
+        norm_cfg=dict(type='SyncBN'),
+        act_cfg=dict(type='SiLU'),
         anchor_generator=dict(
             type='MlvlPointGenerator', offset=0, strides=[8, 16, 32]),
         bbox_coder=dict(type='DistancePointBBoxCoder'),
         loss_cls=dict(
-            type='QualityFocalLoss',
-            use_sigmoid=True,
-            beta=2.0,
-            loss_weight=1.0),
+            type='QualityFocalLoss', use_sigmoid=True, beta=2.0, loss_weight=1.0),
         loss_bbox=dict(type='GIoULoss', loss_weight=2.0)),
-    train_cfg=dict(
-        assigner=dict(type='DynamicSoftLabelAssigner', topk=13),
-        allowed_border=-1,
-        pos_weight=-1,
-        debug=False),
     test_cfg=dict(
         nms_pre=1000,
         min_bbox_size=0,
@@ -55,24 +70,21 @@ model = dict(
         nms=dict(type='nms', iou_threshold=0.5),
         max_per_img=100))
 
-# Test pipeline
+# 320x320 é a resolução em que este checkpoint foi treinado. A versão anterior
+# usava 640x640, o que além de custar quatro vezes mais também avaliava o
+# modelo fora da escala para a qual seus âncoras foram calibrados.
 test_pipeline = [
     dict(type='LoadImageFromFile'),
-    dict(
-        type='Resize',
-        scale=(640, 640),
-        keep_ratio=True),
-    dict(
-        type='Pad',
-        size=(640, 640),
-        pad_val=dict(img=(114, 114, 114))),
+    dict(type='Resize', scale=(320, 320), keep_ratio=True),
+    dict(type='Pad', size=(320, 320), pad_val=dict(img=(114, 114, 114))),
     dict(
         type='PackDetInputs',
         meta_keys=('img_id', 'img_path', 'ori_shape', 'img_shape',
-                   'scale_factor'))
+                   'scale_factor')),
 ]
 
-# Minimal dataloader definition required by init_detector in MMDet 3.x
+# init_detector do MMDet 3.x exige um test_dataloader declarado, ainda que a
+# inferência a partir de array numpy não o utilize.
 test_dataloader = dict(
     batch_size=1,
     num_workers=2,
@@ -82,14 +94,13 @@ test_dataloader = dict(
     dataset=dict(
         type='CocoDataset',
         data_root='.',
-        ann_file=None,  # not used by init_detector
+        ann_file=None,
         data_prefix=dict(img='.'),
         filter_cfg=None,
         pipeline=test_pipeline,
-        metainfo=dict(classes=('person',), palette=[(220, 20, 60)]),
+        metainfo=dict(classes=('person', ), palette=[(220, 20, 60)]),
         test_mode=True,
     ),
 )
 
-# Optional evaluator stub (not used in init_detector)
 test_evaluator = dict(type='CocoMetric', ann_file=None)

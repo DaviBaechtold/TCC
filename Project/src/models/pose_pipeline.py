@@ -1,0 +1,179 @@
+"""Pipeline top-down de estimação de pose 2D full-body.
+
+Camada Model: encapsula detector de pessoas e estimador de keypoints, mede a
+latência de cada estágio e devolve resultado estruturado. Não desenha, não
+imprime, não lê argumentos de linha de comando.
+
+Existe para eliminar a duplicação entre os vários scripts de inferência do
+repositório, que reimplementavam este mesmo pipeline com pequenas variações.
+"""
+
+from __future__ import annotations
+
+import time
+from dataclasses import dataclass, field
+from pathlib import Path
+
+import numpy as np
+import torch
+from mmengine.registry import DefaultScope
+
+# Checkpoints do OpenMMLab de 2023 serializam objetos numpy. O PyTorch >= 2.6
+# usa weights_only=True por padrão e os rejeita, então o carregamento precisa
+# ser relaxado antes de qualquer import que dispare o loader do mmengine.
+_TORCH_LOAD = torch.load
+
+
+def _load_trusting_checkpoint(*args, **kwargs):
+    kwargs.setdefault('weights_only', False)
+    return _TORCH_LOAD(*args, **kwargs)
+
+
+torch.load = _load_trusting_checkpoint
+
+from mmpose.apis import inference_topdown, init_model  # noqa: E402
+
+# Fronteiras dos blocos de keypoints no layout COCO-WholeBody.
+KEYPOINT_REGIONS = {
+    'body': slice(0, 17),
+    'feet': slice(17, 23),
+    'face': slice(23, 91),
+    'left_hand': slice(91, 112),
+    'right_hand': slice(112, 133),
+}
+
+COCO_PERSON_CLASS_ID = 0
+
+# MMPose e MMDet mantêm registries separados sob escopos homônimos. O estimador
+# de pose é inicializado por último e deixa o escopo global em 'mmpose', de modo
+# que chamadas ao detector precisam trocar o escopo temporariamente.
+_default_scope = DefaultScope.overwrite_default_scope
+
+
+@dataclass
+class PoseResult:
+    """Saída do pipeline para um frame."""
+
+    keypoints: np.ndarray        # [N, 133, 2] em pixels do frame original
+    scores: np.ndarray           # [N, 133] confiança por keypoint
+    boxes: np.ndarray            # [N, 4] no formato (x1, y1, x2, y2)
+    latency_ms: dict[str, float] = field(default_factory=dict)
+
+    @property
+    def num_people(self) -> int:
+        return len(self.boxes)
+
+    def region_confidence(self, min_score: float) -> dict[str, float]:
+        """Confiança média por região anatômica, sobre keypoints acima do limiar.
+
+        É a única métrica de qualidade computável ao vivo: AP e MPJPE exigem
+        ground truth, que não existe numa captura de webcam.
+        """
+        if self.num_people == 0:
+            return {name: 0.0 for name in KEYPOINT_REGIONS}
+
+        confidence = {}
+        for name, region in KEYPOINT_REGIONS.items():
+            values = self.scores[:, region]
+            visible = values[values >= min_score]
+            confidence[name] = float(visible.mean()) if visible.size else 0.0
+        return confidence
+
+    def region_counts(self, min_score: float) -> dict[str, tuple[int, int]]:
+        """Keypoints detectados e total por região, somando todas as pessoas."""
+        counts = {}
+        for name, region in KEYPOINT_REGIONS.items():
+            values = self.scores[:, region]
+            counts[name] = (int((values >= min_score).sum()), int(values.size))
+        return counts
+
+
+class PersonDetector:
+    """Estágio 1: localiza pessoas no frame.
+
+    Opcional. Numa câmera rigidamente montada no habitáculo os ocupantes
+    aparecem em regiões previsíveis, e o frame inteiro pode servir de caixa
+    única — o que elimina o custo deste estágio.
+    """
+
+    def __init__(self, config: str, checkpoint: str, device: str,
+                 score_threshold: float):
+        from mmdet.apis import init_detector
+
+        # O NMS do MMDet depende de operador compilado do MMCV, ausente nesta
+        # instalação. O import instala o substituto baseado em torchvision.
+        from src.models import mmcv_ops_fallback  # noqa: F401
+
+        with _default_scope('mmdet'):
+            self._model = init_detector(config, checkpoint, device=device)
+        self._score_threshold = score_threshold
+
+    def __call__(self, frame: np.ndarray) -> np.ndarray:
+        from mmdet.apis import inference_detector
+
+        with _default_scope('mmdet'):
+            result = inference_detector(self._model, frame)
+
+        instances = result.pred_instances
+        keep = ((instances.labels == COCO_PERSON_CLASS_ID) &
+                (instances.scores >= self._score_threshold))
+        boxes = instances.bboxes[keep].cpu().numpy()
+        if len(boxes) == 0:
+            return np.zeros((0, 4), dtype=np.float32)
+        return boxes.astype(np.float32)
+
+
+class FullBodyPosePipeline:
+    """Detector de pessoas seguido de estimação de 133 keypoints por pessoa."""
+
+    def __init__(self,
+                 pose_config: str | Path,
+                 pose_checkpoint: str | Path,
+                 device: str = 'cuda:0',
+                 detector: PersonDetector | None = None):
+        self._pose_model = init_model(str(pose_config), str(pose_checkpoint),
+                                      device=device)
+        self._detector = detector
+
+    def __call__(self, frame: np.ndarray) -> PoseResult:
+        """
+        Args:
+            frame: [H, W, 3] BGR uint8.
+
+        Returns:
+            PoseResult com keypoints já no sistema de coordenadas do frame.
+        """
+        started = time.perf_counter()
+
+        if self._detector is None:
+            height, width = frame.shape[:2]
+            boxes = np.array([[0, 0, width, height]], dtype=np.float32)
+        else:
+            boxes = self._detector(frame)
+        detected = time.perf_counter()
+
+        if len(boxes) == 0:
+            return PoseResult(
+                keypoints=np.zeros((0, 133, 2), np.float32),
+                scores=np.zeros((0, 133), np.float32),
+                boxes=boxes,
+                latency_ms={'detect': (detected - started) * 1e3, 'pose': 0.0})
+
+        # inference_topdown aplica internamente o recorte, o redimensionamento e
+        # a transformação afim, e devolve os keypoints já remapeados para o
+        # frame original. Recortar manualmente antes desta chamada aplicaria a
+        # transformação duas vezes e deslocaria os keypoints.
+        samples = inference_topdown(self._pose_model, frame, bboxes=boxes)
+        estimated = time.perf_counter()
+
+        keypoints = np.stack([s.pred_instances.keypoints[0] for s in samples])
+        scores = np.stack([s.pred_instances.keypoint_scores[0] for s in samples])
+
+        return PoseResult(
+            keypoints=keypoints.astype(np.float32),
+            scores=scores.astype(np.float32),
+            boxes=boxes,
+            latency_ms={
+                'detect': (detected - started) * 1e3,
+                'pose': (estimated - detected) * 1e3,
+            })
