@@ -1,0 +1,17 @@
+{
+  "tag": "rtmwx_gray",
+  "checkpoint": "checkpoints/rtmw-x_simcc-cocktail14_pt-ucoco_270e-384x288-f840f204_20231122.pth",
+  "data_root": "data/processed/grayscale/",
+  "metrics": {
+    "coco-wholebody/AP": 0.6857425013655332,
+    "coco-wholebody/AP .5": 0.9011052936740461,
+    "coco-wholebody/AP .75": 0.7620966631829904,
+    "coco-wholebody/AP (M)": 0.6652637775773763,
+    "coco-wholebody/AP (L)": 0.7256860325458598,
+    "coco-wholebody/AR": 0.7406801007556675,
+    "coco-wholebody/AR .5": 0.9190806045340051,
+    "coco-wholebody/AR .75": 0.8003778337531486,
+    "coco-wholebody/AR (M)": 0.7085768915596831,
+    "coco-wholebody/AR (L)": 0.7879970271274619
+  }
+}
