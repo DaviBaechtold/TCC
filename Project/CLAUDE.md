@@ -38,12 +38,13 @@ checkpoint precisa do patch de `torch.load` — veja `scripts/eval_checkpoint.py
 | Componente | Estado |
 |---|---|
 | Dataset COCO-WholeBody grayscale | Pronto: 118.287 treino / 5.000 val |
-| Módulo 2 — estimação 2D top-down | Funcional (RTMDet-nano + RTMPose-m); adaptação de domínio em curso |
+| Módulo 2 — estimação 2D top-down | Funcional (RTMDet-nano + RTMW-x); adaptação de domínio por LoRA em curso |
 | Módulo 1 — aquisição | Parcial: captura OK, calibração/undistort pendentes |
-| Módulo 3 — lifting 3D | **Não existe.** Maior risco do projeto |
-| Módulo 4 — visualização | Parcial: overlay 2D em OpenCV; falta 3D e painel de métricas |
-| Drive&Act | `inner_mirror.zip` (2,2 GB) baixado em ~/Downloads; falta converter |
-| Human3.6M | Acesso obtido, download pendente |
+| Módulo 3 — lifting 3D | Config e dataset prontos e verificados; treino pendente |
+| Módulo 4 — visualização | Painel de validação funcional (2D, métricas, FPS); visualização 3D pendente do Módulo 3 |
+| Drive&Act | Vídeos e anotações baixados; conversor escrito e validado |
+| H3WB (lifting 3D) | Baixado e convertido: 60k treino / 20k teste, 133 keypoints |
+| Human3.6M (imagens) | Não necessário — a tarefa 2D→3D usa só coordenadas |
 
 ### Números medidos — não sobrescrever com estimativa
 
@@ -72,6 +73,18 @@ Quatro conclusões que orientam todo trabalho futuro:
 
 Sempre declare se um AP usa bbox de ground truth ou de detector. A diferença é
 de ~2 pontos e comparar as duas condições silenciosamente invalida o resultado.
+
+## Manter o documento vivo — regra obrigatória
+
+Este repositório implementa o que o Projeto Físico especifica, e os dois andam
+juntos. **Toda medição, decisão de arquitetura ou descoberta que contradiga o
+documento obriga a atualizá-lo na mesma sessão**, em `~/Documents/Projeto-Fisico`.
+
+Vale especialmente para resultado negativo: um treino que piorou o modelo ou uma
+meta que se revelou inviável são conteúdo do TCC, não fracasso a esconder.
+
+Números medidos aqui e citados lá precisam bater. Quando divergirem, o valor
+medido ganha, e o documento é corrigido — nunca o contrário.
 
 ## Comandos
 

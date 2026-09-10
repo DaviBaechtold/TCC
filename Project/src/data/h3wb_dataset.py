@@ -22,6 +22,8 @@ as anotações são carregadas.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 
 from mmpose.datasets.datasets.wholebody3d import H36MWholeBodyDataset
@@ -34,6 +36,32 @@ from mmpose.registry import DATASETS
 # normalização.
 IMAGE_WIDTH = 1000
 IMAGE_HEIGHT = 1000
+
+
+def _h36m_style_path(img_path: str) -> str:
+    """Reescreve o caminho no padrão de nomes que a métrica MPJPE sabe ler.
+
+    A métrica identifica a ação de origem pelo nome do arquivo, partindo-o em
+    `sujeito_acao.camera_frame.jpg`. O `H36MWholeBodyDataset` gera caminhos na
+    forma `.../S1/Images/Directions.54138969/frame_000000.jpg`, cujo nome base
+    não contém sujeito nem ação — o resultado é que a métrica interpreta o
+    número do frame como nome da ação e reporta chaves sem sentido, do tipo
+    `MPJPE_000000`.
+
+    O agregado não é afetado, mas a decomposição por ação sim, e é ela que
+    revela quais movimentos o modelo erra mais.
+    """
+    parts = Path(img_path).parts
+    if len(parts) < 3:
+        return img_path
+
+    subject = parts[-3]                       # S1
+    action_and_camera = parts[-2]             # Directions.54138969
+    frame = Path(parts[-1]).stem              # frame_000000
+    frame_index = frame.split('_')[-1]
+
+    renamed = f'{subject}_{action_and_camera}_{frame_index}.jpg'
+    return str(Path(img_path).parent / renamed)
 
 
 @DATASETS.register_module()
@@ -54,6 +82,17 @@ class H3WBSeq2SeqDataset(H36MWholeBodyDataset):
         self.multiple_target = multiple_target
         self.full_init()
 
+    def _target_indices(self) -> list[int]:
+        """Quais frames da janela são alvo, na mesma convenção do dataset base.
+
+        Com `multiple_target` ativo a janela inteira é prevista. Sem ele, o alvo
+        é o último frame no modo causal — que é o único utilizável em tempo
+        real, por não depender de frames futuros — ou o central caso contrário.
+        """
+        if self.multiple_target:
+            return list(range(self.multiple_target))
+        return [-1] if self.causal else [self.seq_len // 2]
+
     def _load_annotations(self):
         """Normaliza os parâmetros de câmera para o formato que as transformações esperam.
 
@@ -73,10 +112,19 @@ class H3WBSeq2SeqDataset(H36MWholeBodyDataset):
         A terceira é o tipo da distância focal e do ponto principal. O dataset
         os monta como tuplas, mas `camera_to_image_coord` faz
         `camera_param['f'] / 1000.`, aritmética que exige array NumPy.
+
+        A quarta é a ausência de `target_img_path`, que a métrica MPJPE lê para
+        identificar a sequência de origem de cada predição. O dataset fornece
+        apenas `img_path` e `img_paths`.
         """
         instance_list, image_list = super()._load_annotations()
+        target_indices = self._target_indices()
 
         for instance in instance_list:
+            instance['target_img_path'] = [
+                _h36m_style_path(instance['img_paths'][index])
+                for index in target_indices
+            ]
             camera_param = instance['camera_param']
             if isinstance(camera_param, (list, tuple)):
                 camera_param = camera_param[0]

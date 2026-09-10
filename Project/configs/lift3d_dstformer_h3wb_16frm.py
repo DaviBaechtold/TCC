@@ -24,6 +24,7 @@ custom_imports = dict(
         'mmpose.datasets',
         'mmpose.evaluation',
         'src.data.h3wb_dataset',
+        'src.evaluation.wholebody_mpjpe',
     ],
     allow_failed_imports=False)
 
@@ -169,11 +170,15 @@ val_dataloader = dict(
 
 test_dataloader = val_dataloader
 
-# MPJPE sem alinhamento e com alinhamento de Procrustes. O segundo remove
-# ambiguidades de escala e rotação, isolando o erro de forma da pose.
+# MPJPE decomposto por região e em milímetros, que é a forma em que o benchmark
+# do H3WB reporta e a única diretamente comparável com ele. A métrica nativa do
+# MMPose devolveria metros, três ordens de grandeza abaixo da literatura.
+#
+# Sem alinhamento e com alinhamento de Procrustes: o segundo remove ambiguidade
+# de escala e rotação, isolando o erro de forma da pose.
 val_evaluator = [
-    dict(type='MPJPE', mode='mpjpe'),
-    dict(type='MPJPE', mode='p-mpjpe'),
+    dict(type='WholeBodyMPJPE', mode='mpjpe'),
+    dict(type='WholeBodyMPJPE', mode='p-mpjpe'),
 ]
 test_evaluator = val_evaluator
 
@@ -199,7 +204,7 @@ default_hooks = dict(
     checkpoint=dict(
         type='CheckpointHook',
         interval=1,
-        save_best='MPJPE',
+        save_best='MPJPE/whole',
         rule='less',
         max_keep_ckpts=2),
     sampler_seed=dict(type='DistSamplerSeedHook'),
