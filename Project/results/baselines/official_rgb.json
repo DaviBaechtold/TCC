@@ -1,0 +1,17 @@
+{
+  "tag": "official_rgb",
+  "checkpoint": "checkpoints/rtmpose-m_wholebody_official_256x192.pth",
+  "data_root": "data/raw/",
+  "metrics": {
+    "coco-wholebody/AP": 0.6038687528948442,
+    "coco-wholebody/AP .5": 0.8780888368950095,
+    "coco-wholebody/AP .75": 0.6818652667384217,
+    "coco-wholebody/AP (M)": 0.6109660330857155,
+    "coco-wholebody/AP (L)": 0.6180350550649336,
+    "coco-wholebody/AR": 0.6670340050377834,
+    "coco-wholebody/AR .5": 0.8981423173803527,
+    "coco-wholebody/AR .75": 0.7407115869017632,
+    "coco-wholebody/AR (M)": 0.6577437858508605,
+    "coco-wholebody/AR (L)": 0.6828316610925306
+  }
+}

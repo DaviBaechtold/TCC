@@ -92,3 +92,9 @@ dmypy.json
 # Environment
 .env
 .envrc
+
+# results/ NÃO é ignorado: guarda os JSON de métrica que sustentam as
+# afirmações do documento. Os padrões globais acima (*.pth, *.log, *.jpg)
+# já barram os artefatos pesados que o runner deposita ali, e uma regra
+# `results/**/*` com negação não funcionaria: o git não re-inclui arquivo
+# cujo diretório pai foi excluído.
