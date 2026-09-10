@@ -19,7 +19,10 @@ Exemplos:
 
 import argparse
 import os
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 
 def parse_args():
@@ -33,6 +36,13 @@ def parse_args():
     p.add_argument('--lr', type=float, default=None)
     p.add_argument('--resume', action='store_true')
     p.add_argument('--load-from', default=None)
+    p.add_argument('--lora-rank', type=int, default=None,
+                   help='Sobrescreve o posto declarado no config')
+    p.add_argument('--no-lora', action='store_true',
+                   help='Ignora a seção `lora` do config e treina tudo')
+    p.add_argument('--log-interval', type=int, default=None,
+                   help='Iterações entre registros. Use 1 para diagnosticar '
+                        'em que passo exato a perda diverge')
     return p.parse_args()
 
 
@@ -104,6 +114,12 @@ def main():
         cfg = rescale_schedule(cfg, args.epochs)
     if args.val_interval:
         cfg.train_cfg.val_interval = args.val_interval
+    if args.log_interval:
+        cfg.default_hooks.logger.interval = args.log_interval
+        # A janela de suavização precisa acompanhar: com janela 50 e registro a
+        # cada iteração, um único NaN contamina os cinquenta registros seguintes
+        # e esconde em qual passo ele apareceu.
+        cfg.log_processor.window_size = args.log_interval
 
     Path(cfg.work_dir).mkdir(parents=True, exist_ok=True)
 
@@ -126,7 +142,130 @@ def main():
     print('=' * 72)
 
     runner = Runner.from_cfg(cfg)
+    _apply_lora_if_requested(cfg, args, runner)
     runner.train()
+
+
+def _apply_lora_if_requested(cfg, args, runner):
+    """Carrega o checkpoint e injeta adaptadores de posto baixo, nesta ordem.
+
+    A ordem é o ponto crítico. `Runner.from_cfg` constrói o modelo mas **não**
+    carrega `load_from`: quem carrega é `train()`, mais tarde. Injetar os
+    adaptadores antes disso renomeia os parâmetros — `backbone.stem.0.conv`
+    passa a ser `backbone.stem.0.conv.base` — e o carregamento posterior falha
+    silenciosamente em quase todas as chaves, deixando o modelo treinar a partir
+    de inicialização aleatória. O sintoma é discreto: o treino roda, a perda cai,
+    e apenas a acurácia denuncia (0,05 em vez de 0,98).
+
+    Por isso o checkpoint é carregado aqui, explicitamente, antes da injeção, e
+    o Runner é informado de que não há mais nada a carregar.
+    """
+    lora_cfg = cfg.get('lora')
+    if args.no_lora or not lora_cfg:
+        return
+
+    # O MMPose 1.3.2 não converte bfloat16 para NumPy ao medir acurácia.
+    from src.models import bf16_compat  # noqa: F401
+    from src.models.lora import (adapter_output_magnitude, freeze_except_lora,
+                                 inject_lora, parameter_summary)
+
+    model = runner.model
+    device = next(model.parameters()).device
+
+    if runner._load_from:
+        runner.load_checkpoint(runner._load_from, map_location='cpu')
+        runner._load_from = None  # já carregado; evita recarga pós-injeção
+
+    reference = _weight_fingerprint(model)
+
+    rank = args.lora_rank or lora_cfg.get('rank', 16)
+    adapted = inject_lora(model, rank=rank,
+                          include=tuple(lora_cfg.get('include', ('backbone',))))
+    frozen_norms = freeze_except_lora(
+        model, trainable_prefixes=tuple(lora_cfg.get('trainable', ('head',))))
+    model.to(device)
+
+    # Verifica que os pesos pré-treinados sobreviveram ao envelopamento. É o
+    # teste que teria apanhado a inversão de ordem descrita acima.
+    after = _weight_fingerprint(model)
+    if reference is None or after is None or abs(reference - after) > 1e-6:
+        raise RuntimeError(
+            'Os pesos do backbone mudaram durante a injeção do LoRA '
+            f'({reference} -> {after}). O checkpoint provavelmente não foi '
+            'carregado antes da injeção.')
+
+    # `Runner.train()` chama `_init_model_weights()` depois desta função, o que
+    # reinicializaria tanto os pesos vindos do checkpoint quanto a projeção de
+    # saída dos adaptadores, que precisa começar em zero. Como o modelo já está
+    # inicializado, a chamada é neutralizada em vez de tolerada.
+    model.init_weights = _weights_already_loaded
+
+    runner.register_hook(_build_adapters_pristine_hook(skip=args.resume))
+
+    summary = parameter_summary(model)
+    print(f'  checkpoint    carregado antes da injeção, pesos preservados '
+          f'(norma {after:.4f})')
+    print(f'  LoRA          posto {rank}, {sum(adapted.values())} camadas '
+          f'adaptadas {dict(adapted)}')
+    print(f'  normalização  {frozen_norms} camadas congeladas em modo eval')
+    print(f'  init_weights  neutralizado (pesos vêm do checkpoint)')
+    print(f'  parâmetros    {summary["trainable_M"]:.1f}M treináveis de '
+          f'{summary["total_M"]:.1f}M ({summary["trainable_pct"]:.1f}%)')
+    print('=' * 72)
+
+
+def _weights_already_loaded(*_args, **_kwargs):
+    """Substitui `init_weights` num modelo cujos pesos já vieram do checkpoint."""
+    return None
+
+
+def _build_adapters_pristine_hook(skip: bool):
+    """Hook que verifica, ao iniciar o treino, se os adaptadores seguem íntegros.
+
+    Entre a injeção e o primeiro passo o MMEngine executa uma sequência que já
+    corrompeu os adaptadores duas vezes durante o desenvolvimento: o
+    carregamento do checkpoint, que renomeia chaves, e `init_weights`, que
+    sobrescreve pesos. Ambos falhavam em silêncio — o treino rodava, a perda
+    caía, e só a acurácia denunciava. Esta verificação converte esse modo de
+    falha em erro imediato, e vale mantê-la mesmo com a ordem hoje correta,
+    porque ela depende de detalhes internos do framework.
+    """
+    from mmengine.hooks import Hook
+
+    class AdaptersPristineHook(Hook):
+        priority = 'HIGHEST'
+
+        def before_train(self, runner):
+            if skip:
+                return
+            from src.models.lora import adapter_output_magnitude
+
+            magnitude = adapter_output_magnitude(runner.model)
+            if magnitude != 0.0:
+                raise RuntimeError(
+                    'Os adaptadores LoRA foram reinicializados entre a injeção '
+                    'e o início do treino (soma das projeções de saída = '
+                    f'{magnitude:.1f}, esperado 0). O modelo adaptado deixou de '
+                    'ser idêntico ao checkpoint e o treino divergiria.')
+            runner.logger.info(
+                'Adaptadores LoRA íntegros: projeções de saída ainda em zero.')
+
+    return AdaptersPristineHook()
+
+
+def _weight_fingerprint(model):
+    """Norma de um peso profundo do backbone, usada como assinatura.
+
+    Uma camada profunda é preferível à primeira: ela é sensível a qualquer
+    reinicialização e não é afetada por adaptações de canal de entrada.
+    """
+    import torch
+
+    for name, parameter in model.backbone.named_parameters():
+        if name.endswith('stage4.0.conv.weight') or name.endswith(
+                'stage4.0.conv.base.weight'):
+            return float(torch.linalg.vector_norm(parameter.detach()).cpu())
+    return None
 
 
 if __name__ == '__main__':

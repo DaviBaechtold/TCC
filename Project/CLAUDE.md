@@ -15,7 +15,15 @@ cd ~/Documents/TCC/Project && source venv/bin/activate
 ```
 
 PyTorch 2.8+cu128 · MMPose 1.3.2 · MMCV 2.1.0 · MMEngine 0.10.7 · MMDet 3.2.0
-GPU: RTX 5060, 8 GB. CPU: i5-14400F. Treino cabe em ~4 GB com batch 64 em 256×192.
+
+**Hardware e a assimetria que ele impõe.** Casa: RTX 5060, 8 GB, i5-14400F.
+Faculdade, sob demanda junto ao coordenador: 8× RTX 4090 de 24 GB.
+
+*Treinar* pode acontecer no cluster, então modelos pesados estão liberados.
+*Inferir* precisa caber em 8 GB e sustentar 20 FPS na 5060 — **a apresentação
+final roda obrigatoriamente na 5060**. Esse é o filtro que decide se uma
+arquitetura entra no projeto. Preferência explícita: fazer tudo em casa; o
+cluster é exceção, não caminho padrão.
 
 `mmcv` está sem extensões compiladas. Isso é inofensivo para o pipeline top-down
 (nenhuma op custom é usada), mas gera dezenas de `RuntimeWarning` no stdout —
@@ -42,19 +50,25 @@ checkpoint precisa do patch de `torch.load` — veja `scripts/eval_checkpoint.py
 Whole-body AP em COCO-WholeBody val, 133 keypoints, **bbox de ground truth**,
 flip test ligado. Fonte: `results/baselines/`.
 
-| Configuração | Whole AP | Whole AR |
-|---|---|---|
-| RTMPose-m oficial, RGB | 0,6039 | 0,6670 |
-| RTMPose-m oficial, grayscale (zero-shot) | **0,5255** | 0,5964 |
-| Treino de 50 epochs a partir do checkpoint body7 | 0,4373 | 0,5287 |
+| Configuração | AP gray | AP RGB | gap | FPS na 5060 |
+|---|---|---|---|---|
+| **RTMW-x 384×288** (modelo adotado) | **0,6857** | 0,7273 | **−5,7%** | 24,0 |
+| RTMPose-m 256×192 | 0,5255 | 0,6039 | −13,0% | 57,4 |
+| RTMPose-m, fine-tuning de 10 epochs a LR 5e-4 | 0,5137 | — | — | — |
+| RTMPose-m, treino de 50 epochs a partir do checkpoint body7 | 0,4373 | — | — | — |
 
-Duas conclusões que orientam todo trabalho futuro:
+Quatro conclusões que orientam todo trabalho futuro:
 
-1. **0,5255 é o piso.** É o que se obtém sem treinar nada. Qualquer treino que
-   entregue menos que isso está errado, não "quase lá".
-2. O domain gap RGB→grayscale é de **13,0% relativos**, e concentra-se em
-   AP.75 (−16,3%) e não em AP.50 (−5,2%): perder a cor atrapalha *localizar* o
-   keypoint com precisão, não *encontrá-lo*.
+1. **O RTMW-x é o modelo do projeto.** 0,6857 em grayscale sem treino nenhum,
+   e cumpre o requisito de 20 FPS na 5060. Teto realista após adaptação de
+   domínio: 70–71%, limitado pelos 72,73% que ele atinge em RGB.
+2. **O domain gap encolhe com a capacidade do modelo**: 13,0% no RTMPose-m
+   contra 5,7% no RTMW-x. É um achado próprio e publicável.
+3. **O gap concentra-se em AP.75, não em AP.50.** Perder a cor atrapalha
+   *localizar* o keypoint com precisão, não *encontrá-lo*.
+4. **Fine-tuning completo a LR alto piora o modelo.** Medido: 0,5255 → 0,5137
+   em 10 epochs a 5e-4, por catastrophic forgetting. A adaptação de domínio
+   tem que ser por LoRA ou LR muito baixo, nunca por fine-tuning agressivo.
 
 Sempre declare se um AP usa bbox de ground truth ou de detector. A diferença é
 de ~2 pontos e comparar as duas condições silenciosamente invalida o resultado.
