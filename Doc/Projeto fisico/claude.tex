@@ -1,0 +1,880 @@
+\documentclass[12pt, a4paper]{article}
+
+% --- PACOTES ---
+\usepackage[utf8]{inputenc}
+\usepackage[brazil]{babel}
+\usepackage{abntex2cite}
+\usepackage{graphicx}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{indentfirst}
+\usepackage{setspace}
+\usepackage{times}
+\usepackage{tikz}
+\usepackage{array}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{float}
+\usetikzlibrary{shapes.geometric, arrows, positioning, fit, backgrounds}
+
+% Configuração de listagens de código
+\lstset{
+    basicstyle=\ttfamily\footnotesize,
+    breaklines=true,
+    frame=single,
+    numbers=left,
+    numberstyle=\tiny,
+    backgroundcolor=\color{gray!10},
+    extendedchars=true,
+    inputencoding=utf8,
+    literate=%
+    {á}{{\'a}}1 {é}{{\'e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ú}{{\'u}}1
+    {Á}{{\'A}}1 {É}{{\'E}}1 {Í}{{\'I}}1 {Ó}{{\'O}}1 {Ú}{{\'U}}1
+    {à}{{\`a}}1 {è}{{\`e}}1 {ì}{{\`i}}1 {ò}{{\`o}}1 {ù}{{\`u}}1
+    {À}{{\`A}}1 {È}{{\'E}}1 {Ì}{{\`I}}1 {Ò}{{\`O}}1 {Ù}{{\`U}}1
+    {ã}{{\~a}}1 {õ}{{\~o}}1 {Ã}{{\~A}}1 {Õ}{{\~O}}1
+    {â}{{\^a}}1 {ê}{{\^e}}1 {î}{{\^i}}1 {ô}{{\^o}}1 {û}{{\^u}}1
+    {Â}{{\^A}}1 {Ê}{{\^E}}1 {Î}{{\^I}}1 {Ô}{{\^O}}1 {Û}{{\^U}}1
+    {ç}{{\c{c}}}1 {Ç}{{\c{C}}}1
+}
+
+% --- MARGENS / FORMATAÇÃO ---
+\geometry{
+ a4paper,
+ left=3cm,
+ right=2cm,
+ top=3cm,
+ bottom=2cm
+}
+\onehalfspacing
+\setlength{\parindent}{1.25cm}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    urlcolor=blue,
+    citecolor=black
+}
+
+\begin{document}
+
+% --- CAPA ---
+\begin{titlepage}
+    \centering
+    {\large PROJETO FÍSICO \par}
+    \vspace{1.5cm}
+    {\bfseries\Large SISTEMA DE ESTIMAÇÃO DE POSE 3D FULL-BODY PARA MONITORAMENTO DE OCUPANTES VEICULARES UTILIZANDO CÂMERAS INFRAVERMELHAS MONOCULARES \par}
+    \vspace{2.5cm}
+
+    \begin{flushleft}
+        \textbf{Integrante:} Davi Baechtold Campos \\[0.3cm]
+        \textbf{Orientador:} Prof. Dr. Alceu de Souza Brito Junior \\
+        \textbf{Coorientador:} Prof. Dr. Alessandro Zimmer
+    \end{flushleft}
+
+    \vfill
+    \begin{flushleft}
+        \textbf{Visto do Orientador:}\\[1.4cm]
+        \makebox[9cm]{\hrulefill}\\
+        \small Prof. Dr. Alceu de Souza Brito Junior \\[0.5cm]
+        Data: \underline{\hspace{3cm}}
+    \end{flushleft}
+
+    \vfill
+    {\large Curitiba, \today \par}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+\setcounter{page}{1}
+
+% --- RESUMO ---
+\section{RESUMO}
+
+A segurança veicular representa um desafio crítico na indústria automotiva moderna. Segundo a Organização Mundial da Saúde, aproximadamente 1,19 milhões de pessoas morrem anualmente em acidentes de trânsito, sendo a distração e desatenção do motorista fatores significativos em grande parte desses acidentes. Regulamentações recentes na Europa (GSR 2019/2144), Estados Unidos (Infrastructure Investment and Jobs Act) e Ásia (China GB/T, Japan MLIT) estabelecem requisitos obrigatórios para sistemas de monitoramento de motorista e ocupantes, visando detecção de sonolência, distração e presença de crianças. Esses sistemas demandam percepção tridimensional precisa da pose dos ocupantes para otimizar a atuação de sistemas de segurança passiva, como airbags adaptativos e pré-tensionadores de cinto de segurança.
+
+Este projeto propõe o desenvolvimento de um sistema completo de estimação de pose tridimensional full-body (corpo, face e mãos) para monitoramento de ocupantes veiculares utilizando exclusivamente câmeras infravermelhas monoculares de baixo custo. A solução combina duas abordagens estado-da-arte: detecção 2D de keypoints através do YOLOv11-pose e RTMPose adaptados para imagens grayscale, seguida de lifting 2D-para-3D utilizando arquiteturas transformer com fusão temporal. O termo lifting refere-se ao processo de inferir coordenadas tridimensionais a partir de pontos bidimensionais detectados em imagens, resolvendo a ambiguidade de profundidade através de modelos de aprendizado profundo que incorporam priors anatômicos.
+
+A arquitetura modular proposta compreende quatro subsistemas: aquisição e pré-processamento de imagens infravermelhas com correção de distorção; detecção 2D multi-head integrando YOLOv11 para detecção robusta de corpo e RTMPose para refinamento de keypoints faciais e das mãos; módulo de fusão temporal e lifting 3D com janelas de 16 frames; e sistema de visualização com cálculo de métricas AP (Average Precision) e AR (Average Recall) conforme especificação do RTMPose. O desenvolvimento segue metodologia incremental em seis fases ao longo de 11 meses, com validação no dataset Drive\&Act específico para contexto automotivo.
+
+As questões de pesquisa que norteiam este trabalho são: qual combinação de modelos (YOLOv11 + RTMPose) se adapta melhor ao domínio de imagens infravermelhas veiculares? Qual a degradação de performance com oclusões típicas do ambiente automotivo? Como a fusão temporal impacta a robustez em movimentos rápidos? As métricas-alvo estabelecidas são: whole-body AP > 75\%, whole-body AR > 80\%, e taxa de processamento ≥ 20 FPS em GPU NVIDIA RTX 3060. A contribuição científica reside na adaptação e integração de técnicas estado-da-arte para o domínio veicular com câmeras infravermelhas, área ainda pouco explorada, fornecendo uma solução economicamente viável para democratização de sistemas avançados de segurança.
+
+\vspace{0.5cm}
+\noindent\textbf{Palavras-chave:} Estimação de Pose 3D; Monitoramento de Ocupantes; Câmeras Infravermelhas; YOLOv11; RTMPose; Segurança Veicular; Deep Learning.
+
+% --- INTRODUÇÃO ---
+\section{INTRODUÇÃO}
+
+\subsection{Contexto e Motivação}
+
+A indústria automotiva global enfrenta um desafio crítico de segurança que persiste apesar dos avanços tecnológicos das últimas décadas. Embora a introdução de sistemas como airbags, cintos de três pontos e estruturas de absorção de impacto tenha reduzido significativamente as fatalidades, os dados da Organização Mundial da Saúde revelam que aproximadamente 1,19 milhões de pessoas ainda morrem anualmente em acidentes de trânsito, com 20 a 50 milhões sofrendo lesões não fatais. Estudos da National Highway Traffic Safety Administration dos Estados Unidos indicam que a distração do motorista foi fator contribuinte em 2.974 mortes apenas em 2020, representando 8\% de todas as fatalidades no trânsito.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{image.png}
+    \caption{Enter Caption}
+    \label{fig:placeholder}
+\end{figure}
+
+A próxima geração de sistemas de segurança veicular demanda capacidade de percepção contextual avançada. Sistemas de proteção passiva convencionais, como airbags e pré-tensionadores de cinto, são projetados para cenários padronizados de ocupação, assumindo posições corporais normativas que frequentemente não correspondem à realidade. Um ocupante inclinado para frente durante uma colisão frontal pode sofrer lesões graves por um airbag calibrado para postura ereta. Uma criança mal posicionada no banco dianteiro pode ser gravemente ferida por um airbag convencional. Um motorista distraído manipulando dispositivos móveis requer alertas específicos antes que a situação se torne crítica.
+
+Este cenário motivou uma resposta regulatória coordenada globalmente. A Regulamentação Geral de Segurança da União Europeia (GSR 2019/2144) tornou obrigatória a partir de julho de 2024 a instalação de sistemas DDAW (Driver Drowsiness and Attention Warning) e ADDW (Advanced Driver Distraction Warning) em todos os veículos novos das categorias M e N. A regulamentação delegada 2023/2590 especifica requisitos técnicos detalhados, incluindo detecção de distração visual quando o olhar do motorista permanece fora de áreas específicas por mais de 3,5 segundos em velocidades acima de 50 km/h. Nos Estados Unidos, o Infrastructure Investment and Jobs Act de 2021 determina pesquisa e posterior regulamentação para sistemas de prevenção de direção sob influência de álcool e detecção de crianças em bancos traseiros. Na China, o padrão GB/T 41797-2022 estabelece requisitos de desempenho para sistemas DMS incluindo detecção de fechamento de olhos por mais de 2 segundos, uso de telefone celular e bocejo.
+
+Paralelamente às exigências regulatórias, programas de avaliação de consumidores como Euro NCAP, IIHS-HLDI e ANCAP estão incorporando sistemas de monitoramento de ocupantes em seus protocolos de teste, influenciando diretamente as decisões de compra dos consumidores. O Euro NCAP Vision 2030 estabelece que, a partir de 2025, apenas sistemas de detecção direta de presença de crianças (através de câmeras ou sensores de profundidade) receberão pontuação, excluindo métodos indiretos baseados apenas em sensores de peso ou abertura de portas.
+
+As motivações para resolver este problema são múltiplas e impactantes. Do ponto de vista de segurança pública, estima-se que sistemas eficazes de monitoramento de motorista poderiam prevenir 15 a 20\% dos acidentes relacionados à distração e fadiga, potencialmente salvando centenas de milhares de vidas anualmente. Do ponto de vista da indústria automotiva, o atendimento às regulamentações é obrigatório para comercialização de veículos nos principais mercados globais. Do ponto de vista tecnológico, sistemas de monitoramento de ocupantes habilitam a próxima geração de veículos autônomos, onde a capacidade do motorista de retomar o controle deve ser continuamente avaliada. Do ponto de vista econômico, a disponibilização de soluções baseadas em hardware de baixo custo (câmeras infravermelhas monoculares) democratiza tecnologias que atualmente são restritas a veículos premium.
+
+O que ganhamos com a resolução deste problema? Primeiro, redução mensurável de mortes e lesões no trânsito através de intervenções preventivas baseadas em detecção precoce de estados de risco. Segundo, viabilização de sistemas de segurança passiva adaptativos que ajustam parâmetros de acionamento baseados na pose real do ocupante, reduzindo lesões causadas pelos próprios dispositivos de segurança. Terceiro, cumprimento de requisitos regulatórios globais que são condição necessária para comercialização de veículos. Quarto, habilitação de funcionalidades de conforto e entretenimento personalizadas baseadas em reconhecimento de gestos e estado do ocupante. Quinto, geração de conhecimento científico sobre adaptação de técnicas de visão computacional para o domínio específico de imagens infravermelhas em ambientes veiculares restritos.
+
+\subsection{Definição do Problema}
+
+O problema central abordado neste trabalho pode ser formulado da seguinte maneira: como estimar com alta precisão (whole-body AP > 75\%) a pose tridimensional completa de ocupantes veiculares em tempo real (≥ 20 FPS) utilizando exclusivamente câmeras monoculares infravermelhas de baixo custo, em condições desafiadoras de iluminação variável, oclusões parciais sistemáticas e posturas não-convencionais típicas do ambiente automotivo?
+
+Este problema se desdobra em múltiplos desafios técnicos inter-relacionados, cuja compreensão detalhada é fundamental para a concepção da solução proposta.
+
+\subsubsection{Desafio 1: Adaptação de Domínio RGB para Infravermelho}
+
+Modelos estado-da-arte de estimação de pose são treinados majoritariamente em datasets RGB de ambientes abertos, como COCO (200k imagens de cenas cotidianas), MPII (25k imagens de atividades diversas) e Human3.6M (3,6 milhões de frames de estúdio controlado). A transferência desses modelos para imagens infravermelhas implica em domain shift significativo caracterizado por: ausência completa de informação cromática que auxilia na segmentação de pessoas e detecção de vestuário; texturas visuais distintas onde superfícies refletivas em RGB aparecem de forma diferenciada em infravermelho; padrões de ruído específicos dos sensores infravermelhos, especialmente em condições de baixa iluminação; e comportamento distinto de materiais comuns em veículos (tecidos, plásticos, metais) sob iluminação infravermelha.
+
+Estudos prévios na literatura demonstram degradação de 15 a 30\% em métricas de acurácia quando modelos RGB são aplicados diretamente a imagens grayscale sem retreinamento ou fine-tuning. A magnitude desta degradação depende da arquitetura do modelo, com redes mais profundas geralmente sofrendo maior impacto devido à maior especialização dos filtros iniciais para padrões cromáticos.
+
+\subsubsection{Desafio 2: Especificidades do Ambiente Veicular}
+
+O interior de veículos apresenta um conjunto único de desafios que diferem substancialmente dos ambientes para os quais os modelos convencionais são treinados. As restrições espaciais severas limitam as posições possíveis de câmeras e reduzem a distância entre sensor e ocupante, resultando em maior variabilidade de escala e perspectiva. A iluminação é altamente variável e extrema, incluindo luz solar direta através de para-brisas (até 100.000 lux), condições noturnas urbanas (0,1 a 10 lux), túneis com transições rápidas de iluminação, e sombras dinâmicas causadas por estruturas externas como árvores e edificações.
+
+As oclusões sistemáticas são particularmente problemáticas. O volante obstrui regularmente o tronco e as mãos do motorista, especialmente em manobras de giro. O painel de instrumentos limita a visibilidade das pernas e pés. Cintos de segurança cruzam o corpo criando linhas de oclusão. O encosto de cabeça pode obstruir parcialmente a face dependendo do ângulo da câmera. Objetos pessoais como bolsas, dispositivos móveis e roupas criam oclusões dinâmicas imprevisíveis.
+
+As posturas típicas de condução diferem substancialmente das poses presentes em datasets genéricos. Motoristas mantêm os braços estendidos ao volante por períodos prolongados, uma configuração raramente vista em datasets de ação humana. Rotações frequentes de cabeça para verificação de espelhos retrovisores e pontos cegos criam movimentos rápidos com motion blur. Interações com controles do veículo (câmbio, freio de mão, botões do painel) geram poses assimétricas e não-naturais. Passageiros em posições reclinadas ou interagindo com dispositivos móveis apresentam configurações corporais distintas.
+
+\subsubsection{Desafio 3: Integração Full-Body com Múltiplas Resoluções}
+
+A maioria dos trabalhos em estimação de pose foca isoladamente em corpo (17 a 21 keypoints COCO), face (68 keypoints 300W ou 98 keypoints WFLW) ou mãos (21 keypoints por mão). Sistemas que integram todas as modalidades simultaneamente são escassos na literatura, especialmente em configurações de tempo real. A integração apresenta desafios técnicos fundamentais relacionados ao balanceamento de resoluções espaciais, uma vez que a face demanda alta resolução (tipicamente 128×128 ou 256×256 pixels por face) para detecção precisa de landmarks como cantos dos olhos e contorno dos lábios, enquanto o corpo opera eficientemente em resoluções mais baixas (64×64 pixels por pessoa inteira).
+
+A capacidade computacional limitada exige decisões de arquitetura cuidadosas para processar três heads especializados sem exceder o orçamento de tempo real. A precisão varia significativamente por região anatômica, com keypoints de mãos sendo intrinsecamente mais difíceis de detectar devido ao maior número de graus de liberdade articulares e oclusões mútuas entre dedos. A fusão de informações de diferentes escalas espaciais requer mecanismos de atenção ou agregação de features multi-escala.
+
+\subsubsection{Desafio 4: Ambiguidade Monocular 2D-3D}
+
+Câmeras monoculares projetam o espaço tridimensional em um plano bidimensional através de uma transformação perspectiva, resultando em perda irreversível de informação de profundidade. Múltiplas configurações 3D distintas podem produzir projeções 2D idênticas ou muito similares. Por exemplo, um braço estendido diretamente para a câmera versus um braço dobrado podem gerar silhuetas 2D semelhantes. Esta ambiguidade é particularmente problemática para articulações onde o movimento ocorre no eixo da câmera.
+
+Técnicas de lifting devem aprender priors anatômicos e geométricos robustos, incluindo comprimentos de segmentos corporais proporcionais, ângulos articulares fisiologicamente plausíveis, limites de amplitude de movimento, simetria bilateral aproximada do corpo humano, e coerência temporal em sequências de vídeo. A literatura demonstra que modelos puramente baseados em dados frequentemente produzem configurações 3D anatomicamente implausíveis quando treinados apenas com loss de reconstrução 2D.
+
+\subsubsection{Desafio 5: Restrições de Tempo Real e Eficiência Computacional}
+
+Aplicações de segurança veicular demandam latência inferior a 100 milissegundos para viabilizar intervenções preventivas efetivas. Considerando processamento a 20 FPS, o orçamento computacional é de apenas 50 milissegundos por frame, incluindo aquisição, pré-processamento, detecção 2D, lifting 3D e pós-processamento. Este requisito elimina arquiteturas extremamente profundas ou com alto custo computacional por operação.
+
+Hardware automotivo tem restrições severas de custo, consumo energético e dissipação térmica. Enquanto GPUs de desenvolvimento como RTX 3060 são aceitáveis para prototipagem, o deployment real requer plataformas embarcadas com poder computacional limitado. A solução deve ser projetada desde o início considerando otimizações como quantização, pruning de canais, conhecimento de operadores eficientes e arquiteturas mobile-friendly.
+
+\subsection{Objetivos}
+
+\subsubsection{Objetivo Geral}
+
+Desenvolver e validar experimentalmente um sistema computacional eficiente e modular para estimação de pose tridimensional completa full-body (corpo, face e mãos) de ocupantes veiculares em tempo real, utilizando câmeras infravermelhas monoculares de baixo custo, através da integração de YOLOv11-pose para detecção robusta de corpo e RTMPose para refinamento multi-região, seguido de lifting 2D-para-3D baseado em redes neurais profundas com fusão temporal.
+
+\subsubsection{Objetivos Específicos}
+
+Os objetivos específicos foram formulados de maneira a serem mensuráveis, alcançáveis dentro do escopo do TCC, e responderem diretamente às questões de pesquisa estabelecidas.
+
+\textbf{Objetivo 1 --- Detector 2D Corporal:} Adaptar e treinar um pipeline de detecção 2D de keypoints corporais combinando YOLOv11-pose para detecção inicial robusta de pessoas e RTMPose para refinamento de keypoints, operando em imagens infravermelhas grayscale, alcançando body AP > 80\% e body AR > 85\% no dataset Drive\&Act conforme métricas do protocolo COCO-WholeBody. Esta etapa responde à questão de pesquisa: qual modelo de detecção 2D se adapta melhor ao domínio de imagens infravermelhas veiculares?
+
+\textbf{Objetivo 2 --- Lifting 3D Corporal:} Implementar e treinar uma rede neural de lifting 2D-para-3D baseada em arquitetura transformer com fusão temporal sobre janelas deslizantes de 16 frames, capaz de estimar coordenadas 3D corporais com MPJPE inferior a 50mm no subset H36M do Drive\&Act. Esta etapa investiga: como a fusão temporal impacta a robustez da estimação 3D?
+
+\textbf{Objetivo 3 --- Expansão Multi-Região:} Expandir a arquitetura para detecção integrada de face (68 keypoints) e mãos (21 keypoints por mão) através de heads especializados na arquitetura RTMPose, alcançando whole-body AP > 75\% e whole-body AR > 80\%, mantendo desempenho de tempo real. Esta etapa investiga a viabilidade de integração full-body eficiente.
+
+\textbf{Objetivo 4 --- Validação Experimental:} Validar experimentalmente o sistema completo no dataset Drive\&Act, analisando sistematicamente a degradação de desempenho em condições adversas (oclusões por volante, variação diurna/noturna, movimentos rápidos de volante), comparando com baselines YOLO-only e RTMPose-only. Esta etapa responde: qual a degradação de performance com oclusões típicas e variação de iluminação?
+
+\textbf{Objetivo 5 --- Otimização para Tempo Real:} Otimizar a arquitetura completa para inferência em tempo real (≥ 20 FPS) em hardware de gama média (GPU NVIDIA RTX 3060), explorando técnicas de quantização INT8, pruning de canais redundantes e fusão de operadores, documentando trade-offs entre velocidade e acurácia.
+
+\textbf{Objetivo 6 --- Documentação e Reprodutibilidade:} Documentar extensivamente e disponibilizar código-fonte, modelos treinados, scripts de treinamento/avaliação e pipeline completo de reprodução para fomento de pesquisas futuras, incluindo publicação científica dos resultados de corpo + face.
+
+\subsection{Questões de Pesquisa}
+
+As questões de pesquisa definidas orientam todos os experimentos que serão realizados e garantem que o trabalho produza contribuições científicas claras e mensuráveis.
+
+\textbf{QP1 --- Adaptação de Modelos:} Qual combinação de modelos de detecção 2D (YOLOv11-pose standalone, RTMPose standalone, YOLOv11 + RTMPose pipeline) apresenta melhor desempenho em termos de AP/AR em imagens infravermelhas veiculares do Drive\&Act? Como o pré-treinamento em COCO RGB convertido para grayscale se compara com treinamento from-scratch em Drive\&Act?
+
+\textbf{QP2 --- Impacto de Oclusões:} Qual a degradação percentual de whole-body AP em cenários com oclusão parcial de mãos pelo volante versus cenários sem oclusão? A fusão temporal com janelas de 16 frames consegue recuperar keypoints temporariamente oclusos através de interpolação temporal?
+
+\textbf{QP3 --- Robustez à Iluminação:} Como o desempenho varia entre subsets diurnos, noturnos e em túneis do Drive\&Act? Data augmentation específica para variação de iluminação (random brightness, contrast, gamma) reduz esta variação?
+
+\textbf{QP4 --- Fusão Temporal:} Qual o ganho em MPJPE e suavidade temporal (métrica de jitter) ao utilizar transformer com fusão temporal de 16 frames comparado com lifting frame-a-frame? Existe um trade-off entre latência (devido ao buffer temporal) e acurácia?
+
+\textbf{QP5 --- Eficiência Computacional:} Qual a relação entre profundidade da rede de lifting (número de layers transformer) e tempo de inferência? Quantização INT8 mantém whole-body AP acima de 70\% enquanto reduz latência?
+
+\subsection{Contribuições Esperadas}
+
+Este trabalho visa contribuir para o estado-da-arte em múltiplas dimensões, gerando impacto científico, técnico e aplicado.
+
+\textbf{Contribuição Científica:} Primeiro trabalho a integrar YOLOv11-pose e RTMPose em pipeline combinado especificamente para imagens infravermelhas veiculares, com análise sistemática de transferência de domínio RGB-para-grayscale. Primeira avaliação extensiva de métodos de lifting 3D no contexto de Drive\&Act, incluindo análise de degradação por tipo de oclusão. Estudo comparativo inédito de métricas AP/AR (protocolo COCO-WholeBody) versus MPJPE para avaliação de sistemas full-body em ambiente automotivo.
+
+\textbf{Contribuição Técnica:} Pipeline completo end-to-end de código aberto para estimação de pose full-body em imagens infravermelhas, incluindo scripts de pré-processamento, treinamento, avaliação e inferência otimizada. Implementação de estratégias de data augmentation específicas para contexto automotivo (simulação de oclusão por volante, variação de iluminação túnel-dia-noite). Módulo de visualização 3D interativa com sobreposição de skeleton estimado sobre frames originais.
+
+\textbf{Contribuição Aplicada:} Demonstração de viabilidade técnica e econômica de sistemas de monitoramento de ocupantes baseados exclusivamente em câmeras infravermelhas monoculares (custo < \$50 USD), sem necessidade de sensores ToF ou stereo. Análise de requisitos computacionais para deployment em plataformas embarcadas automotivas, fornecendo benchmarks de velocidade e memória. Validação em dataset real de direção (Drive\&Act) ao invés de apenas datasets de laboratório, aumentando a relevância prática dos resultados.
+
+\textbf{Contribuição Metodológica:} Framework de avaliação incremental por módulos (corpo → corpo+face → full-body) que pode ser adaptado para outros projetos de visão computacional complexos. Documentação extensiva de decisões de arquitetura, trade-offs e lições aprendidas que pode servir como guia para futuros trabalhos em monitoramento veicular.
+
+\subsection{Escopo e Delimitações}
+
+\subsubsection{Escopo Incluído}
+
+O escopo incluído define precisamente o que será desenvolvido, implementado e validado durante a execução deste TCC.
+
+\begin{itemize}
+    \item Desenvolvimento completo de pipeline de aquisiçãoe pré-processamento de imagens infravermelhas, incluindo correção de distorção de lente, normalização adaptativa e buffer temporal;
+    
+    \item Implementação do módulo de detecção 2D integrando YOLOv11-pose (detecção de pessoa + keypoints corporais iniciais) e RTMPose (refinamento corpo + face + mãos);
+    
+    \item Implementação de módulo de lifting 2D-para-3D com arquitetura transformer incluindo positional encoding espaço-temporal e fusão de janelas de 16 frames;
+    
+    \item Treinamento extensivo em múltiplos datasets: COCO grayscale (pré-treino corpo), 300W grayscale (face), FreiHAND (mãos), Human3.6M (lifting 3D), e Drive\&Act (fine-tuning final);
+    
+    \item Validação experimental completa incluindo: análise de degradação por condição de iluminação, análise de degradação por tipo de oclusão, comparação com baselines (YOLO-only, RTMPose-only, lifting frame-a-frame), estudo de ablation de componentes;
+    
+    \item Implementação de sistema de visualização 3D com: overlay de keypoints 2D sobre frame original, renderização de skeleton 3D com rotação interativa, gráficos de confiança por keypoint, exibição de métricas em tempo real (FPS, AP, MPJPE);
+    
+    \item Otimização para inferência em tempo real através de quantização INT8 seletiva, pruning de canais com menos de 10\% de ativação, fusão de operadores batch norm com convoluções;
+    
+    \item Documentação técnica extensiva incluindo: especificação completa de arquiteturas, hiperparâmetros de treinamento, procedimentos de avaliação, guias de reprodução, análise de resultados;
+    
+    \item Disponibilização de código-fonte open-source no GitHub com licença permissiva (MIT ou Apache 2.0), incluindo modelos pré-treinados em formato ONNX para portabilidade.
+\end{itemize}
+
+\subsubsection{Escopo Excluído}
+
+O escopo excluído delimita explicitamente o que não será abordado neste trabalho, evitando ambiguidades e estabelecendo expectativas realistas.
+
+\begin{itemize}
+    \item Desenvolvimento de hardware customizado de captura (câmeras, lentes, sistemas de montagem veicular, iluminação infravermelha ativa);
+    
+    \item Implementação de sistemas de decisão ou atuação (algoritmos de acionamento de airbags, estratégias de tensionamento de cintos, sistemas de alerta de distração);
+    
+    \item Integração com ECUs automotivas reais ou protocolos de comunicação veicular (CAN bus, FlexRay);
+    
+    \item Coleta de novos datasets com participantes reais por questões éticas, logísticas e de GDPR (utilizaremos exclusivamente datasets públicos);
+    
+    \item Detecção e rastreamento de múltiplos ocupantes simultâneos (foco exclusivo no motorista ou passageiro dianteiro individual);
+    
+    \item Deploy e validação em sistemas embarcados automotivos reais (validação restrita a ambiente desktop/laptop com GPU dedicada);
+    
+    \item Certificações ou homologações para uso safety-critical (ISO 26262, ASPICE, validação funcional conforme normas automotivas);
+    
+    \item Análise de privacidade, aspectos legais de LGPD/GDPR, ou compliance regulatório de sistemas de monitoramento;
+    
+    \item Desenvolvimento de interfaces de usuário para motoristas ou displays de instrumentação;
+    
+    \item Estimação de outros atributos além de pose (reconhecimento facial, estimação de idade/gênero, detecção de emoções, análise de atenção visual).
+\end{itemize}
+
+\subsection{Estrutura do Documento}
+
+Este documento de Projeto Físico está organizado de forma lógica e progressiva para facilitar a compreensão completa do sistema proposto e sua implementação.
+
+A Seção 3 apresenta o detalhamento técnico completo do projeto através de diagramas em blocos que ilustram a arquitetura geral e o fluxo de dados entre módulos. Cada um dos quatro módulos principais (Aquisição, Detecção 2D, Lifting 3D, Visualização) é especificado em detalhes incluindo linguagens de programação, frameworks e bibliotecas utilizadas, formatos de entrada e saída, fluxogramas de processamento, pseudocódigo de componentes críticos, e definição precisa de interfaces.
+
+A Seção 4 detalha o cronograma de implementação distribuído em seis fases ao longo de 11 meses, especificando atividades, entregas, marcos de validação e status atual de cada fase. Este planejamento temporal foi elaborado considerando dependências entre módulos, complexidade estimada de cada componente, e necessidade de validação incremental.
+
+A Seção 5 descreve os procedimentos de teste e validação em duas perspectivas complementares: testes em caixa preta que avaliam o sistema do ponto de vista funcional end-to-end, e testes em caixa branca que verificam o comportamento correto de componentes internos. São especificados protocolos de teste, métricas de avaliação, datasets utilizados e critérios de aceitação quantitativos.
+
+A Seção 6 apresenta análise detalhada de riscos técnicos, de dados e de cronograma, incluindo probabilidades estimadas, impactos potenciais, cálculo de severidade, estratégias de mitigação e ações de contingência. Esta análise será revisada periodicamente durante a execução do projeto.
+
+A Seção 7 sintetiza as principais conclusões sobre viabilidade do projeto, recapitula contribuições esperadas, descreve estado atual de desenvolvimento e perspectivas futuras. A Seção 8 lista as referências bibliográficas que fundamentam este trabalho.
+
+% --- DETALHAMENTO DO PROJETO ---
+\section{DETALHAMENTO DO PROJETO}
+
+\subsection{Diagrama em Blocos - Visão Geral}
+
+A Figura \ref{fig:blocos_geral} apresenta a arquitetura geral do sistema proposto, dividida em quatro módulos principais que processam sequencialmente os dados desde a captura até a saída final. O fluxo de dados segue uma pipeline linear com retroalimentação temporal do Módulo 3 para o Módulo 2, permitindo fusão de informações ao longo do tempo.
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[
+            node distance=2.5cm,
+            block/.style={rectangle, draw, thick, fill=blue!20, text width=3cm, text centered, minimum height=1.2cm, rounded corners},
+            input/.style={rectangle, draw, thick, fill=green!20, text width=2.2cm, text centered, minimum height=0.9cm},
+            output/.style={rectangle, draw, thick, fill=red!20, text width=2.2cm, text centered, minimum height=0.9cm},
+            arrow/.style={thick,->,>=stealth}
+        ]
+        
+        \node[input] (cam) {Câmeras IR\\Monoculares};
+        \node[block, right of=cam, node distance=4cm] (mod1) {\textbf{Módulo 1:}\\Aquisição e\\Pré-processamento};
+        \node[block, right of=mod1, node distance=4.5cm] (mod2) {\textbf{Módulo 2:}\\YOLOv11 +\\RTMPose 2D};
+        \node[block, below of=mod2, node distance=2.5cm] (mod3) {\textbf{Módulo 3:}\\Fusão Temporal e\\Lifting 3D};
+        \node[block, left of=mod3, node distance=4.5cm] (mod4) {\textbf{Módulo 4:}\\Visualização e\\Métricas AP/AR};
+        \node[output, left of=mod4, node distance=4cm] (out) {Pose 3D\\Full-Body};
+        
+        \draw[arrow] (cam) -- (mod1);
+        \draw[arrow] (mod1) -- node[above] {\tiny Frames IR} (mod2);
+        \draw[arrow] (mod2) -- node[right] {\tiny Keypoints 2D} (mod3);
+        \draw[arrow] (mod3) -- node[below] {\tiny Pose 3D} (mod4);
+        \draw[arrow] (mod4) -- (out);
+        \draw[arrow, dashed] (mod3.west) -- ++(-1,0) |- node[left, pos=0.25] {\tiny Temporal} (mod2.west);
+        
+    \end{tikzpicture}
+    \caption{Diagrama em blocos da arquitetura geral do sistema.}
+    \label{fig:blocos_geral}
+\end{figure}
+
+\subsection{Módulo 1: Aquisição e Pré-processamento}
+
+\subsubsection{Descrição Funcional}
+
+O Módulo 1 é responsável pela captura de frames das câmeras infravermelhas e preparação dos dados para processamento pelos módulos subsequentes. Este módulo opera como a interface entre o hardware de captura e o pipeline de processamento, garantindo qualidade e consistência dos dados de entrada.
+
+\subsubsection{Especificação Técnica}
+
+\textbf{Linguagem:} Python 3.10+\\
+\textbf{Bibliotecas principais:}
+\begin{itemize}
+    \item OpenCV 4.8+ (cv2) - Captura de vídeo e processamento de imagem
+    \item NumPy 1.24+ - Operações numéricas e manipulação de arrays
+    \item Threading/Multiprocessing - Gerenciamento de múltiplas câmeras
+\end{itemize}
+
+\textbf{Hardware alvo:} Sistema desktop/laptop com GPU NVIDIA (RTX 3060 ou superior)\\
+\textbf{Entrada:} Stream de vídeo de câmeras USB infravermelhas (resolução 640×480 a 30fps)\\
+\textbf{Saída:} Frames normalizados (tensores PyTorch) com shape $[B, 1, H, W]$
+
+\subsubsection{Pseudocódigo}
+
+\begin{lstlisting}[language=Python, caption=Módulo 1 - Aquisição e Pré-processamento]
+class CameraAcquisition:
+    def __init__(self, camera_id=0, resolution=(640,480)):
+        self.cap = cv2.VideoCapture(camera_id)
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, resolution[0])
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, resolution[1])
+        self.camera_matrix = load_calibration()
+        self.temporal_buffer = deque(maxlen=16)
+        
+    def preprocess_frame(self, frame):
+        # Correcao de distorcao
+        frame = cv2.undistort(frame, self.camera_matrix, 
+                              self.dist_coeffs)
+        # Redimensionar para entrada da rede
+        frame = cv2.resize(frame, (256, 256))
+        # Normalizar para [0, 1]
+        frame = frame.astype(np.float32) / 255.0
+        # Converter para tensor PyTorch
+        tensor = torch.from_numpy(frame).unsqueeze(0)
+        return tensor
+\end{lstlisting}
+
+\subsection{Módulo 2: Detecção 2D com YOLOv11 e RTMPose}
+
+\subsubsection{Descrição Funcional}
+
+O Módulo 2 implementa detecção de keypoints 2D através de um pipeline em duas etapas: YOLOv11-pose detecta pessoas e keypoints corporais iniciais, seguido de RTMPose que refina todos os keypoints (corpo, face, mãos). Esta abordagem combina robustez do YOLO com precisão do RTMPose.
+
+\subsubsection{Especificação Técnica}
+
+\textbf{Linguagem:} Python 3.10+\\
+\textbf{Framework:} PyTorch 2.0+ com CUDA 11.8\\
+\textbf{Modelos:} YOLOv11-pose + RTMPose (adaptados para grayscale)\\
+\textbf{Entrada:} Batch de frames $[B, 1, 256, 256]$\\
+\textbf{Saída:} Keypoints 2D com shape $[B, N_{\mathrm{keypoints}}, 3]$ (x, y, confidence)
+
+\textbf{Métricas de Avaliação:} Conforme protocolo COCO-WholeBody
+\begin{itemize}
+    \item \textbf{AP (Average Precision):} Primary metric averaged over IoU thresholds [0.5:0.95]
+    \item \textbf{AR (Average Recall):} Recall averaged over IoU thresholds
+    \item \textbf{AP$^{\text{body}}$:} AP apenas para keypoints corporais (17 pontos)
+    \item \textbf{AP$^{\text{whole}}$:} AP para full-body (133 pontos: 17 corpo + 68 face + 42 mãos)
+\end{itemize}
+
+\subsubsection{Pseudocódigo}
+
+\begin{lstlisting}[language=Python, caption=Módulo 2 - Pipeline YOLOv11 + RTMPose]
+class TwoStageDetector:
+    def __init__(self):
+        # Etapa 1: YOLOv11-pose para deteccao robusta
+        self.yolo = YOLO('yolov11n-pose.pt')
+        self.yolo.to('cuda')
+        
+        # Etapa 2: RTMPose para refinamento full-body
+        self.rtmpose = RTMPose(
+            body_keypoints=17,
+            face_keypoints=68,
+            hand_keypoints=21
+        ).to('cuda')
+        
+    def forward(self, frames):
+        # Etapa 1: YOLO detecta pessoas e keypoints iniciais
+        yolo_results = self.yolo(frames)
+        bboxes = yolo_results.boxes
+        coarse_keypoints = yolo_results.keypoints
+        
+        # Etapa 2: Para cada pessoa detectada, RTMPose refina
+        refined_outputs = []
+        for bbox, kpts_coarse in zip(bboxes, coarse_keypoints):
+            # Crop da pessoa detectada
+            person_crop = crop_bbox(frames, bbox)
+            
+            # RTMPose refina corpo + detecta face/maos
+            kpts_refined = self.rtmpose(person_crop)
+            refined_outputs.append(kpts_refined)
+        
+        return refined_outputs
+\end{lstlisting}
+
+\subsection{Módulo 3: Fusão Temporal e Lifting 3D}
+
+\subsubsection{Descrição Funcional}
+
+O Módulo 3 recebe keypoints 2D e realiza fusão temporal para consistência seguida de lifting 2D-para-3D. A arquitetura transformer captura dependências espaciais e temporais ao longo de janelas de 16 frames.
+
+\subsubsection{Especificação Técnica}
+
+\textbf{Linguagem:} Python 3.10+\\
+\textbf{Arquitetura:} Transformer Encoder com atenção espaço-temporal\\
+\textbf{Entrada:} Sequência de keypoints 2D $[T=16, N, 2]$\\
+\textbf{Saída:} Keypoints 3D $[N, 3]$ para frame central
+
+\subsection{Módulo 4: Visualização e Métricas AP/AR}
+
+\subsubsection{Descrição Funcional}
+
+O Módulo 4 apresenta resultados visualmente e calcula métricas conforme protocolo COCO-WholeBody, incluindo AP e AR em diferentes IoU thresholds e por região corporal.
+
+\subsubsection{Funcionalidades}
+
+\begin{enumerate}
+    \item Overlay 2D de keypoints com coloração por confiança
+    \item Visualização 3D interativa com rotação
+    \item Cálculo de AP/AR por região (body, face, hands, whole)
+    \item Gráficos de desempenho em tempo real
+    \item Comparação com ground truth quando disponível
+\end{enumerate}
+
+% --- CRONOGRAMA ---
+\section{CRONOGRAMA}
+
+\begin{table}[H]
+    \centering
+    \caption{Cronograma detalhado de implementação.}
+    \label{tab:cronograma_impl}
+    \small
+    \begin{tabular}{|c|p{5cm}|c|p{2.5cm}|c|}
+        \hline
+        \textbf{Fase} & \textbf{Atividades} & \textbf{Período} & \textbf{Entrega} & \textbf{Status} \\ \hline
+        
+        1 & Setup e Corpo 2D (YOLO + RTMPose corpo) & set--out/2025 & Pipeline corpo 2D com AP>80\% & \textcolor{orange}{Em andamento} \\ \hline
+        
+        2 & Lifting 3D + Fine-tuning Drive\&Act & nov--dez/2025 & Sistema corpo 3D MPJPE<50mm & Não iniciado \\ \hline
+        
+        3 & Paper corpo+face + Experimentos comparativos & jan/2026 & \textbf{Paper submetido} & Não iniciado \\ \hline
+        
+        4 & Integração Face RTMPose & fev--mar/2026 & Face AP>70\% & Não iniciado \\ \hline
+        
+        5 & Integração Mãos + Sistema full-body unificado & abr--mai/2026 & Whole-body AP>75\% & Não iniciado \\ \hline
+        
+        6 & Otimização + Documentação TCC & jun--ago/2026 & \textbf{TCC completo} & Não iniciado \\ \hline
+    \end{tabular}
+\end{table}
+
+% --- TESTES E VALIDAÇÃO ---
+\section{PROCEDIMENTOS DE TESTE E VALIDAÇÃO}
+
+\subsection{Testes em Caixa Preta}
+
+\subsubsection{Teste 1: Precisão AP/AR}
+
+\textbf{Procedimento:} Executar sistema em 1000 frames do Drive\&Act test set, calcular whole-body AP e AR conforme COCO-WholeBody protocol.\\
+\textbf{Critério de Aceite:} Whole-body AP > 75\%, AR > 80\%
+
+\subsubsection{Teste 2: Tempo Real}
+
+\textbf{Procedimento:} Processar 1000 frames consecutivos medindo latência por frame.\\
+\textbf{Critério de Aceite:} FPS ≥ 20, latência < 100ms
+
+\subsubsection{Teste 3: Robustez a Oclusões}
+
+\textbf{Procedimento:} Avaliar subset com oclusão de mãos por volante.\\
+\textbf{Critério de Aceite:} Degradação de AP < 15\% comparado com frames sem oclusão
+
+\subsection{Testes em Caixa Branca}
+
+\subsubsection{Teste 4: Módulo YOLOv11}
+
+\textbf{Verificações:} Bounding boxes precisas, keypoints coarse corretos, confiança > 0.5 para detecções válidas.
+
+\subsubsection{Teste 5: Módulo RTMPose}
+
+\textbf{Verificações:} Refinamento melhora AP comparado com keypoints coarse do YOLO, heatmaps bem formados com picos únicos.
+
+\subsubsection{Teste 6: Módulo Lifting 3D}
+
+\textbf{Verificações:} Coordenadas 3D respeitam restrições biomecânicas (comprimentos de membros), fusão temporal reduz jitter comparado com single-frame, teste com keypoints 2D ground truth para avaliar capacidade pura de lifting.
+
+\subsubsection{Teste 7: Pipeline Integrado}
+
+\textbf{Verificações:} Propagação correta de dados entre módulos, gerenciamento de memória GPU sem vazamentos, tratamento de exceções e casos limite, profiling de performance para identificar gargalos.
+
+\subsection{Validação no Dataset Drive\&Act}
+
+O protocolo de validação completa seguirá a especificação COCO-WholeBody para cálculo de métricas AP e AR, com subdivisão por regiões corporais e condições de captura.
+
+\begin{lstlisting}[language=Python, caption=Script de Validação com Métricas AP/AR]
+def validate_on_driveact(model, split='test'):
+    dataset = DriveActDataset(split=split)
+    coco_evaluator = COCOWholeBodyEvaluator()
+    results = defaultdict(list)
+    
+    for sample in tqdm(dataset):
+        frame_ir, gt_kpts_2d, gt_kpts_3d, metadata = sample
+        
+        # Inferencia pipeline completo
+        pred_kpts_2d = model.detect_2d(frame_ir)
+        pred_kpts_3d = model.lift_to_3d(pred_kpts_2d)
+        
+        # Metricas 2D (AP/AR por regiao)
+        ap_body = coco_evaluator.eval_body(pred_kpts_2d, 
+                                            gt_kpts_2d)
+        ap_face = coco_evaluator.eval_face(pred_kpts_2d, 
+                                            gt_kpts_2d)
+        ap_hands = coco_evaluator.eval_hands(pred_kpts_2d, 
+                                              gt_kpts_2d)
+        ap_whole = coco_evaluator.eval_whole(pred_kpts_2d, 
+                                              gt_kpts_2d)
+        
+        # Metricas 3D (MPJPE legacy para comparacao)
+        mpjpe = compute_mpjpe(pred_kpts_3d, gt_kpts_3d)
+        
+        # Agrupar por condicao de iluminacao
+        condition = metadata['illumination']
+        results[condition].append({
+            'ap_body': ap_body,
+            'ap_face': ap_face,
+            'ap_hands': ap_hands,
+            'ap_whole': ap_whole,
+            'mpjpe': mpjpe
+        })
+    
+    # Agregar e reportar
+    report = generate_validation_report(results)
+    return report
+\end{lstlisting}
+
+\textbf{Métricas Reportadas no Relatório Final:}
+\begin{itemize}
+    \item \textbf{AP$^{\text{body}}$} (\%): Average Precision para 17 keypoints corporais
+    \item \textbf{AP$^{\text{face}}$} (\%): Average Precision para 68 keypoints faciais
+    \item \textbf{AP$^{\text{hands}}$} (\%): Average Precision para 42 keypoints das mãos
+    \item \textbf{AP$^{\text{whole}}$} (\%): Average Precision para 133 keypoints full-body
+    \item \textbf{AR$^{\text{whole}}$} (\%): Average Recall para full-body
+    \item \textbf{MPJPE} (mm): Mean Per Joint Position Error 3D (métrica complementar)
+    \item \textbf{FPS}: Taxa de processamento em tempo real
+    \item \textbf{Latência} (ms): Tempo end-to-end por frame
+    \item \textbf{Memória GPU} (MB): Uso de memória durante inferência
+\end{itemize}
+
+\textbf{Subdivisão por Condições:}
+\begin{itemize}
+    \item Diurno: Iluminação natural > 10.000 lux
+    \item Noturno: Iluminação artificial < 100 lux
+    \item Túnel: Transições rápidas de iluminação
+    \item Oclusão volante: Mãos parcialmente oclusas
+    \item Sem oclusão: Pose completa visível
+\end{itemize}
+
+% --- ANÁLISE DE RISCOS ---
+\section{RISCOS}
+
+A análise de riscos foi estruturada em três categorias principais (técnicos, dados, cronograma) com quantificação de probabilidade, impacto e severidade. A severidade é calculada como o produto Probabilidade × Impacto, onde Probabilidade e Impacto são classificados em escala de 1 a 3 (Baixo=1, Médio=2, Alto=3), resultando em severidade de 1 a 9.
+
+\subsection{Riscos Técnicos}
+
+\begin{table}[H]
+    \centering
+    \caption{Análise de riscos técnicos.}
+    \small
+    \begin{tabular}{|p{3.5cm}|c|c|c|p{4cm}|}
+        \hline
+        \textbf{Risco} & \textbf{Prob.} & \textbf{Imp.} & \textbf{Sev.} & \textbf{Mitigação} \\ \hline
+        
+        Integração YOLOv11 + RTMPose complexa & 
+        Média (2) & 
+        Alto (3) & 
+        6 & 
+        Validar cada modelo separadamente primeiro; implementar interface modular; testar pipeline em dataset simples antes do Drive\&Act \\ \hline
+        
+        Não atingir tempo real (≥20 FPS) & 
+        Média (2) & 
+        Alto (3) & 
+        6 & 
+        Arquiteturas leves desde início (YOLOv11n, RTMPose-s); quantização INT8 planejada; aceitar 15 FPS como mínimo; otimizar operadores críticos com TensorRT \\ \hline
+        
+        Transferência domínio RGB→IR inadequada & 
+        Média (2) & 
+        Médio (2) & 
+        4 & 
+        Converter datasets RGB para grayscale no pré-treino; data augmentation específica IR; fine-tuning progressivo em Drive\&Act; coletar dados IR complementares se necessário \\ \hline
+        
+        Degradação severa com oclusões & 
+        Alta (3) & 
+        Médio (2) & 
+        6 & 
+        Fusão temporal para recuperação de keypoints oclusos; data augmentation com simulação de oclusão por volante; avaliar uso de priors anatômicos fortes no lifting \\ \hline
+        
+        Complexidade lifting 3D full-body & 
+        Baixa (1) & 
+        Médio (2) & 
+        2 & 
+        Usar arquitetura transformer comprovada; treinar corpo separado de face/mãos; validação incremental \\ \hline
+        
+        Overfitting em Drive\&Act limitado & 
+        Baixa (1) & 
+        Médio (2) & 
+        2 & 
+        Validação cruzada k-fold; regularização L2; early stopping; data augmentation agressiva \\ \hline
+        
+    \end{tabular}
+\end{table}
+
+\textbf{Ações de Contingência Técnicas:}
+\begin{itemize}
+    \item \textbf{Se integração YOLOv11+RTMPose falhar:} Utilizar apenas RTMPose end-to-end (demonstrado funcional em literatura), sacrificando robustez em detecção de pessoas mas mantendo precisão de keypoints
+    
+    \item \textbf{Se tempo real não for atingido:} Documentar trade-off velocidade×acurácia; entregar versão otimizada para GPU potente (RTX 4090) e versão degradada para RTX 3060; sugerir hardware mínimo para deployment
+    
+    \item \textbf{Se transferência RGB→IR for crítica:} Priorizar fine-tuning extensivo; considerar domain adaptation techniques (MMD loss, adversarial training); reduzir dependência de pré-treino treinando mais epochs em Drive\&Act
+    
+    \item \textbf{Se degradação com oclusões exceder 20\% AP:} Aceitar limitação documentada; sugerir uso de múltiplas câmeras em trabalhos futuros; focar validação em cenários sem oclusão severa
+\end{itemize}
+
+\subsection{Riscos de Dados}
+
+\begin{table}[H]
+    \centering
+    \caption{Análise de riscos de dados.}
+    \small
+    \begin{tabular}{|p{3.5cm}|c|c|c|p{4cm}|}
+        \hline
+        \textbf{Risco} & \textbf{Prob.} & \textbf{Imp.} & \textbf{Sev.} & \textbf{Mitigação} \\ \hline
+        
+        Anotações Drive\&Act com ruído & 
+        Média (2) & 
+        Médio (2) & 
+        4 & 
+        Análise qualitativa de amostras aleatórias; filtragem estatística de outliers (z-score > 3); uso de loss functions robustas (Huber loss); validação cruzada com subset manualmente verificado \\ \hline
+        
+        Cobertura limitada de variações no Drive\&Act & 
+        Média (2) & 
+        Médio (2) & 
+        4 & 
+        Identificação precoce de gaps através de análise exploratória; geração de dados sintéticos com rendering 3D; augmentation agressiva (rotação, escala, brilho); complementação com outros datasets IR se disponíveis \\ \hline
+        
+        Datasets face/mãos não têm versões IR & 
+        Alta (3) & 
+        Médio (2) & 
+        6 & 
+        Conversão RGB→grayscale validada empiricamente; fine-tuning em Drive\&Act compensa domain gap; priorizar modelos que generalizam bem em grayscale (RTMPose demonstrado robusto) \\ \hline
+        
+        Acesso limitado a GPUs de treinamento & 
+        Baixa (1) & 
+        Alto (3) & 
+        3 & 
+        Google Colab Pro (~\$10/mês, 24GB V100); clusters PUCPR (solicitar acesso antecipado); AWS/Azure spot instances (\$0.50/hora); planejar treinos longos em horários ociosos \\ \hline
+        
+        Desbalanceamento de classes por região & 
+        Baixa (1) & 
+        Baixo (1) & 
+        1 & 
+        Weighted loss por região corporal; oversampling de frames com face/mãos visíveis; class balancing durante data loading \\ \hline
+        
+    \end{tabular}
+\end{table}
+
+\textbf{Ações de Contingência Dados:}
+\begin{itemize}
+    \item \textbf{Se Drive\&Act tiver qualidade insuficiente:} Complementar com rendering sintético usando simuladores automotivos (CARLA, lgSVL); criar subset "gold standard" manualmente anotado para validação final; aceitar métricas inferiores mas com análise qualitativa robusta
+    
+    \item \textbf{Se datasets face/mãos não transferirem bem:} Focar desenvolvimento apenas em corpo (17 keypoints) como entrega mínima viável; deixar face/mãos como trabalhos futuros; publicar paper apenas com corpo 3D
+    
+    \item \textbf{Se acesso a GPU for bloqueante:} Reduzir resolução de treinamento (192×192 ao invés de 256×256); usar modelos menores (YOLOv11n ao invés de YOLOv11s); treinar em batches menores com gradient accumulation; estender cronograma em 1-2 meses
+\end{itemize}
+
+\subsection{Riscos de Cronograma}
+
+\begin{table}[H]
+    \centering
+    \caption{Análise de riscos de cronograma.}
+    \small
+    \begin{tabular}{|p{3.5cm}|c|c|c|p{4cm}|}
+        \hline
+        \textbf{Risco} & \textbf{Prob.} & \textbf{Imp.} & \textbf{Sev.} & \textbf{Mitigação} \\ \hline
+        
+        Atraso Fase 1 (corpo 2D YOLOv11+RTMPose) & 
+        Média (2) & 
+        Alto (3) & 
+        6 & 
+        Buffer de 2 semanas na Fase 1; reuniões semanais com orientador; checkpoint parcial em set/2025 para ajustes; começar Fase 2 em paralelo se detector 2D estiver 80\% funcional \\ \hline
+        
+        Paper não aceito na 1ª submissão & 
+        Média (2) & 
+        Baixo (1) & 
+        2 & 
+        Continuar desenvolvimento do TCC independente de aceitação; resubmeter em paralelo a outro venue; não bloquear progresso Fases 4-5 aguardando revisão; considerar paper como contribuição secundária \\ \hline
+        
+        Problemas pessoais ou saúde & 
+        Baixa (1) & 
+        Alto (3) & 
+        3 & 
+        Comunicação imediata com orientador; replanejamento de cronograma; buffer de 3-4 semanas no total do projeto; priorização de entregas essenciais (corpo > face > mãos) \\ \hline
+        
+        Dependências entre fases causam cascata de atrasos & 
+        Média (2) & 
+        Médio (2) & 
+        4 & 
+        Validação rigorosa de cada fase antes de prosseguir; módulos independentes permitem paralelização parcial; entregas incrementais permitem replanejar prioridades \\ \hline
+        
+        Tempo de treinamento subestimado & 
+        Baixa (1) & 
+        Médio (2) & 
+        2 & 
+        Estimativas baseadas em literatura (RTMPose: 100 epochs = 20h em V100); usar learning rate schedules eficientes; early stopping agressivo; checkpoints frequentes \\ \hline
+        
+    \end{tabular}
+\end{table}
+
+\textbf{Ações de Contingência Cronograma:}
+\begin{itemize}
+    \item \textbf{Se Fase 1 atrasar > 3 semanas:} Comprimir Fase 2 usando modelos de lifting pré-treinados (MixSTE, VideoPose3D) ao invés de treinar from-scratch; aceitar MPJPE < 70mm ao invés de < 50mm
+    
+    \item \textbf{Se Fases 4-5 (face/mãos) ficarem inviáveis:} Entregar TCC apenas com corpo 3D full-functional; documentar arquitetura extensível para face/mãos; deixar integração full-body como trabalhos futuros explicitamente
+    
+    \item \textbf{Se atraso geral > 1 mês:} Solicitar extensão de prazo junto à coordenação do curso; comprimir Fase 6 (otimização) aceitando FPS = 15 ao invés de 20; reduzir escopo de documentação mantendo essencial
+\end{itemize}
+
+\subsection{Monitoramento e Revisão de Riscos}
+
+O monitoramento de riscos será realizado quinzenalmente durante reuniões com o orientador Prof. Alceu. A cada revisão:
+
+\begin{enumerate}
+    \item Atualizar probabilidades baseadas em progresso real
+    \item Recalcular severidades e repriorizar mitigações
+    \item Acionar contingências quando severidade > 6 e probabilidade aumentar
+    \item Documentar novos riscos identificados durante desenvolvimento
+    \item Avaliar efetividade de mitigações implementadas
+\end{enumerate}
+
+Riscos com severidade ≥ 6 (destacados nas tabelas) receberão atenção prioritária e serão discutidos em todas as reuniões. Um log de riscos será mantido no repositório Git do projeto para rastreabilidade.
+
+% --- CONCLUSÃO ---
+\section{CONCLUSÃO}
+
+Este Projeto Físico apresenta a especificação completa e detalhada de um sistema de estimação de pose tridimensional full-body para monitoramento de ocupantes veiculares utilizando câmeras infravermelhas monoculares. O projeto foi estruturado em quatro módulos claramente definidos e independentes: Aquisição e Pré-processamento, Detecção 2D através de pipeline YOLOv11+RTMPose, Fusão Temporal e Lifting 3D com transformers, e Visualização com cálculo de métricas AP/AR conforme protocolo COCO-WholeBody.
+
+A principal inovação técnica proposta é a integração de YOLOv11-pose para detecção robusta inicial com RTMPose para refinamento multi-região (corpo, face, mãos) em imagens infravermelhas grayscale, um domínio ainda pouco explorado na literatura de estimação de pose. Esta abordagem de dois estágios visa combinar a robustez do YOLO em condições adversas com a alta precisão do RTMPose em keypoints detalhados. A escolha de métricas AP/AR ao invés de MPJPE como métrica primária alinha-se com os padrões contemporâneos da comunidade de pesquisa e permite comparação direta com trabalhos estado-da-arte.
+
+As tecnologias selecionadas - Python 3.10, PyTorch 2.0, YOLOv11, RTMPose, OpenCV - são amplamente utilizadas, maduras e com suporte ativo da comunidade. A escolha de PyTorch como framework principal permite flexibilidade no desenvolvimento e facilita a implementação de arquiteturas customizadas. A disponibilidade de modelos pré-treinados para YOLOv11 e RTMPose reduz significativamente o risco técnico e o tempo de desenvolvimento, permitindo focar esforços na adaptação para o domínio infravermelho e na integração eficiente dos componentes.
+
+A estratégia de desenvolvimento incremental adotada oferece múltiplas vantagens estratégicas. Primeiro, permite validação cuidadosa de cada componente antes da integração, reduzindo a complexidade de debugging. Segundo, garante entregas parciais de valor mesmo se o sistema completo não for concluído no prazo estabelecido - um sistema de estimação de pose corporal 3D funcional já representa contribuição significativa. Terceiro, possibilita ajustes de escopo baseados em feedback de validações intermediárias. Quarto, viabiliza publicação científica dos resultados parciais (corpo + face) na Fase 3, gerando visibilidade e feedback da comunidade antes da finalização do TCC.
+
+Os procedimentos de teste e validação foram planejados em duas perspectivas complementares e essenciais. Os testes em caixa preta avaliam o sistema do ponto de vista funcional end-to-end, focando em métricas práticas como whole-body AP > 75\%, AR > 80\%, desempenho em tempo real ≥ 20 FPS, e robustez a condições adversas típicas do ambiente automotivo (oclusões por volante, variação de iluminação diurna/noturna, movimentos rápidos). Os testes em caixa branca validam componentes internos isoladamente, garantindo que cada módulo implementa corretamente sua especificação e que as interfaces entre módulos funcionam conforme projetado. A validação final no dataset Drive\&Act, específico para contexto automotivo e contendo imagens infravermelhas reais de condução, fornecerá métricas realistas de performance em cenários de aplicação real, superando validações restritas a datasets de laboratório.
+
+A análise de riscos identificou e quantificou sistematicamente três categorias principais: técnicos, de dados e de cronograma. Os riscos técnicos mais significativos incluem a complexidade da integração YOLOv11+RTMPose (severidade 6), possível não atingimento de tempo real (severidade 6), e degradação severa com oclusões (severidade 6). Os riscos de dados incluem potencial falta de datasets face/mãos em infravermelho (severidade 6) e qualidade das anotações do Drive\&Act (severidade 4). Os riscos de cronograma incluem possível atraso na Fase 1 crítica (severidade 6). Para cada risco identificado, estratégias específicas de mitigação foram definidas proativamente, incluindo validação incremental, uso de arquiteturas eficientes, data augmentation específica para IR, e buffers temporais. Ações de contingência claras foram estabelecidas, como entregar sistema apenas com corpo caso face/mãos sejam inviáveis, aceitar 15 FPS se otimização para 20 FPS falhar, e comprimir fases finais se necessário mantendo entregas essenciais.
+
+O projeto é avaliado como plenamente viável com base em múltiplas evidências concretas. Primeiro, trabalhos relacionados recentes demonstram factibilidade técnica: YOLOv11-pose foi lançado em 2024 com melhorias significativas de velocidade e acurácia; RTMPose foi publicado em 2023 demonstrando estado-da-arte em pose estimation com eficiência computacional; trabalhos de lifting 3D com transformers (VideoPose3D, MixSTE) demonstram que janelas temporais de 16-27 frames são suficientes para estimação precisa. Segundo, o dataset Drive\&Act fornece dados específicos do domínio para treinamento e validação, incluindo 9,6 milhões de frames anotados com keypoints 2D e subset com ground truth 3D. Terceiro, recursos computacionais adequados estão disponíveis através de Google Colab Pro (GPU V100 24GB), clusters da PUCPR, e plataformas cloud como AWS/Azure para treinos longos. Quarto, a estratégia incremental e as contingências planejadas garantem flexibilidade para adaptar escopo sem comprometer contribuições essenciais.
+
+Em relação à evolução dos riscos desde o planejamento inicial, a decisão de substituir MPJPE por métricas AP/AR como primárias reduziu riscos de comparabilidade com literatura, uma vez que AP/AR são padrão em trabalhos recentes. A escolha de integrar YOLOv11 aumentou ligeiramente a complexidade técnica (nova severidade 6) mas reduz significativamente o risco de falhas de detecção em condições adversas, um trade-off positivo considerando os requisitos de robustez do contexto automotivo. A compreensão mais profunda da importância do Drive\&Act como dataset específico do domínio reforçou a estratégia de fine-tuning extensivo, ajustando alocação de tempo nas fases.
+
+Os riscos atualmente avaliados como mais críticos (severidade 6) serão monitorados quinzenalmente em reuniões com o orientador, com ações de mitigação sendo implementadas proativamente mesmo antes de materialização dos riscos. Por exemplo, a validação de cada módulo separadamente (YOLOv11 standalone, RTMPose standalone) será realizada antes da integração para reduzir complexidade. Arquiteturas leves (YOLOv11n, RTMPose-s) serão priorizadas desde o início para maximizar chances de atingir tempo real. Fine-tuning progressivo em Drive\&Act será iniciado cedo para identificar problemas de transferência de domínio rapidamente.
+
+O cronograma estabelecido, distribuído em 11 meses com 6 fases claramente definidas e 6 marcos de validação, é considerado realista baseado em três fatores principais. Primeiro, a experiência do orientador Prof. Alceu com projetos de visão computacional e deep learning fornece estimativas calibradas de complexidade e tempo necessário. Segundo, trabalhos similares na literatura (RTMPose original levou aproximadamente 3 meses de desenvolvimento + 2 meses de experimentos) fornecem benchmarks de referência. Terceiro, os buffers temporais incorporados (2-3 semanas distribuídas) e a natureza modular do projeto permitem absorver imprevistos sem comprometer entregas críticas.
+
+A equipe (discente Davi Baechtold Campos e orientadores Prof. Alceu e Prof. Alessandro) avalia que o projeto continua sendo plenamente viável e com alto potencial de contribuição científica e prática. A combinação de um problema relevante e bem motivado (segurança veicular, compliance regulatório), solução técnica sólida baseada em métodos estado-da-arte, recursos adequados disponíveis, e planejamento cuidadoso com mitigação de riscos fornece confiança substancial de que os objetivos serão alcançados. O sistema proposto, uma vez concluído, poderá contribuir tanto para o avanço do conhecimento em estimação de pose em domínios restritos (imagens infravermelhas, ambiente veicular) quanto para aplicações práticas em segurança automotiva, potencialmente beneficiando milhões de usuários através da democratização de tecnologias de monitoramento de ocupantes baseadas em hardware de baixo custo.
+
+A documentação técnica detalhada apresentada neste Projeto Físico - incluindo pseudocódigo, diagramas de arquitetura, especificações de interfaces, estratégias de treinamento, protocolos de teste, e análise de riscos - demonstra que não existem lacunas significativas no entendimento de como o sistema será implementado. Todos os componentes críticos foram especificados em nível de detalhe suficiente para iniciar imediatamente a implementação. As ferramentas, bibliotecas e frameworks necessários foram identificados, estão disponíveis publicamente, e possuem documentação extensa. Os datasets necessários foram identificados e verificou-se seu acesso público. As métricas de avaliação foram definidas precisamente alinhadas com protocolos estabelecidos na literatura. Os critérios de aceitação foram quantificados de forma mensurável e alcançável.
+
+Atualmente, o projeto encontra-se na Fase 1 (Setup e Corpo 2D), com ambiente de desenvolvimento configurado, datasets principais baixados e organizados, e desenvolvimento inicial do pipeline YOLOv11+RTMPose em andamento. A expectativa é concluir a Fase 1 até outubro/2025 conforme planejado, com validação do detector 2D corporal alcançando body AP > 80\% em subset do Drive\&Act. As próximas reuniões com o orientador focarão em validar a arquitetura de integração YOLOv11+RTMPose e discutir primeiros resultados experimentais de detecção 2D em imagens infravermelhas.
+
+Em síntese, este Projeto Físico estabelece bases sólidas para o desenvolvimento de um sistema inovador de estimação de pose 3D full-body para monitoramento de ocupantes veiculares, com contribuições científicas, técnicas e práticas claramente delineadas, riscos identificados e mitigados, e viabilidade técnica e temporal comprovada. O projeto está alinhado com requisitos regulatórios globais emergentes, utiliza tecnologias estado-da-arte adaptadas para um domínio específico ainda pouco explorado, e tem potencial de impacto tanto acadêmico quanto industrial na área de segurança automotiva.
+
+% --- REFERÊNCIAS BIBLIOGRÁFICAS ---
+\section{REFERÊNCIAS BIBLIOGRÁFICAS}
+
+\begin{thebibliography}{99}
+
+\bibitem{who2023}
+WORLD HEALTH ORGANIZATION. \textbf{Road traffic injuries}. WHO Fact Sheets, 2023. Disponível em: \url{https://www.who.int/news-room/fact-sheets/detail/road-traffic-injuries}. Acesso em: 20 out. 2025.
+
+\bibitem{nhtsa2022}
+NATIONAL HIGHWAY TRAFFIC SAFETY ADMINISTRATION. \textbf{Distracted Driving in 2020}. Traffic Safety Facts Research Note, DOT HS 813 309, 2022. Disponível em: \url{https://crashstats.nhtsa.dot.gov}. Acesso em: 20 out. 2025.
+
+\bibitem{gsr2019}
+EUROPEAN UNION. \textbf{Regulation (EU) 2019/2144 on type-approval requirements for motor vehicles}. Official Journal of the European Union, L 325, p. 1-40, 2019. Disponível em: \url{http://data.europa.eu/eli/reg/2019/2144/oj}. Acesso em: 20 out. 2025.
+
+\bibitem{gsr2023}
+EUROPEAN COMMISSION. \textbf{Commission Delegated Regulation (EU) 2023/2590 on advanced driver distraction warning systems}. Official Journal of the European Union, L 2023/2590, 2023. Disponível em: \url{http://data.europa.eu/eli/reg_del/2023/2590/oj}. Acesso em: 20 out. 2025.
+
+\bibitem{iija2021}
+UNITED STATES CONGRESS. \textbf{Infrastructure Investment and Jobs Act}. Public Law 117-58, H.R. 3684, 2021. Disponível em: \url{https://www.congress.gov/bill/117th-congress/house-bill/3684}. Acesso em: 20 out. 2025.
+
+\bibitem{china_gbt}
+CATARC. \textbf{Driver Attention Monitoring System (GB/T 41797-2022)}. China National Standard, 2022. Disponível em: \url{https://www.chinesestandard.net/PDF/English.aspx/GBT41797-2022}. Acesso em: 20 out. 2025.
+
+\bibitem{euroncap2030}
+EURO NCAP. \textbf{Vision 2030: A Safer Future for Mobility}. Euro NCAP Strategic Roadmap, 2022. Disponível em: \url{https://cdn.euroncap.com/media/74190/euro-ncap-vision-2030.pdf}. Acesso em: 20 out. 2025.
+
+\bibitem{fraunhofer2024}
+DIEDERICHS, F. et al. \textbf{Pioneering In-Cabin Monitoring: Unmasking the Power of 2D and 3D Cameras}. Fraunhofer IOSB White Paper, 2024. Disponível em: \url{https://www.iosb.fraunhofer.de}. Acesso em: 20 out. 2025.
+
+\bibitem{safeup_d41}
+SAFE-UP CONSORTIUM. \textbf{D4.1 Use Case Definition}. SAFE-UP Project Deliverable, 2021. Disponível em: \url{https://www.safe-up.eu}. Acesso em: 20 out. 2025.
+
+\bibitem{safeup_d42}
+SAFE-UP CONSORTIUM. \textbf{D4.2 Architecture of Passive Safety Systems}. SAFE-UP Project Deliverable, 2021. Disponível em: \url{https://www.safe-up.eu}. Acesso em: 20 out. 2025.
+
+\bibitem{yolov11}
+ULTRALYTICS. \textbf{YOLOv11: Real-Time Object Detection and Pose Estimation}. Ultralytics Documentation, 2024. Disponível em: \url{https://docs.ultralytics.com/tasks/pose/}. Acesso em: 20 out. 2025.
+
+\bibitem{rtmpose}
+JIANG, T. et al. \textbf{RTMPose: Real-Time Multi-Person Pose Estimation based on MMPose}. arXiv preprint arXiv:2303.07399, 2023. Disponível em: \url{https://arxiv.org/abs/2303.07399}. Acesso em: 20 out. 2025.
+
+\bibitem{mmpose}
+CONTRIBUTORS, M. \textbf{OpenMMLab Pose Estimation Toolbox and Benchmark}. GitHub repository, 2020. Disponível em: \url{https://github.com/open-mmlab/mmpose}. Acesso em: 20 out. 2025.
+
+\bibitem{driveact}
+MARTIN, M. et al. \textbf{Drive\&Act: A Multi-Modal Dataset for Fine-Grained Driver Behavior Recognition in Autonomous Vehicles}. In: IEEE International Conference on Computer Vision (ICCV), 2019. p. 2801-2810. DOI: 10.1109/ICCV.2019.00289.
+
+\bibitem{coco}
+LIN, T.-Y. et al. \textbf{Microsoft COCO: Common Objects in Context}. In: European Conference on Computer Vision (ECCV), 2014. p. 740-755. DOI: 10.1007/978-3-319-10602-1\_48.
+
+\bibitem{cocowholebody}
+JIN, S. et al. \textbf{Whole-Body Human Pose Estimation in the Wild}. In: European Conference on Computer Vision (ECCV), 2020. p. 196-214. DOI: 10.1007/978-3-030-58545-7\_12.
+
+\bibitem{human36m}
+IONESCU, C. et al. \textbf{Human3.6M: Large Scale Datasets and Predictive Methods for 3D Human Sensing in Natural Environments}. IEEE Transactions on Pattern Analysis and Machine Intelligence, v. 36, n. 7, p. 1325-1339, 2014. DOI: 10.1109/TPAMI.2013.248.
+
+\bibitem{300w}
+SAGONAS, C. et al. \textbf{300 Faces in-the-Wild Challenge: The First Facial Landmark Localization Challenge}. In: IEEE International Conference on Computer Vision Workshops (ICCVW), 2013. p. 397-403. DOI: 10.1109/ICCVW.2013.59.
+
+\bibitem{freihand}
+ZIMMERMANN, C. et al. \textbf{FreiHAND: A Dataset for Markerless Capture of Hand Pose and Shape from Single RGB Images}. In: IEEE International Conference on Computer Vision (ICCV), 2019. p. 813-822. DOI: 10.1109/ICCV.2019.00090.
+
+\bibitem{videopose3d}
+PAVLLO, D. et al. \textbf{3D Human Pose Estimation in Video with Temporal Convolutions and Semi-Supervised Training}. In: IEEE Conference on Computer Vision and Pattern Recognition (CVPR), 2019. p. 7753-7762. DOI: 10.1109/CVPR.2019.00794.
+
+\bibitem{mixste}
+ZHANG, J. et al. \textbf{MixSTE: Seq2seq Mixed Spatio-Temporal Encoder for 3D Human Pose Estimation in Video}. In: IEEE Conference on Computer Vision and Pattern Recognition (CVPR), 2022. p. 13232-13242. DOI: 10.1109/CVPR52688.2022.01288.
+
+\bibitem{pytorch}
+PASZKE, A. et al. \textbf{PyTorch: An Imperative Style, High-Performance Deep Learning Library}. In: Advances in Neural Information Processing Systems (NeurIPS), 2019. p. 8024-8035. Disponível em: \url{https://pytorch.org}. Acesso em: 20 out. 2025.
+
+\bibitem{opencv}
+BRADSKI, G. \textbf{The OpenCV Library}. Dr. Dobb's Journal of Software Tools, v. 25, n. 11, p. 120-125, 2000. Disponível em: \url{https://opencv.org}. Acesso em: 20 out. 2025.
+
+\bibitem{vaswani2017}
+VASWANI, A. et al. \textbf{Attention is All You Need}. In: Advances in Neural Information Processing Systems (NeurIPS), 2017. p. 5998-6008. Disponível em: \url{https://arxiv.org/abs/1706.03762}. Acesso em: 20 out. 2025.
+
+\bibitem{adam}
+KINGMA, D. P.; BA, J. \textbf{Adam: A Method for Stochastic Optimization}. In: International Conference on Learning Representations (ICLR), 2015. Disponível em: \url{https://arxiv.org/abs/1412.6980}. Acesso em: 20 out. 2025.
+
+\bibitem{wandb}
+BIEWALD, L. \textbf{Experiment Tracking with Weights and Biases}. Software available from wandb.com, 2020. Disponível em: \url{https://www.wandb.com}. Acesso em: 20 out. 2025.
+
+\bibitem{lightning}
+FALCON, W. et al. \textbf{PyTorch Lightning}. GitHub repository, 2019. Disponível em: \url{https://github.com/Lightning-AI/lightning}. Acesso em: 20 out. 2025.
+
+\end{thebibliography}
+
+\end{document}
