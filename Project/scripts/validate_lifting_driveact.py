@@ -66,9 +66,11 @@ def parse_args():
                         'com o treinado para tolerar entrada incompleta')
     p.add_argument('--confidence', default='raw',
                    choices=['raw', 'constante', 'normalizada'],
-                   help='Como preencher o terceiro canal da entrada do lifting. '
-                        'No treino ele é constante em 1,0; a resposta bruta do '
-                        'SimCC vai a 10 e está fora dessa distribuição')
+                   help='Escala do terceiro canal da entrada do lifting. '
+                        '`raw` entrega a resposta do SimCC como vem, que vai a '
+                        '10; `normalizada` divide pela resposta média nos '
+                        'keypoints observados; `constante` entrega 1,0, que é '
+                        'o que o treino original do H3WB viu')
     p.add_argument('--device', default='cuda:0')
     p.add_argument('--out', type=Path,
                    default=Path('results/lifting_driveact.json'))
@@ -124,9 +126,13 @@ def main():
     pose = FullBodyPosePipeline(
         panel._config_without_flip_test(panel.POSE_CONFIG, work_dir),
         args.pose_ckpt or panel.POSE_CHECKPOINT, args.device, detector=None)
+    # Quem normaliza é o lifter, e só ele. Antes o script dividia pela escala e
+    # o lifter dividia de novo, entregando confiança na casa de 0,1 a um modelo
+    # treinado entre 0,37 e 1,0 — e o resultado dessa medição foi descartado.
+    escala = OBSERVED_RESPONSE if args.confidence == 'normalizada' else 1.0
     lifter = SequenceLifter(args.lift_cfg or panel.LIFT_CONFIG,
                             args.lift_ckpt or panel.LIFT_CHECKPOINT,
-                            args.device)
+                            args.device, response_scale=escala)
 
     import cv2
 
@@ -153,11 +159,8 @@ def main():
                 continue
 
             height, width = frame.shape[:2]
-            scores = result.scores[0]
-            if args.confidence == 'constante':
-                scores = np.ones_like(scores)
-            elif args.confidence == 'normalizada':
-                scores = np.clip(scores / OBSERVED_RESPONSE, 0.0, 1.0)
+            scores = (np.ones_like(result.scores[0])
+                      if args.confidence == 'constante' else result.scores[0])
             predicted = lifter(result.keypoints[0], scores, (width, height))
             if lifter.warming_up or image['frame_id'] not in reference:
                 continue
