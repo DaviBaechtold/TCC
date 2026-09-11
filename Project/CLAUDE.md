@@ -103,6 +103,16 @@ Lifting 3D, H3WB, sujeito retido S7, 2D de GT, janela de 16 frames, 30 épocas:
 A curva ainda descia na época 30 — mais épocas é alavanca disponível aqui, ao
 contrário do LoRA, que saturou.
 
+Erro por posição na janela (200 janelas): central 39,35mm, causal 42,86mm. O
+causal custa 3,51mm e elimina 267ms de atraso — é o adotado.
+
+**A escala métrica exige calibração da câmera.** A saída bruta da cabeça mede
+metade do tamanho real; quem restaura é o decodificador, lendo `factor` do
+metainfo. Por isso `SequenceLifter` chama `model.predict`, não
+`head(backbone(x))`. O fator vem da geometria da câmera: com o verdadeiro o erro
+é 43,4mm, com a mediana do H3WB é 72,7mm. A calibração do Módulo 1 é
+pré-requisito, não acabamento.
+
 **Não compare os 38,96mm com os 88,3mm do benchmark do H3WB.** O benchmark é
 frame único e usa outro conjunto. A comparação válida é o lifting temporal de
 17 juntas no Human3.6M (40,9mm MixSTE), e os 42,34mm de corpo caem nessa faixa.
