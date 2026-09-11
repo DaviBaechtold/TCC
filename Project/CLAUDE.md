@@ -163,13 +163,17 @@ python scripts/eval_checkpoint.py \
 python scripts/train_wholebody.py \
   --config configs/rtmpose_m_wholebody_gray_ft.py [--epochs 10]
 
-# Inferência em tempo real, multi-pessoa
-python src/evaluation/run_realtime.py \
-  --cfg <config> --ckpt <checkpoint> \
-  --det-cfg configs/detectors/rtmdet_nano_person_infer.py \
-  --det-ckpt checkpoints/rtmdet_nano_8xb32-100e_coco-obj365-person-05d8511e.pth \
-  --device cuda:0 --source 0
+# Painel de validação ao vivo, com os modelos correntes por padrão
+python scripts/run_panel.py
+
+# Taxa de processamento, com as condições registradas junto do resultado
+python scripts/benchmark_throughput.py --cfg configs/eval/rtmw_x_wholebody_eval.py \
+  --ckpt <checkpoint> --tag <nome> --image <imagem com pessoas> [--flip-test] [--detector]
 ```
+
+**Não rode o painel com um treino em andamento**: a disputa pela GPU derruba a
+taxa para cerca de um terço da real (63ms por quadro contra 20ms com a GPU
+livre), e o número exibido induz a erro numa demonstração.
 
 ```bash
 # Fila de treinos longos, resiliente a travamentos da máquina.
@@ -244,15 +248,13 @@ não é refatoração — é rearrumar a mesma bagunça.
 Estas violações existem hoje. Não são para consertar de uma vez; são para
 consertar quando a tarefa em curso passar por elas.
 
-- **`src/evaluation/run_realtime*.py` são quatro variantes quase idênticas**
-  (`_bottomup`, `_optimized`, `_turbo`, e a base). Violação de DRY. O destino é
-  um módulo de pipeline em `src/models/` com as variações como parâmetro, e um
-  único controller fino em `scripts/`.
-- **`run_realtime.py` mistura as três camadas** num arquivo: `argparse`
-  (controller), `inference_topdown` (model) e `draw_keypoints` (view).
-- **`scripts/test_bottomup_WORKING.py` e `test_bottomup_debug.py`** — nomes que
-  não explicam nada e sugerem código de rascunho versionado.
-- **`src/models/` não existe**, embora seja onde o Módulo 3 tem que nascer.
+- **`src/evaluation/evaluate_pose.py` e `evaluate_pose_video.py`** ainda misturam
+  as três camadas num arquivo, e comparam RGB contra IR num protocolo que a
+  medição de domain gap substituiu. São as próximas a passar pela regra.
+- **`scripts/test_quick.py`, `evaluate_accuracy_comparison.py`** — nomes que não
+  dizem o que verificam, e nenhum dos dois foi executado na retomada.
+- O remendo do `torch.load` ainda aparece copiado em alguns scripts antigos;
+  `src/models/torch_compat.py` é o lugar dele.
 
 ## Convenções
 

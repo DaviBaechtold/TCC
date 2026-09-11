@@ -49,6 +49,12 @@ def parse_args():
     p.add_argument('--image', default=None,
                    help='Frame real. Obrigatório com --detector, porque ruído '
                         'não produz detecções e deixaria a pose fora da conta')
+    p.add_argument('--channels-last', action='store_true',
+                   help='Layout de memória NHWC, que favorece os núcleos '
+                        'tensoriais em convoluções')
+    p.add_argument('--compile', action='store_true',
+                   help='Compila o grafo com torch.compile. A primeira chamada '
+                        'paga a compilação, por isso o aquecimento importa')
     return p.parse_args()
 
 
@@ -84,6 +90,7 @@ def main():
                 if args.detector else None)
     pipeline = FullBodyPosePipeline(patched, args.ckpt, device=args.device,
                                     detector=detector)
+    _apply_inference_optimizations(pipeline, args)
 
     if args.image:
         frame = cv2.imread(args.image)
@@ -108,6 +115,8 @@ def main():
         'detector': DETECTOR_CONFIG if args.detector else None,
         'batch_size': 1,
         'precision': 'fp32',
+        'channels_last': args.channels_last,
+        'compiled': args.compile,
     }
 
     report = measure(lambda: pipeline(frame), label=args.tag,
@@ -122,6 +131,23 @@ def main():
     print(f'\nresultado gravado em {out}')
     requisito = 'CUMPRE' if report.fps >= 20 else 'NÃO CUMPRE'
     print(f'requisito de 20 FPS: {requisito} ({report.fps:.1f} FPS)')
+
+
+def _apply_inference_optimizations(pipeline, args) -> None:
+    """Aplica otimizações que não mudam a saída, só o custo de calculá-la.
+
+    Ficam atrás de flags, e não ligadas por padrão, porque o ganho depende da
+    arquitetura e do hardware: medir é o ponto deste script. Herdadas da variante
+    `run_realtime_turbo.py`, removida por duplicar o pipeline inteiro para
+    acrescentar estas três linhas.
+    """
+    import torch
+
+    model = pipeline._pose_model
+    if args.channels_last:
+        model.to(memory_format=torch.channels_last)
+    if args.compile:
+        model.backbone = torch.compile(model.backbone, mode='max-autotune')
 
 
 if __name__ == '__main__':
