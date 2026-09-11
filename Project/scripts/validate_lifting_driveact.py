@@ -52,6 +52,11 @@ def parse_args():
     p.add_argument('--poses', type=Path, required=True,
                    help='Diretório openpose_3d/ com a referência tridimensional')
     p.add_argument('--max-sequences', type=int, default=5)
+    p.add_argument('--max-frames-per-sequence', type=int, default=200,
+                   help='Teto por sequência. Cada quadro custa a pose mais o '
+                        'lifting, e uma sequência inteira do Drive&Act tem '
+                        'milhares — sem teto a medição leva mais tempo que o '
+                        'treino que ela deveria avaliar')
     p.add_argument('--device', default='cuda:0')
     p.add_argument('--out', type=Path,
                    default=Path('results/lifting_driveact.json'))
@@ -120,7 +125,8 @@ def main():
             continue
 
         reference = {frame.frame_id: frame for frame in read_pose_csv(csv_path)}
-        images = sorted(by_sequence[file_id], key=lambda i: i['frame_id'])
+        images = sorted(by_sequence[file_id],
+                        key=lambda i: i['frame_id'])[:args.max_frames_per_sequence]
         lifter.reset()
         matched = 0
 
