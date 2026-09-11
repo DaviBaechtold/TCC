@@ -1,0 +1,25 @@
+{
+  "tag": "rtmwx_etapa3_driveact",
+  "checkpoint": "work_dirs/rtmw_x_driveact_ft/best_torso_px_mean_epoch_10.pth",
+  "data_root": "data/processed/driveact/",
+  "metrics": {
+    "coco-wholebody/AP": 0.9764937675737606,
+    "coco-wholebody/AP .5": 0.9900990099009901,
+    "coco-wholebody/AP .75": 0.9900426550321877,
+    "coco-wholebody/AP (M)": -1.0,
+    "coco-wholebody/AP (L)": 0.9764937675737606,
+    "coco-wholebody/AR": 0.986681782334385,
+    "coco-wholebody/AR .5": 0.9999507097791798,
+    "coco-wholebody/AR .75": 0.9983734227129337,
+    "coco-wholebody/AR (M)": -1.0,
+    "coco-wholebody/AR (L)": 0.986681782334385,
+    "torso/px_mean": 9.524865233039755,
+    "torso/px_median": 7.352695233556645,
+    "torso/px_p90": 18.21202455747288,
+    "torso/normalized_mean": 0.02822535229240369,
+    "torso/normalized_median": 0.02217388619616743,
+    "torso/samples": 19953.0,
+    "torso/PCK@0.1": 0.980907014173719,
+    "torso/PCK@0.2": 0.9980141218005296
+  }
+}

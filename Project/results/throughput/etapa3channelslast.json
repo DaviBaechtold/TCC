@@ -1,0 +1,27 @@
+{
+  "label": "etapa3channelslast",
+  "conditions": {
+    "device": "NVIDIA GeForce RTX 5060",
+    "torch": "2.8.0+cu128",
+    "cuda": "12.8",
+    "config": "configs/eval/rtmw_x_wholebody_eval.py",
+    "checkpoint": "best_torso_px_mean_epoch_10_merged.pth",
+    "input_size": [
+      288,
+      384
+    ],
+    "frame": "640x426",
+    "people_in_frame": 1,
+    "flip_test": false,
+    "detector": null,
+    "batch_size": 1,
+    "precision": "fp32",
+    "channels_last": true,
+    "compiled": false,
+    "warmup": 20
+  },
+  "median_ms": 14.342,
+  "p95_ms": 14.496,
+  "fps": 69.72,
+  "iterations": 100
+}

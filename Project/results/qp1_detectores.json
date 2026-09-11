@@ -1,0 +1,44 @@
+{
+  "caixa de ground truth": {
+    "erro_normalizado": 0.0288,
+    "latencia_mediana_ms": 15.79,
+    "fps": 63.3,
+    "quadros_sem_deteccao": 0,
+    "quadros_medidos": 1454
+  },
+  "RTMDet-nano": {
+    "erro_normalizado": 0.03,
+    "latencia_mediana_ms": 33.26,
+    "fps": 30.1,
+    "quadros_sem_deteccao": 0,
+    "quadros_medidos": 1454
+  },
+  "sem detector": {
+    "erro_normalizado": 0.0526,
+    "latencia_mediana_ms": 15.84,
+    "fps": 63.1,
+    "quadros_sem_deteccao": 0,
+    "quadros_medidos": 1454
+  },
+  "YOLOv11n-pose": {
+    "erro_normalizado": 0.0295,
+    "latencia_mediana_ms": 20.28,
+    "fps": 49.3,
+    "quadros_sem_deteccao": 0,
+    "quadros_medidos": 1454
+  },
+  "YOLOv12n": {
+    "erro_normalizado": 0.029,
+    "latencia_mediana_ms": 21.84,
+    "fps": 45.8,
+    "quadros_sem_deteccao": 4,
+    "quadros_medidos": 1450
+  },
+  "YOLOv26n-pose": {
+    "erro_normalizado": 0.0292,
+    "latencia_mediana_ms": 21.3,
+    "fps": 47.0,
+    "quadros_sem_deteccao": 0,
+    "quadros_medidos": 1454
+  }
+}
