@@ -49,6 +49,25 @@ def _normalize(keypoints: np.ndarray, width: int, height: int) -> np.ndarray:
     return normalized
 
 
+# Resposta média do estimador 2D nos keypoints que ele de fato observa, medida
+# sobre 150 quadros do Drive&Act. Serve de escala porque a saída do SimCC é
+# magnitude de resposta, sem teto em 1, enquanto o treino do lifting vê
+# confiança no intervalo [0, 1].
+OBSERVED_RESPONSE = 8.30
+
+
+def _normalize_confidence(scores: np.ndarray, scale: float) -> np.ndarray:
+    """Leva a confiança ao intervalo [0, 1] que o treino do lifting usa.
+
+    A escala precisa vir de quem chama porque depende da origem do número. A
+    saída do SimCC é magnitude de resposta, sem teto em 1, e chega a 10; já os
+    pesos de visibilidade de um dataset anotado já estão em [0, 1] e dividir de
+    novo os achataria. Adivinhar pela grandeza do vetor funcionaria quase sempre,
+    e falharia em silêncio no quadro em que quase nada foi detectado.
+    """
+    return np.clip(scores.astype(np.float32) / scale, 0.0, 1.0)
+
+
 class SequenceLifter:
     """Buffer temporal mais estimador 2D→3D, com estado entre chamadas."""
 
@@ -57,7 +76,8 @@ class SequenceLifter:
                  checkpoint: str | Path,
                  device: str = 'cuda:0',
                  sequence_length: int = SEQUENCE_LENGTH,
-                 factor: float = DEFAULT_FACTOR):
+                 factor: float = DEFAULT_FACTOR,
+                 response_scale: float = OBSERVED_RESPONSE):
         from mmengine.config import Config
         from mmengine.registry import init_default_scope
         from mmengine.runner.checkpoint import load_checkpoint
@@ -74,6 +94,7 @@ class SequenceLifter:
         self._sequence_length = sequence_length
         self._window: deque[np.ndarray] = deque(maxlen=sequence_length)
         self._factor = factor
+        self._response_scale = response_scale
         self._flip_indices = self._model.head.decoder.__dict__.get(
             'flip_indices', list(range(NUM_KEYPOINTS)))
 
@@ -108,7 +129,8 @@ class SequenceLifter:
         width, height = frame_size
         entry = np.concatenate(
             [_normalize(keypoints, width, height),
-             scores.astype(np.float32).reshape(-1, 1)], axis=-1)
+             _normalize_confidence(scores, self._response_scale
+                                   ).reshape(-1, 1)], axis=-1)
         self._window.append(entry)
 
         window = list(self._window)

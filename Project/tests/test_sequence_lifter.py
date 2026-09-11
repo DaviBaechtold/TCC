@@ -48,7 +48,9 @@ def main():
     dataset_cfg['pipeline'] = cfg.val_pipeline
     dataset = DATASETS.build(dataset_cfg)
 
-    lifter = SequenceLifter(CONFIG, CHECKPOINT, 'cuda:0')
+    # O H3WB já traz visibilidade em [0, 1]; a escala de 1,0 evita dividir duas
+    # vezes. O painel, que recebe resposta do SimCC, usa o padrão.
+    lifter = SequenceLifter(CONFIG, CHECKPOINT, 'cuda:0', response_scale=1.0)
 
     errors = []
     step = max(1, len(dataset) // WINDOWS_TO_CHECK)

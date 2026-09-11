@@ -1,16 +1,19 @@
 # Módulo 3 treinado para operar com entrada incompleta.
 #
 # Medição que motiva este config: o lifting mede 42,20mm de erro corporal no
-# próprio domínio de treino e 82,88mm no habitáculo. A causa **não** é postura
-# nem ponto de vista. Zerando, no próprio H3WB, os keypoints que a vista de
-# retrovisor não observa, o erro sobe para 80,75mm — praticamente o valor do
-# domínio veicular. A rede nunca viu janela com keypoints faltando e trata o
-# zero como posição legítima.
+# próprio domínio de treino e 82,88mm no habitáculo, e a causa não é postura nem
+# ponto de vista, e sim o que a rede recebe onde não há observação.
 #
-# A única diferença para `lift3d_dstformer_h3wb_16frm.py` é a transformação
-# `KeypointDropout` no pipeline de treino. Parte do checkpoint já treinado, em
-# vez de recomeçar: o que falta não é aprender a tarefa, é aprender a tolerar
-# ausência.
+# A primeira tentativa apagava esses keypoints e **piorou** o domínio veicular,
+# para 108,37mm. O erro foi de raciocínio: zerar as pernas no H3WB dava 80,75mm,
+# perto dos 82,88mm reais, e disso concluiu-se que a corrupção real eram zeros.
+# Coincidiram as magnitudes, não os mecanismos — o estimador 2D coloca a junta
+# invisível junto da borda inferior do recorte, não na origem.
+#
+# Esta versão simula o que foi medido, e torna informativo o canal de confiança,
+# que no H3WB é constante em 1,0 e que a rede aprendeu a ignorar. Ver
+# `src/data/estimator_noise.py`. Parte do checkpoint já convergido: o que falta
+# não é aprender a tarefa.
 _base_ = ['./lift3d_dstformer_h3wb_16frm.py']
 
 max_epochs = 15
@@ -27,19 +30,19 @@ custom_imports = dict(
         'mmpose.datasets',
         'mmpose.evaluation',
         'src.data.h3wb_dataset',
-        'src.data.keypoint_dropout',
+        'src.data.estimator_noise',
         'src.evaluation.wholebody_mpjpe',
     ],
     allow_failed_imports=True)
 
 train_cfg = dict(by_epoch=True, max_epochs=max_epochs, val_interval=1)
 
-# A ordem importa: o dropout vem depois do `GenerateTarget`, que é quem produz
+# A ordem importa: a simulação vem depois do `GenerateTarget`, que é quem produz
 # `keypoint_labels`, e antes do `RandomFlipAroundRoot`, para que o espelhamento
-# troque os lados de um membro já ausente em vez de reintroduzi-lo.
+# troque os lados de um membro já extrapolado em vez de reintroduzi-lo.
 train_pipeline = [
     dict(type='GenerateTarget', encoder={{_base_.train_codec}}),
-    dict(type='KeypointDropout', prob=0.6, max_groups=2),
+    dict(type='SimulatedEstimatorNoise', prob=0.6, max_groups=2),
     dict(
         type='RandomFlipAroundRoot',
         keypoints_flip_cfg=dict(center_mode='static', center_x=0.),
@@ -67,4 +70,4 @@ param_scheduler = [
         convert_to_iter_based=True),
 ]
 
-work_dir = 'work_dirs/lift3d_robusto'
+work_dir = 'work_dirs/lift3d_robusto_v2'

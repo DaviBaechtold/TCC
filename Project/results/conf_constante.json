@@ -1,0 +1,24 @@
+{
+  "pa_mpjpe_mm": 84.88,
+  "pa_mpjpe_median_mm": 80.49,
+  "frames": 420,
+  "keypoints": [
+    0,
+    1,
+    2,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12
+  ],
+  "alignment": "procrustes",
+  "reference": "Drive&Act OpenPose 3D (triangulação, não marcadores)",
+  "pose_checkpoint": "best_coco-wholebody_AP_epoch_5_merged.pth",
+  "lift_checkpoint": "best_MPJPE_whole_epoch_30.pth",
+  "confidence": "constante"
+}

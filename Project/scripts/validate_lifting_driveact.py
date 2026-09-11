@@ -40,6 +40,11 @@ OBSERVABLE_KEYPOINTS = (0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12)
 
 ROOT_KEYPOINT = 0
 
+# Resposta média do estimador 2D nos keypoints observáveis do Drive&Act, medida
+# sobre 150 quadros. Serve de escala para levar a resposta bruta ao intervalo
+# que o treino do lifting viu.
+OBSERVABLE_RESPONSE = 8.30
+
 
 def parse_args():
     p = argparse.ArgumentParser(description=__doc__,
@@ -66,6 +71,11 @@ def parse_args():
     p.add_argument('--lift-ckpt', default=None,
                    help='Checkpoint do lifting. Permite comparar o modelo base '
                         'com o treinado para tolerar entrada incompleta')
+    p.add_argument('--confidence', default='raw',
+                   choices=['raw', 'constante', 'normalizada'],
+                   help='Como preencher o terceiro canal da entrada do lifting. '
+                        'No treino ele é constante em 1,0; a resposta bruta do '
+                        'SimCC vai a 10 e está fora dessa distribuição')
     p.add_argument('--device', default='cuda:0')
     p.add_argument('--out', type=Path,
                    default=Path('results/lifting_driveact.json'))
@@ -149,8 +159,12 @@ def main():
                 continue
 
             height, width = frame.shape[:2]
-            predicted = lifter(result.keypoints[0], result.scores[0],
-                               (width, height))
+            scores = result.scores[0]
+            if args.confidence == 'constante':
+                scores = np.ones_like(scores)
+            elif args.confidence == 'normalizada':
+                scores = np.clip(scores / OBSERVABLE_RESPONSE, 0.0, 1.0)
+            predicted = lifter(result.keypoints[0], scores, (width, height))
             if lifter.warming_up or image['frame_id'] not in reference:
                 continue
 
@@ -179,6 +193,7 @@ def main():
         'reference': 'Drive&Act OpenPose 3D (triangulação, não marcadores)',
         'pose_checkpoint': Path(args.pose_ckpt or panel.POSE_CHECKPOINT).name,
         'lift_checkpoint': Path(args.lift_ckpt or panel.LIFT_CHECKPOINT).name,
+        'confidence': args.confidence,
     }
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(report, indent=2, ensure_ascii=False))
