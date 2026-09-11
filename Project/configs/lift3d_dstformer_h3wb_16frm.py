@@ -35,8 +35,11 @@ num_keypoints = 133
 sequence_length = 16   # T especificado no Projeto Físico
 max_epochs = 30
 base_lr = 2e-4
-train_batch_size = 16
-val_batch_size = 16
+# Batch 4 é o teto medido nos 8 GB da RTX 5060: 3,66 GB de pico, 0,175 s por
+# iteração. Em 8 o DSTFormer estoura — a atenção dupla sobre 133 keypoints em
+# janelas de 16 frames é cara em ativações, não em parâmetros.
+train_batch_size = 4
+val_batch_size = 4
 
 randomness = dict(seed=42)
 resume = False
@@ -145,6 +148,10 @@ train_dataloader = dict(
         # guarda da classe base que precisa ser contornada.
         seq_len=sequence_length,
         multiple_target=sequence_length,
+        # Janelas com 50% de sobreposição no treino. Com passo 1, como faz a
+        # implementação distribuída, janelas vizinhas compartilhariam 15 dos 16
+        # frames e o conjunto consumiria 20 GB de RAM para a mesma informação.
+        window_stride=sequence_length // 2,
         keypoint_2d_src='gt',
         pipeline=train_pipeline,
     ))
@@ -163,6 +170,9 @@ val_dataloader = dict(
         data_prefix=dict(img='original/'),
         seq_len=sequence_length,
         multiple_target=sequence_length,
+        # Avaliação sem sobreposição: cada frame do conjunto de teste é contado
+        # uma única vez, senão o MPJPE fica ponderado pela taxa de sobreposição.
+        window_stride=sequence_length,
         keypoint_2d_src='gt',
         test_mode=True,
         pipeline=val_pipeline,

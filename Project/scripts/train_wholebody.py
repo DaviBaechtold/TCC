@@ -121,6 +121,12 @@ def main():
         # e esconde em qual passo ele apareceu.
         cfg.log_processor.window_size = args.log_interval
 
+    # O MMPose 1.3.2 converte tensores para NumPy ao medir acurácia e não
+    # reconhece bfloat16. A correção precisa estar instalada antes de qualquer
+    # passo de treino, independentemente de haver LoRA.
+    if str(cfg.optim_wrapper.get('dtype', '')).endswith('bfloat16'):
+        from src.models import bf16_compat  # noqa: F401
+
     Path(cfg.work_dir).mkdir(parents=True, exist_ok=True)
 
     switch = next((h['switch_epoch'] for h in cfg.get('custom_hooks', [])
@@ -172,7 +178,17 @@ def _apply_lora_if_requested(cfg, args, runner):
     model = runner.model
     device = next(model.parameters()).device
 
-    if runner._load_from:
+    # Retomar e começar do zero exigem caminhos opostos.
+    #
+    # Ao retomar, o checkpoint de retomada já traz os pesos adaptados, com os
+    # nomes que o LoRA introduz; carregar o checkpoint base antes seria inútil e,
+    # pior, `Runner.load_checkpoint` liga `_has_loaded`, o que faz o
+    # `load_or_resume` seguinte retornar sem fazer nada — o treino recomeçaria
+    # da época 1 em silêncio, como de fato aconteceu. Anular `_load_from` leva o
+    # MMEngine a procurar o checkpoint mais recente do work_dir.
+    if getattr(runner, '_resume', False):
+        runner._load_from = None
+    elif runner._load_from:
         runner.load_checkpoint(runner._load_from, map_location='cpu')
         runner._load_from = None  # já carregado; evita recarga pós-injeção
 

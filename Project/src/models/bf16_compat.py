@@ -15,6 +15,7 @@ Importar este módulo instala a correção. A operação é idempotente.
 from __future__ import annotations
 
 import importlib
+import sys
 
 import torch
 
@@ -39,17 +40,15 @@ def install() -> None:
 
     tensor_utils.to_numpy = to_numpy
 
-    # O módulo da cabeça importa o símbolo diretamente, de modo que substituir
-    # apenas em `tensor_utils` não alcançaria a chamada real.
-    for module_path in ('mmpose.models.heads.coord_cls_heads.rtmw_head',
-                        'mmpose.models.heads.coord_cls_heads.rtmcc_head',
-                        'mmpose.models.heads.coord_cls_heads.simcc_head'):
-        try:
-            head_module = importlib.import_module(module_path)
-        except ImportError:
-            continue
-        if hasattr(head_module, 'to_numpy'):
-            head_module.to_numpy = to_numpy
+    # Os módulos das cabeças importam o símbolo diretamente (`from ... import
+    # to_numpy`), de modo que substituir apenas em `tensor_utils` não alcançaria
+    # a chamada real. Varrer os módulos já carregados cobre qualquer cabeça, em
+    # vez de depender de uma lista fixa que envelhece — foi assim que a cabeça
+    # de regressão do MotionBERT escapou da primeira versão desta correção.
+    for module in list(sys.modules.values()):
+        if getattr(module, '__name__', '').startswith('mmpose.') and \
+                getattr(module, 'to_numpy', None) is original_to_numpy:
+            module.to_numpy = to_numpy
 
     _installed = True
 
