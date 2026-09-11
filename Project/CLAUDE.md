@@ -33,6 +33,25 @@ Checkpoints do OpenMMLab (2023) contêm objetos numpy e o PyTorch ≥ 2.6 usa
 `weights_only=True` por padrão, rejeitando-os. Todo entrypoint que carrega
 checkpoint precisa do patch de `torch.load` — veja `scripts/eval_checkpoint.py`.
 
+### Armadilhas do MMPose/MMEngine — conferir antes de culpar o próprio código
+
+Todas já custaram horas aqui, e todas são **silenciosas**: o treino roda, a perda
+cai, e só uma métrica denuncia. Lista completa na memória
+`mmpose-armadilhas-conhecidas`. As três que mais mordem:
+
+- **`Runner.from_cfg` não carrega `load_from`** — quem carrega é `train()`, que
+  antes ainda chama `init_weights()`. Qualquer modificação do modelo feita entre
+  os dois é desfeita sem aviso.
+- **`Runner.load_checkpoint` liga `_has_loaded`**, e o `load_or_resume` seguinte
+  retorna sem fazer nada. Carregar checkpoint antes do `train()` desliga a
+  retomada e o treino recomeça da época 1 em silêncio.
+- **`requires_grad=False` não congela BatchNorm** — a camada segue normalizando
+  pelo lote e sobrescrevendo as estatísticas acumuladas.
+
+Use bfloat16, nunca float16: com fp16 o recorte de gradiente corrompe os pesos
+quando a norma transborda. E o shim de `src/models/bf16_compat.py` precisa estar
+carregado, porque o MMPose não converte bfloat16 para NumPy.
+
 ## Estado atual (set/2026)
 
 | Componente | Estado |
@@ -40,7 +59,7 @@ checkpoint precisa do patch de `torch.load` — veja `scripts/eval_checkpoint.py
 | Dataset COCO-WholeBody grayscale | Pronto: 118.287 treino / 5.000 val |
 | Módulo 2 — estimação 2D top-down | Funcional (RTMDet-nano + RTMW-x); adaptação de domínio por LoRA em curso |
 | Módulo 1 — aquisição | Parcial: captura OK, calibração/undistort pendentes |
-| Módulo 3 — lifting 3D | Config e dataset prontos e verificados; treino pendente |
+| Módulo 3 — lifting 3D | DSTFormer 42,4M params sobre H3WB; batch 4 é o teto dos 8 GB (3,66 GB, 5,1 min/época) |
 | Módulo 4 — visualização | Painel de validação funcional (2D, métricas, FPS); visualização 3D pendente do Módulo 3 |
 | Drive&Act | Vídeos e anotações baixados; conversor escrito e validado |
 | H3WB (lifting 3D) | Baixado e convertido: 60k treino / 20k teste, 133 keypoints |
@@ -106,6 +125,17 @@ python src/evaluation/run_realtime.py \
   --det-ckpt checkpoints/rtmdet_nano_8xb32-100e_coco-obj365-person-05d8511e.pth \
   --device cuda:0 --source 0
 ```
+
+```bash
+# Fila de treinos longos, resiliente a travamentos da máquina.
+# Relançar após uma queda continua de onde parou; o progresso fica em arquivo.
+setsid nohup ./scripts/run_overnight.sh > work_dirs/logs/fila.log 2>&1 &
+```
+
+**Lance todo treino longo por aí.** A máquina trava sozinha, por causa alheia ao
+projeto — 26% dos boots terminam em congelamento. Diagnóstico completo na
+memória `hardware-instabilidade-do-pc`. Logs em `work_dirs/logs/`, que sobrevive
+à troca de sessão, ao contrário do diretório temporário.
 
 `data/`, `checkpoints/`, `work_dirs/` e `venv/` são ignorados pelo git.
 `results/` **não é** — os JSON de métrica ali sustentam afirmações do documento.
