@@ -14,7 +14,10 @@ Exemplo:
 import argparse
 import json
 import os
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 
 def parse_args():
@@ -61,10 +64,10 @@ def main():
         cfg.test_dataloader.batch_size = args.batch_size
     cfg.val_dataloader = cfg.test_dataloader
     cfg.val_evaluator = cfg.test_evaluator
-    cfg.load_from = args.ckpt
     cfg.work_dir = os.path.join(args.out_dir, args.tag)
-
     Path(cfg.work_dir).mkdir(parents=True, exist_ok=True)
+
+    cfg.load_from = _merged_if_lora(args.ckpt, cfg.work_dir)
 
     runner = Runner.from_cfg(cfg)
     metrics = runner.test()
@@ -84,6 +87,32 @@ def main():
     for k, v in sorted(metrics.items()):
         print(f'  {k:<32} {v:.4f}')
     print(f'\nSalvo em: {out}')
+
+
+def _merged_if_lora(checkpoint: str, work_dir: str) -> str:
+    """Funde adaptadores, se houver, e devolve o caminho a carregar.
+
+    Um checkpoint treinado com LoRA tem nomes de camada diferentes dos do
+    modelo comum descrito no config de avaliação. O MMEngine trata chave
+    ausente como aviso, de modo que avaliá-lo sem fundir rodaria até o fim e
+    reportaria a métrica de um modelo aleatório, sem nada indicando o erro.
+    Fundir aqui torna a avaliação correta por construção, e não por o operador
+    lembrar de usar o script certo.
+    """
+    import torch
+
+    from src.models.lora import has_lora_adapters, merge_lora_state_dict
+
+    loaded = torch.load(checkpoint, map_location='cpu', weights_only=False)
+    state_dict = loaded.get('state_dict', loaded)
+    if not has_lora_adapters(state_dict):
+        return checkpoint
+
+    merged_path = Path(work_dir) / f'{Path(checkpoint).stem}_merged.pth'
+    torch.save({'state_dict': merge_lora_state_dict(state_dict),
+                'meta': loaded.get('meta', {})}, merged_path)
+    print(f'  checkpoint com LoRA detectado; fundido em {merged_path}')
+    return str(merged_path)
 
 
 if __name__ == '__main__':

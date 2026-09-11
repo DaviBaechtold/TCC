@@ -77,7 +77,9 @@ def main():
     cfg = Config.fromfile(args.cfg)
     cfg.model.test_cfg = dict(cfg.model.get('test_cfg', {}))
     cfg.model.test_cfg['flip_test'] = args.flip_test
-    patched = Path(args.out_dir) / f'{args.tag}_cfg.py'
+    # O config remendado é artefato descartável, não evidência: vai para
+    # work_dirs/ e não para results/, que guarda o que o documento cita.
+    patched = Path('work_dirs/throughput') / f'{args.tag}_cfg.py'
     patched.parent.mkdir(parents=True, exist_ok=True)
     cfg.dump(patched)
 

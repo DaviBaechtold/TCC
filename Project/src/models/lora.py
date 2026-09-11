@@ -244,3 +244,68 @@ def parameter_summary(model: nn.Module) -> dict[str, float]:
         'trainable_M': trainable / 1e6,
         'trainable_pct': 100.0 * trainable / total if total else 0.0,
     }
+
+
+def merge_lora_state_dict(state_dict: dict, alpha: float | None = None) -> dict:
+    """Funde os adaptadores nos pesos base e devolve nomes de camada originais.
+
+    Um checkpoint treinado com LoRA não carrega num modelo comum: a injeção
+    renomeia `conv.weight` para `conv.base.weight` e acrescenta `conv.down` e
+    `conv.up`. Como o MMEngine trata chave ausente como aviso e não como erro,
+    avaliar esse checkpoint num config sem LoRA roda até o fim e reporta a
+    métrica de um modelo aleatório. Esta função existe para que isso não seja
+    possível: ela devolve um `state_dict` que um modelo comum carrega inteiro.
+
+    A fusão é exata, não uma aproximação. Para uma convolução, o termo aditivo
+    `up(down(x))` compõe-se num único núcleo, porque `up` é ponto-a-ponto e
+    `down` compartilha núcleo, passo e dilatação com a camada base; convoluções
+    agrupadas nunca são adaptadas, justamente por não admitirem essa composição.
+
+    Args:
+        state_dict: pesos do checkpoint treinado com adaptadores.
+        alpha: escala usada na injeção. `None` assume `alpha == rank`, que é o
+            padrão de `inject_lora` e resulta em fator unitário.
+
+    Returns:
+        Novo dicionário, com os adaptadores fundidos e as chaves originais.
+    """
+    merged = {}
+    adapters = 0
+
+    for key, tensor in state_dict.items():
+        if key.endswith('.down.weight') or key.endswith('.up.weight'):
+            continue
+        if '.base.' not in key:
+            merged[key] = tensor
+            continue
+
+        prefix, _, suffix = key.rpartition('.base.')
+        if suffix != 'weight':  # bias da camada base: só renomeia
+            merged[f'{prefix}.{suffix}'] = tensor
+            continue
+
+        down = state_dict[f'{prefix}.down.weight']
+        up = state_dict[f'{prefix}.up.weight']
+        rank = down.shape[0]
+        scaling = (rank if alpha is None else alpha) / rank
+
+        if tensor.dim() == 4:
+            delta = torch.einsum('or,rikl->oikl', up[:, :, 0, 0], down)
+        else:
+            delta = up @ down
+
+        merged[f'{prefix}.weight'] = tensor + delta * scaling
+        adapters += 1
+
+    if adapters == 0:
+        raise ValueError('nenhum adaptador encontrado: este checkpoint não foi '
+                         'treinado com LoRA')
+    return merged
+
+
+def has_lora_adapters(state_dict: dict) -> bool:
+    """Reconhece um checkpoint treinado com adaptadores pelo nome das chaves."""
+    return any(
+        key.endswith('.up.weight')
+        and key.removesuffix('up.weight') + 'down.weight' in state_dict
+        for key in state_dict)
