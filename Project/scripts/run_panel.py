@@ -222,8 +222,15 @@ def main():
                     if show_skeleton:
                         for index in range(result.num_people):
                             draw_box(frame, result.boxes[index])
+                            # A mesma máscara do painel 3D: o sistema não pode
+                            # afirmar num quadrante o que nega no outro. Uma
+                            # junta que a câmera não enxerga não é desenhada em
+                            # lugar nenhum.
+                            trusted = reliable_keypoints(result.scores[index],
+                                                         args.score_thr)
                             draw_pose(frame, result.keypoints[index],
-                                      result.scores[index], args.score_thr)
+                                      np.where(trusted, result.scores[index],
+                                               0.0), args.score_thr)
 
                     frame_times.append(time.perf_counter() - started)
                     state.frame = frame
