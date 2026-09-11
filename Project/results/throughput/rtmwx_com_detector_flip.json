@@ -1,0 +1,25 @@
+{
+  "label": "rtmwx_com_detector_flip",
+  "conditions": {
+    "device": "NVIDIA GeForce RTX 5060",
+    "torch": "2.8.0+cu128",
+    "cuda": "12.8",
+    "config": "configs/eval/rtmw_x_wholebody_eval.py",
+    "checkpoint": "best_coco-wholebody_AP_epoch_5_merged.pth",
+    "input_size": [
+      288,
+      384
+    ],
+    "frame": "640x426",
+    "people_in_frame": 2,
+    "flip_test": true,
+    "detector": "configs/detectors/rtmdet_nano_person_infer.py",
+    "batch_size": 1,
+    "precision": "fp32",
+    "warmup": 20
+  },
+  "median_ms": 52.415,
+  "p95_ms": 60.359,
+  "fps": 19.08,
+  "iterations": 100
+}

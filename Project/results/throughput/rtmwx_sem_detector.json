@@ -1,0 +1,25 @@
+{
+  "label": "rtmwx_sem_detector",
+  "conditions": {
+    "device": "NVIDIA GeForce RTX 5060",
+    "torch": "2.8.0+cu128",
+    "cuda": "12.8",
+    "config": "configs/eval/rtmw_x_wholebody_eval.py",
+    "checkpoint": "best_coco-wholebody_AP_epoch_5_merged.pth",
+    "input_size": [
+      288,
+      384
+    ],
+    "frame": "640x426",
+    "people_in_frame": 1,
+    "flip_test": false,
+    "detector": null,
+    "batch_size": 1,
+    "precision": "fp32",
+    "warmup": 20
+  },
+  "median_ms": 15.513,
+  "p95_ms": 18.722,
+  "fps": 64.46,
+  "iterations": 100
+}

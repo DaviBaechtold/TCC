@@ -119,6 +119,7 @@ def main():
                      warmup=args.warmup)
 
     out = Path(args.out_dir) / f'{args.tag}.json'
+    out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(report.as_dict(), indent=2, ensure_ascii=False))
 
     print(json.dumps(report.as_dict(), indent=2, ensure_ascii=False))
