@@ -59,7 +59,14 @@ def main():
     cfg.test_dataloader.dataset.data_root = args.data_root
     cfg.test_dataloader.dataset.data_prefix = dict(img=args.img_prefix)
     cfg.test_dataloader.dataset.ann_file = args.ann_file
-    cfg.test_evaluator.ann_file = os.path.join(args.data_root, args.ann_file)
+    # O avaliador pode ser um dicionário ou uma lista deles, quando mais de uma
+    # métrica é reportada lado a lado. Só as que leem anotação têm `ann_file`.
+    annotation_path = os.path.join(args.data_root, args.ann_file)
+    evaluators = (cfg.test_evaluator if isinstance(cfg.test_evaluator, list)
+                  else [cfg.test_evaluator])
+    for evaluator in evaluators:
+        if 'ann_file' in evaluator:
+            evaluator['ann_file'] = annotation_path
     if args.batch_size:
         cfg.test_dataloader.batch_size = args.batch_size
     cfg.val_dataloader = cfg.test_dataloader

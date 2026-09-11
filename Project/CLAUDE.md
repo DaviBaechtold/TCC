@@ -70,18 +70,53 @@ carregado, porque o MMPose não converte bfloat16 para NumPy.
 Whole-body AP em COCO-WholeBody val, 133 keypoints, **bbox de ground truth**,
 flip test ligado. Fonte: `results/baselines/`.
 
-| Configuração | AP gray | AP RGB | gap | FPS na 5060 |
-|---|---|---|---|---|
-| **RTMW-x 384×288** (modelo adotado) | **0,6857** | 0,7273 | **−5,7%** | 24,0 |
-| RTMPose-m 256×192 | 0,5255 | 0,6039 | −13,0% | 57,4 |
-| RTMPose-m, fine-tuning de 10 epochs a LR 5e-4 | 0,5137 | — | — | — |
-| RTMPose-m, treino de 50 epochs a partir do checkpoint body7 | 0,4373 | — | — | — |
+AP em COCO-WholeBody val2017, bbox de GT, flip test ligado:
+
+| Configuração | AP gray | AP RGB | gap |
+|---|---|---|---|
+| **RTMW-x + LoRA, época 5** (checkpoint atual) | **0,6930** | — | — |
+| RTMW-x 384×288 sem treino | 0,6857 | 0,7273 | **−5,7%** |
+| RTMPose-m 256×192 sem treino | 0,5255 | 0,6039 | −13,0% |
+| RTMPose-m, fine-tuning de 10 epochs a LR 5e-4 | 0,5137 | — | — |
+| RTMPose-m, treino de 50 epochs a partir do checkpoint body7 | 0,4373 | — | — |
+
+O checkpoint fundido está em
+`work_dirs/rtmw_x_gray_lora/best_coco-wholebody_AP_epoch_5_merged.pth`. É ele que
+o `configs/rtmw_x_driveact_ft.py` carrega, e é ele que se usa para inferência —
+o checkpoint bruto tem nomes de camada adaptados e não carrega num config comum.
+
+Throughput na 5060, lote 1, fp32, mediana de 100 iterações após 20 de
+aquecimento, com `torch.cuda.synchronize()` a cada iteração:
+
+| Estágio | Custo |
+|---|---|
+| Detector RTMDet-nano | 7,35 ms, fixo |
+| Pose RTMW-x 384×288 | 12,44 ms por pessoa |
+| Flip test | dobra o custo da pose |
+
+Cumpre 20 FPS em três das quatro configurações; falha só com detector + flip
+test + duas pessoas (19,1 FPS). Flip test é para avaliação, não para operação.
+**O "24,0 FPS" citado antes não tinha condição declarada e foi descartado.**
+
+Lifting 3D, H3WB, sujeito retido S7, 2D de GT, janela de 16 frames, 30 épocas:
+38,96mm full-body, 42,34mm corpo, 9,58mm face, **80,50mm mãos** (dominam o erro).
+A curva ainda descia na época 30 — mais épocas é alavanca disponível aqui, ao
+contrário do LoRA, que saturou.
+
+**Não compare os 38,96mm com os 88,3mm do benchmark do H3WB.** O benchmark é
+frame único e usa outro conjunto. A comparação válida é o lifting temporal de
+17 juntas no Human3.6M (40,9mm MixSTE), e os 42,34mm de corpo caem nessa faixa.
+
+**O proxy grayscale não cobre o domínio real**, medido sobre 300 imagens de
+cada: COCO em cinza tem média 105,3 e desvio 56,4; o NIR do Drive&Act tem 29,6
+e 31,0. Três vezes e meia mais escuro, metade do contraste. É o que explica a
+saturação do LoRA e o que justifica a Etapa 3.
 
 Quatro conclusões que orientam todo trabalho futuro:
 
 1. **O RTMW-x é o modelo do projeto.** 0,6857 em grayscale sem treino nenhum,
-   e cumpre o requisito de 20 FPS na 5060. Teto realista após adaptação de
-   domínio: 70–71%, limitado pelos 72,73% que ele atinge em RGB.
+   e cumpre o requisito de 20 FPS na 5060 com folga de três vezes. A adaptação
+   por LoRA levou a 0,6930 e saturou; a meta de 70% **não foi atingida**.
 2. **O domain gap encolhe com a capacidade do modelo**: 13,0% no RTMPose-m
    contra 5,7% no RTMW-x. É um achado próprio e publicável.
 3. **O gap concentra-se em AP.75, não em AP.50.** Perder a cor atrapalha

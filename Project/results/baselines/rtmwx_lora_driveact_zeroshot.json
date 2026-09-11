@@ -1,0 +1,17 @@
+{
+  "tag": "rtmwx_lora_driveact_zeroshot",
+  "checkpoint": "work_dirs/rtmw_x_gray_lora/best_coco-wholebody_AP_epoch_5_merged.pth",
+  "data_root": "data/processed/driveact/",
+  "metrics": {
+    "coco-wholebody/AP": 0.9330361464302661,
+    "coco-wholebody/AP .5": 0.9900980338570136,
+    "coco-wholebody/AP .75": 0.9898704991714169,
+    "coco-wholebody/AP (M)": -1.0,
+    "coco-wholebody/AP (L)": 0.9330361464302661,
+    "coco-wholebody/AR": 0.957013998422713,
+    "coco-wholebody/AR .5": 0.9999507097791798,
+    "coco-wholebody/AR .75": 0.9966975552050473,
+    "coco-wholebody/AR (M)": -1.0,
+    "coco-wholebody/AR (L)": 0.957013998422713
+  }
+}

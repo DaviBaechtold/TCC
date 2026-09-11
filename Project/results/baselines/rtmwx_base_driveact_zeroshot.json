@@ -1,0 +1,17 @@
+{
+  "tag": "rtmwx_base_driveact_zeroshot",
+  "checkpoint": "checkpoints/rtmw-x_simcc-cocktail14_pt-ucoco_270e-384x288-f840f204_20231122.pth",
+  "data_root": "data/processed/driveact/",
+  "metrics": {
+    "coco-wholebody/AP": 0.9350959709522565,
+    "coco-wholebody/AP .5": 0.9900975458350253,
+    "coco-wholebody/AP .75": 0.9898563193781896,
+    "coco-wholebody/AP (M)": -1.0,
+    "coco-wholebody/AP (L)": 0.9350959709522565,
+    "coco-wholebody/AR": 0.9579751577287066,
+    "coco-wholebody/AR .5": 0.9999507097791798,
+    "coco-wholebody/AR .75": 0.996352523659306,
+    "coco-wholebody/AR (M)": -1.0,
+    "coco-wholebody/AR (L)": 0.9579751577287066
+  }
+}
