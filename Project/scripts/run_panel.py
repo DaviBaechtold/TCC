@@ -238,6 +238,8 @@ def main():
                         state.keypoints_3d = lifter(result.keypoints[0],
                                                     result.scores[0],
                                                     (width, height))
+                        state.keypoints_3d_reliable = (
+                            result.scores[0] >= args.score_thr)
                         state.lifting_warming_up = lifter.warming_up
                     else:
                         state.keypoints_3d = None

@@ -66,6 +66,9 @@ class PanelState:
     # como "17/17 detectados" não significa nada sem o limiar ao lado.
     score_threshold: float = 0.0
     keypoints_3d: np.ndarray | None = None
+    # Quais keypoints o estimador 2D localizou de fato. O lifting devolve
+    # posição para todos os 133, inclusive os que nunca estiveram na imagem.
+    keypoints_3d_reliable: np.ndarray | None = None
     # Ângulo da vista 3D, girado continuamente para dar noção de volume: numa
     # projeção ortográfica estática a pose é ambígua em profundidade.
     azimuth: float = 0.0
@@ -186,7 +189,8 @@ class ValidationPanel:
 
         from src.visualization.skeleton3d import draw_pose_3d
 
-        draw_pose_3d(canvas, state.keypoints_3d, (x, y), (w, h), state.azimuth)
+        draw_pose_3d(canvas, state.keypoints_3d, (x, y), (w, h),
+                     state.azimuth, state.keypoints_3d_reliable)
 
         # A escala só é métrica quando a câmera está calibrada: sem o fator de
         # geometria o erro cresce 68%, então exibir metros seria enganoso.

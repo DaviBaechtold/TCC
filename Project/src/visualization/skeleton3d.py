@@ -47,13 +47,16 @@ def _rotation(azimuth: float) -> np.ndarray:
 
 
 def project(keypoints_3d: np.ndarray, size: tuple[int, int],
-            azimuth: float) -> np.ndarray:
+            azimuth: float, reliable: np.ndarray | None = None) -> np.ndarray:
     """Projeta a pose 3D em coordenadas de tela, ajustando o enquadramento.
 
     Args:
         keypoints_3d: [K, 3] relativo à raiz.
         size: (largura, altura) da área de desenho.
         azimuth: ângulo de rotação em radianos.
+        reliable: [K] booleano. Keypoints falsos são projetados normalmente mas
+            ficam fora do cálculo do enquadramento — senão um membro inventado
+            estica a vista e encolhe o corpo real a nada.
 
     Returns:
         [K, 2] em pixels, com origem no canto superior esquerdo da área.
@@ -62,7 +65,8 @@ def project(keypoints_3d: np.ndarray, size: tuple[int, int],
     rotated = keypoints_3d @ _rotation(azimuth).T
     plane = rotated[:, :2]
 
-    lower, upper = plane.min(axis=0), plane.max(axis=0)
+    framed = plane if reliable is None or not reliable.any() else plane[reliable]
+    lower, upper = framed.min(axis=0), framed.max(axis=0)
     extent = np.maximum(upper - lower, 1e-6)
     usable = np.array([width, height], dtype=np.float64) * (1 - 2 * MARGIN_RATIO)
     scale = float(np.min(usable / extent))
@@ -76,9 +80,17 @@ def project(keypoints_3d: np.ndarray, size: tuple[int, int],
 
 def draw_pose_3d(canvas: np.ndarray, keypoints_3d: np.ndarray,
                  origin: tuple[int, int], size: tuple[int, int],
-                 azimuth: float) -> None:
-    """Desenha o esqueleto 3D dentro da região indicada de `canvas`."""
-    projected = project(keypoints_3d, size, azimuth) + np.array(origin)
+                 azimuth: float, reliable: np.ndarray | None = None) -> None:
+    """Desenha o esqueleto 3D dentro da região indicada de `canvas`.
+
+    `reliable` marca quais keypoints o estimador 2D de fato localizou. Os demais
+    não são desenhados, e essa omissão é o ponto: o lifting devolve uma posição
+    tridimensional para os 133 keypoints sempre, inclusive para os que nunca
+    apareceram na imagem. Da posição de retrovisor os tornozelos não aparecem em
+    nenhum quadro, e desenhá-los produz pernas inteiras plausíveis e inventadas
+    --- exatamente o tipo de figura que não pode aparecer numa demonstração.
+    """
+    projected = project(keypoints_3d, size, azimuth, reliable) + np.array(origin)
     points = projected.astype(np.int32)
 
     # A profundidade ordena o desenho: o que está atrás sai primeiro e é
@@ -89,5 +101,7 @@ def draw_pose_3d(canvas: np.ndarray, keypoints_3d: np.ndarray,
 
     for index in order:
         start, end, color = SKELETON_LINKS[index]
+        if reliable is not None and not (reliable[start] and reliable[end]):
+            continue
         cv2.line(canvas, tuple(points[start]), tuple(points[end]),
                  color, 1, cv2.LINE_AA)
