@@ -140,11 +140,12 @@ def main():
     print('=' * 72)
 
     runner = Runner.from_cfg(cfg)
-    _apply_lora_if_requested(cfg, args, runner)
+    resuming = _resolve_starting_point(runner)
+    _apply_lora_if_requested(cfg, args, runner, resuming)
     runner.train()
 
 
-def _apply_lora_if_requested(cfg, args, runner):
+def _apply_lora_if_requested(cfg, args, runner, resuming):
     """Carrega o checkpoint e injeta adaptadores de posto baixo, nesta ordem.
 
     A ordem é o ponto crítico. `Runner.from_cfg` constrói o modelo mas **não**
@@ -164,49 +165,28 @@ def _apply_lora_if_requested(cfg, args, runner):
 
     # O MMPose 1.3.2 não converte bfloat16 para NumPy ao medir acurácia.
     from src.models import bf16_compat  # noqa: F401
-    from mmengine.runner import find_latest_checkpoint
-
     from src.models.lora import (adapter_output_magnitude, freeze_except_lora,
                                  inject_lora, parameter_summary)
 
     model = runner.model
     device = next(model.parameters()).device
 
-    # Retomar e começar do zero exigem caminhos opostos, e o que decide não é a
-    # flag `--resume`: é existir ou não um checkpoint para retomar.
-    #
-    # Ao retomar de verdade, o checkpoint traz os pesos já adaptados, com os
-    # nomes que o LoRA introduz; carregar o checkpoint base antes seria inútil
-    # e, pior, `Runner.load_checkpoint` liga `_has_loaded`, o que faz o
-    # `load_or_resume` seguinte retornar sem fazer nada — o treino recomeçaria
-    # da época 1 em silêncio, como de fato aconteceu.
-    #
-    # Quando não há o que retomar, tratar `--resume` como retomada é pior ainda:
-    # `_load_from` é anulado, o MMEngine não encontra checkpoint algum, e como
-    # `init_weights` está neutralizado logo abaixo, **o treino parte de pesos
-    # aleatórios**. Aconteceu na primeira execução da Etapa 3: a perda começou
-    # em 0,23 contra 0,0035 do modelo carregado, e a acurácia em 0,02 contra
-    # 0,76. Nada levantou exceção. Daí a verificação explícita do work_dir.
-    resume_target = (find_latest_checkpoint(runner.work_dir)
-                     if getattr(runner, '_resume', False) else None)
-    resuming = bool(resume_target)
-
     if resuming:
-        runner._load_from = None  # o MMEngine acha sozinho o mais recente
+        # O checkpoint de retomada já traz os pesos adaptados, com os nomes que
+        # o LoRA introduz. Não há o que carregar antes da injeção.
+        pass
+    elif runner._load_from:
+        # `Runner.load_checkpoint` liga `_has_loaded`, o que faria o
+        # `load_or_resume` seguinte retornar sem fazer nada — daí anular
+        # `_load_from` logo abaixo.
+        runner.load_checkpoint(runner._load_from, map_location='cpu')
+        runner._load_from = None
     else:
-        # Sem nada a retomar, isto é um começo — e precisa ser declarado, senão
-        # o MMEngine tentaria "retomar" do checkpoint base, que não tem estado
-        # de otimizador nem adaptadores.
-        runner._resume = False
-        if runner._load_from:
-            runner.load_checkpoint(runner._load_from, map_location='cpu')
-            runner._load_from = None  # já carregado; evita recarga pós-injeção
-        else:
-            raise RuntimeError(
-                'Nada a retomar em ' + str(runner.work_dir) + ' e nenhum '
-                '`load_from` no config. Com os adaptadores injetados e '
-                '`init_weights` neutralizado, o treino partiria de pesos '
-                'aleatórios em silêncio.')
+        raise RuntimeError(
+            'Nada a retomar em ' + str(runner.work_dir) + ' e nenhum '
+            '`load_from` no config. Com os adaptadores injetados e '
+            '`init_weights` neutralizado, o treino partiria de pesos '
+            'aleatórios em silêncio.')
 
     reference = _weight_fingerprint(model)
 
@@ -237,9 +217,6 @@ def _apply_lora_if_requested(cfg, args, runner):
     runner.register_hook(_build_adapters_pristine_hook(skip=resuming))
 
     summary = parameter_summary(model)
-    origem = (f'retomando de {resume_target}' if resuming
-              else f'começando de {cfg.get("load_from")}')
-    print(f'  origem        {origem}')
     print(f'  checkpoint    carregado antes da injeção, pesos preservados '
           f'(norma {after:.4f})')
     print(f'  LoRA          posto {rank}, {sum(adapted.values())} camadas '
@@ -249,6 +226,46 @@ def _apply_lora_if_requested(cfg, args, runner):
     print(f'  parâmetros    {summary["trainable_M"]:.1f}M treináveis de '
           f'{summary["total_M"]:.1f}M ({summary["trainable_pct"]:.1f}%)')
     print('=' * 72)
+
+
+def _resolve_starting_point(runner) -> bool:
+    """Decide entre retomar e começar, e informa qual foi a escolha.
+
+    O que decide **não** é a flag `--resume`: é existir ou não um checkpoint no
+    work_dir. Tratá-la como verdade absoluta produz duas falhas silenciosas
+    opostas, ambas já observadas neste projeto.
+
+    Sem nada a retomar e com `load_from` apontando para um checkpoint de outro
+    treino, o MMEngine chama `resume()` sobre ele e **restaura o contador de
+    épocas de lá**. Um checkpoint de trinta épocas carregado num treino de
+    quinze faz o laço `while epoch < max_epochs` ser falso de saída: zero
+    épocas, nenhum erro, um work_dir com aparência de treino concluído.
+
+    E, no caminho do LoRA, anular `load_from` sem ter o que retomar deixa o
+    modelo com os pesos aleatórios da construção, porque `init_weights` está
+    neutralizado para preservar os adaptadores. A perda começou em 0,23 contra
+    0,0035 do modelo carregado, e a acurácia em 0,02 contra 0,76.
+
+    Returns:
+        `True` se o treino de fato retoma de um checkpoint do work_dir.
+    """
+    from mmengine.runner import find_latest_checkpoint
+
+    if not getattr(runner, '_resume', False):
+        print(f'  origem        começando de {runner._load_from}')
+        return False
+
+    latest = find_latest_checkpoint(runner.work_dir)
+    if latest:
+        runner._load_from = None  # o MMEngine acha sozinho o mais recente
+        print(f'  origem        retomando de {latest}')
+        return True
+
+    # Nada a retomar: isto é um começo, e `load_from` vale como carga de pesos,
+    # não como retomada de estado.
+    runner._resume = False
+    print(f'  origem        nada a retomar; começando de {runner._load_from}')
+    return False
 
 
 def _weights_already_loaded(*_args, **_kwargs):
