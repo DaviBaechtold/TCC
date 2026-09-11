@@ -261,25 +261,47 @@ def extract_frames(video_path: Path,
     return written
 
 
-def to_coco_keypoints(points_2d: np.ndarray,
-                      confidence: np.ndarray) -> tuple[list[float], int]:
-    """Monta o vetor de keypoints COCO-WholeBody de 133 entradas.
+# O COCO-WholeBody não guarda as 133 juntas num vetor só: ele as reparte em
+# cinco campos, e o leitor do MMPose concatena `keypoints + foot_kpts +
+# face_kpts + lefthand_kpts + righthand_kpts` nessa ordem. Emitir um vetor
+# único de 133 produz um arquivo que parece certo e que o leitor rejeita.
+WHOLEBODY_FIELD_SIZES = (
+    ('keypoints', 17),       # corpo
+    ('foot_kpts', 6),        # pés
+    ('face_kpts', 68),
+    ('lefthand_kpts', 21),
+    ('righthand_kpts', 21),
+)
 
-    Só as 23 primeiras posições (corpo e pés) recebem valor; face e mãos ficam
-    zeradas com visibilidade 0, porque o Drive&Act não as anota. Zerar em vez de
-    omitir é o que permite avaliar corpo e pés no protocolo COCO-WholeBody sem
-    que as regiões ausentes contem como erro.
+
+def to_coco_keypoints(points_2d: np.ndarray,
+                      confidence: np.ndarray) -> tuple[dict[str, list], int]:
+    """Monta os cinco campos de keypoints do COCO-WholeBody.
+
+    Só corpo e pés recebem valor; face e mãos ficam zeradas com visibilidade 0,
+    porque o Drive&Act não as anota. Zerar em vez de omitir é o que permite
+    avaliar corpo e pés no protocolo COCO-WholeBody sem que as regiões ausentes
+    contem como erro.
+
+    Returns:
+        Os campos prontos para a anotação, e a contagem de juntas visíveis.
     """
-    keypoints = [0.0] * (NUM_WHOLEBODY_KEYPOINTS * 3)
+    flat = [0.0] * (NUM_WHOLEBODY_KEYPOINTS * 3)
     num_visible = 0
 
     for index, (point, score) in enumerate(zip(points_2d, confidence)):
         if score <= 0:
             continue
         offset = index * 3
-        keypoints[offset] = float(point[0])
-        keypoints[offset + 1] = float(point[1])
-        keypoints[offset + 2] = 2  # 2 = anotado e visível, convenção do COCO
+        flat[offset] = float(point[0])
+        flat[offset + 1] = float(point[1])
+        flat[offset + 2] = 2  # 2 = anotado e visível, convenção do COCO
         num_visible += 1
 
-    return keypoints, num_visible
+    fields = {}
+    start = 0
+    for name, size in WHOLEBODY_FIELD_SIZES:
+        fields[name] = flat[start * 3:(start + size) * 3]
+        start += size
+
+    return fields, num_visible

@@ -154,7 +154,7 @@ def main():
             if filename is None:
                 continue  # o vídeo acabou antes deste frame
 
-            keypoints, num_visible = to_coco_keypoints(points_2d, confidence)
+            keypoint_fields, num_visible = to_coco_keypoints(points_2d, confidence)
             x, y, w, h = bounding_box_from_keypoints(
                 points_2d, confidence > 0, calibration.image_size)
             if w <= 0 or h <= 0:
@@ -172,7 +172,10 @@ def main():
                 'id': next_annotation_id, 'image_id': next_image_id,
                 'category_id': 1, 'iscrowd': 0,
                 'bbox': [x, y, w, h], 'area': w * h,
-                'num_keypoints': num_visible, 'keypoints': keypoints,
+                # O leitor do MMPose acessa `segmentation` sem verificar
+                # presença; ausente, a leitura falha com KeyError.
+                'segmentation': [],
+                'num_keypoints': num_visible, **keypoint_fields,
             })
             activity_counts[activity] += 1
             next_image_id += 1
