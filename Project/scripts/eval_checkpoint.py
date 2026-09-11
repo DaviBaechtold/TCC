@@ -67,7 +67,7 @@ def main():
     cfg.work_dir = os.path.join(args.out_dir, args.tag)
     Path(cfg.work_dir).mkdir(parents=True, exist_ok=True)
 
-    cfg.load_from = _merged_if_lora(args.ckpt, cfg.work_dir)
+    cfg.load_from = _merged_if_lora(args.ckpt)
 
     runner = Runner.from_cfg(cfg)
     metrics = runner.test()
@@ -89,7 +89,7 @@ def main():
     print(f'\nSalvo em: {out}')
 
 
-def _merged_if_lora(checkpoint: str, work_dir: str) -> str:
+def _merged_if_lora(checkpoint: str) -> str:
     """Funde adaptadores, se houver, e devolve o caminho a carregar.
 
     Um checkpoint treinado com LoRA tem nomes de camada diferentes dos do
@@ -108,7 +108,10 @@ def _merged_if_lora(checkpoint: str, work_dir: str) -> str:
     if not has_lora_adapters(state_dict):
         return checkpoint
 
-    merged_path = Path(work_dir) / f'{Path(checkpoint).stem}_merged.pth'
+    # Ao lado do checkpoint de origem, e não em results/, que é versionado:
+    # um modelo fundido tem centenas de megabytes e não é evidência de medição.
+    source = Path(checkpoint)
+    merged_path = source.with_name(f'{source.stem}_merged.pth')
     torch.save({'state_dict': merge_lora_state_dict(state_dict),
                 'meta': loaded.get('meta', {})}, merged_path)
     print(f'  checkpoint com LoRA detectado; fundido em {merged_path}')
