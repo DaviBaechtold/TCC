@@ -65,6 +65,12 @@ class PanelState:
     # do SimCC não é probabilidade e não tem teto em 1, de modo que um número
     # como "17/17 detectados" não significa nada sem o limiar ao lado.
     score_threshold: float = 0.0
+    keypoints_3d: np.ndarray | None = None
+    # Ângulo da vista 3D, girado continuamente para dar noção de volume: numa
+    # projeção ortográfica estática a pose é ambígua em profundidade.
+    azimuth: float = 0.0
+    lifting_warming_up: bool = False
+    calibrated: bool = False
     frame_index: int = 0
     paused: bool = False
     message: str = ''
@@ -150,7 +156,7 @@ class ValidationPanel:
                  BORDER, 1)
 
         self._draw_video(canvas, state)
-        self._draw_3d_placeholder(canvas)
+        self._draw_3d(canvas, state)
         self._draw_region_metrics(canvas, state)
         self._draw_performance(canvas, state)
         self._draw_buttons(canvas)
@@ -167,17 +173,29 @@ class ValidationPanel:
         offset_x, offset_y = x + (w - fw) // 2, y + (h - fh) // 2
         canvas[offset_y:offset_y + fh, offset_x:offset_x + fw] = fitted
 
-    def _draw_3d_placeholder(self, canvas):
+    def _draw_3d(self, canvas, state):
         x, y, w, h = _panel(canvas, self.rect_3d, 'Visualizacao 3D')
-        center_y = y + h // 2
-        _put(canvas, 'Modulo 3 treinado, ainda nao ligado ao painel',
-             (x + 10, center_y - 22), 0.5, WARNING)
-        _put(canvas, 'Lifting mede 38.96mm de MPJPE full-body no H3WB.',
-             (x + 10, center_y), 0.44, TEXT_MUTED)
-        _put(canvas, 'Falta o buffer temporal de 16 frames ao vivo; ate la',
-             (x + 10, center_y + 20), 0.44, TEXT_MUTED)
-        _put(canvas, 'este painel fica vazio em vez de exibir pose simulada.',
-             (x + 10, center_y + 40), 0.44, TEXT_MUTED)
+
+        if state.keypoints_3d is None:
+            center_y = y + h // 2
+            _put(canvas, 'Sem pose 3D neste quadro',
+                 (x + 10, center_y - 12), 0.5, WARNING)
+            _put(canvas, 'Nenhuma pessoa detectada, ou o lifting esta desligado.',
+                 (x + 10, center_y + 10), 0.44, TEXT_MUTED)
+            return
+
+        from src.visualization.skeleton3d import draw_pose_3d
+
+        draw_pose_3d(canvas, state.keypoints_3d, (x, y), (w, h), state.azimuth)
+
+        # A escala só é métrica quando a câmera está calibrada: sem o fator de
+        # geometria o erro cresce 68%, então exibir metros seria enganoso.
+        rodape = ('Escala metrica (camera calibrada)' if state.calibrated
+                  else 'Forma correta, escala aproximada: camera sem calibracao')
+        _put(canvas, rodape, (x + 6, y + h - 6), 0.4, TEXT_MUTED)
+        if state.lifting_warming_up:
+            _put(canvas, 'Buffer temporal enchendo', (x + 6, y + 18), 0.42,
+                 WARNING)
 
     def _draw_region_metrics(self, canvas, state):
         x, y, w, h = _panel(canvas, self.rect_metrics_2d,
@@ -240,7 +258,7 @@ class ValidationPanel:
             _put(canvas, value, (x + w - 96, row_y), 0.44, TEXT_PRIMARY)
             row_y += 22
 
-        _put(canvas, 'MPJPE/PA-MPJPE: exigem o Modulo 3 ligado ao painel.',
+        _put(canvas, 'MPJPE/PA-MPJPE exigem ground truth 3D: nao ha ao vivo.',
              (x + 6, y + h - 6), 0.4, TEXT_MUTED)
 
     def _draw_buttons(self, canvas):

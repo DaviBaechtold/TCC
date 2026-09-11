@@ -9,6 +9,12 @@ Sem argumentos, usa o modelo corrente do projeto com a webcam padrão:
     python scripts/run_panel.py
 
 Os demais argumentos servem para comparar modelos ou reproduzir um vídeo.
+`--lift-ckpt ""` desliga o painel 3D, o que é útil para isolar o custo do
+Módulo 3 ao medir a taxa de quadros.
+
+**Não rode com um treino em andamento.** A disputa pela GPU derruba a taxa para
+cerca de um terço da real: medidos 63ms por quadro sob contenção contra 20ms com
+a GPU livre, e o número exibido no painel induziria a erro numa demonstração.
 
 Teclas: espaço pausa, r grava, s salva frame, k alterna esqueleto, q sai.
 """
@@ -58,6 +64,13 @@ DETECTOR_CHECKPOINT = ('checkpoints/rtmdet_nano_8xb32-100e_coco-obj365-person-'
 # parte da resposta espúria sem perder os keypoints de fato localizados.
 DEFAULT_SCORE_THRESHOLD = 3.0
 
+LIFT_CONFIG = 'configs/lift3d_dstformer_h3wb_16frm.py'
+LIFT_CHECKPOINT = 'work_dirs/lift3d_dstformer_h3wb/best_MPJPE_whole_epoch_30.pth'
+
+# Uma volta completa a cada ~12 segundos a 30 FPS. Mais rápido cansa a leitura,
+# mais lento não chega a revelar a profundidade.
+AZIMUTH_STEP_RADIANS = 0.0175
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__,
@@ -70,6 +83,10 @@ def parse_args():
                         help='Config do detector; vazio dispensa o estágio')
     parser.add_argument('--det-ckpt', default=DETECTOR_CHECKPOINT,
                         help='Checkpoint do detector')
+    parser.add_argument('--lift-cfg', default=LIFT_CONFIG,
+                        help='Config do lifting 2D para 3D')
+    parser.add_argument('--lift-ckpt', default=LIFT_CHECKPOINT,
+                        help='Checkpoint do lifting; vazio desliga o painel 3D')
     parser.add_argument('--source', default='0', help='Índice de câmera ou caminho de vídeo')
     parser.add_argument('--device', default='cuda:0')
     parser.add_argument('--score-thr', type=float, default=DEFAULT_SCORE_THRESHOLD,
@@ -155,6 +172,14 @@ def main():
     else:
         print('Sem detector: o frame inteiro e usado como regiao de interesse.')
 
+    lifter = None
+    if args.lift_ckpt:
+        print('Carregando lifting 3D...')
+        from src.models.sequence_lifter import SequenceLifter
+        lifter = SequenceLifter(args.lift_cfg, args.lift_ckpt, args.device)
+    else:
+        print('Sem lifting: o painel 3D fica vazio.')
+
     print('Carregando estimador de pose...')
     pipeline = FullBodyPosePipeline(_config_without_flip_test(args.cfg, args.out_dir),
                                     args.ckpt, args.device, detector)
@@ -207,6 +232,24 @@ def main():
                     state.region_counts = result.region_counts(args.score_thr)
                     state.fps = len(frame_times) / sum(frame_times) if frame_times else 0.0
                     state.frame_index += 1
+
+                    if lifter is not None and result.num_people:
+                        height, width = frame.shape[:2]
+                        state.keypoints_3d = lifter(result.keypoints[0],
+                                                    result.scores[0],
+                                                    (width, height))
+                        state.lifting_warming_up = lifter.warming_up
+                    else:
+                        state.keypoints_3d = None
+                        if lifter is not None:
+                            # Sem pessoa o buffer perderia continuidade
+                            # temporal; recomeçar é melhor que misturar
+                            # trechos separados por uma lacuna.
+                            lifter.reset()
+
+                    # Gira a vista continuamente: numa projeção ortográfica
+                    # estática a profundidade é ambígua a olho nu.
+                    state.azimuth += AZIMUTH_STEP_RADIANS
 
                     if writer is not None:
                         writer.write(frame)
