@@ -172,25 +172,49 @@ def _apply_lora_if_requested(cfg, args, runner):
 
     # O MMPose 1.3.2 não converte bfloat16 para NumPy ao medir acurácia.
     from src.models import bf16_compat  # noqa: F401
+    from mmengine.runner import find_latest_checkpoint
+
     from src.models.lora import (adapter_output_magnitude, freeze_except_lora,
                                  inject_lora, parameter_summary)
 
     model = runner.model
     device = next(model.parameters()).device
 
-    # Retomar e começar do zero exigem caminhos opostos.
+    # Retomar e começar do zero exigem caminhos opostos, e o que decide não é a
+    # flag `--resume`: é existir ou não um checkpoint para retomar.
     #
-    # Ao retomar, o checkpoint de retomada já traz os pesos adaptados, com os
-    # nomes que o LoRA introduz; carregar o checkpoint base antes seria inútil e,
-    # pior, `Runner.load_checkpoint` liga `_has_loaded`, o que faz o
+    # Ao retomar de verdade, o checkpoint traz os pesos já adaptados, com os
+    # nomes que o LoRA introduz; carregar o checkpoint base antes seria inútil
+    # e, pior, `Runner.load_checkpoint` liga `_has_loaded`, o que faz o
     # `load_or_resume` seguinte retornar sem fazer nada — o treino recomeçaria
-    # da época 1 em silêncio, como de fato aconteceu. Anular `_load_from` leva o
-    # MMEngine a procurar o checkpoint mais recente do work_dir.
-    if getattr(runner, '_resume', False):
-        runner._load_from = None
-    elif runner._load_from:
-        runner.load_checkpoint(runner._load_from, map_location='cpu')
-        runner._load_from = None  # já carregado; evita recarga pós-injeção
+    # da época 1 em silêncio, como de fato aconteceu.
+    #
+    # Quando não há o que retomar, tratar `--resume` como retomada é pior ainda:
+    # `_load_from` é anulado, o MMEngine não encontra checkpoint algum, e como
+    # `init_weights` está neutralizado logo abaixo, **o treino parte de pesos
+    # aleatórios**. Aconteceu na primeira execução da Etapa 3: a perda começou
+    # em 0,23 contra 0,0035 do modelo carregado, e a acurácia em 0,02 contra
+    # 0,76. Nada levantou exceção. Daí a verificação explícita do work_dir.
+    resume_target = (find_latest_checkpoint(runner.work_dir)
+                     if getattr(runner, '_resume', False) else None)
+    resuming = bool(resume_target)
+
+    if resuming:
+        runner._load_from = None  # o MMEngine acha sozinho o mais recente
+    else:
+        # Sem nada a retomar, isto é um começo — e precisa ser declarado, senão
+        # o MMEngine tentaria "retomar" do checkpoint base, que não tem estado
+        # de otimizador nem adaptadores.
+        runner._resume = False
+        if runner._load_from:
+            runner.load_checkpoint(runner._load_from, map_location='cpu')
+            runner._load_from = None  # já carregado; evita recarga pós-injeção
+        else:
+            raise RuntimeError(
+                'Nada a retomar em ' + str(runner.work_dir) + ' e nenhum '
+                '`load_from` no config. Com os adaptadores injetados e '
+                '`init_weights` neutralizado, o treino partiria de pesos '
+                'aleatórios em silêncio.')
 
     reference = _weight_fingerprint(model)
 
@@ -216,9 +240,14 @@ def _apply_lora_if_requested(cfg, args, runner):
     # inicializado, a chamada é neutralizada em vez de tolerada.
     model.init_weights = _weights_already_loaded
 
-    runner.register_hook(_build_adapters_pristine_hook(skip=args.resume))
+    # A verificação de integridade só não se aplica a uma retomada real: aí os
+    # adaptadores já foram treinados e não têm por que estar em zero.
+    runner.register_hook(_build_adapters_pristine_hook(skip=resuming))
 
     summary = parameter_summary(model)
+    origem = (f'retomando de {resume_target}' if resuming
+              else f'começando de {cfg.get("load_from")}')
+    print(f'  origem        {origem}')
     print(f'  checkpoint    carregado antes da injeção, pesos preservados '
           f'(norma {after:.4f})')
     print(f'  LoRA          posto {rank}, {sum(adapted.values())} camadas '

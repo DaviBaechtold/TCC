@@ -49,12 +49,28 @@ val_dataloader = dict(
 
 test_dataloader = val_dataloader
 
-# O AP reportado é, na prática, o dos keypoints observáveis: a OKS do COCO
-# ignora keypoints com visibilidade 0 no ground truth, de modo que face, mãos e
-# as juntas fora do campo de visão não entram na conta. As métricas por região
-# de face e mãos que esta classe também emite são degeneradas aqui e devem ser
-# ignoradas — não há o que medir nelas.
-val_evaluator = dict(ann_file=data_root + f'driveact_{split}.val.json')
+custom_imports = dict(
+    imports=[
+        'mmpose.models.backbones.cspnext',
+        'mmpose.models.necks.cspnext_pafpn',
+        'mmpose.models.heads.coord_cls_heads.rtmw_head',
+        'mmpose.datasets',
+        'mmpose.evaluation',
+        'src.evaluation.normalized_keypoint_error',
+    ],
+    allow_failed_imports=True)
+
+# O AP é mantido por comparabilidade com a literatura, mas **não** serve de
+# critério aqui: ele satura neste dataset e chega a inverter qual modelo é
+# melhor. Medido sobre estas mesmas 20.288 instâncias, o modelo sem adaptação
+# alguma marca 0,9351 e o adaptado 0,9330, enquanto o erro em pixels vai de
+# 16,17 para 15,04 — as duas métricas discordam quanto ao sinal. Ver
+# src/evaluation/normalized_keypoint_error.py para as três causas da saturação.
+val_evaluator = [
+    dict(type='CocoWholeBodyMetric',
+         ann_file=data_root + f'driveact_{split}.val.json'),
+    dict(type='TorsoNormalizedError'),
+]
 test_evaluator = val_evaluator
 
 optim_wrapper = dict(optimizer=dict(lr=base_lr))
@@ -72,3 +88,13 @@ param_scheduler = [
 ]
 
 work_dir = 'work_dirs/rtmw_x_driveact_ft'
+
+# Selecionar o melhor checkpoint pelo AP escolheria pelo ruído da métrica
+# saturada. O erro médio em pixels é o critério, e menor é melhor.
+default_hooks = dict(
+    checkpoint=dict(
+        type='CheckpointHook',
+        interval=1,
+        save_best='torso/px_mean',
+        rule='less',
+        max_keep_ckpts=2))
