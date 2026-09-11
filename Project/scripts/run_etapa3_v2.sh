@@ -8,10 +8,28 @@ set -u
 cd "$(dirname "$0")/.."
 source venv/bin/activate
 LOGS=work_dirs/logs; mkdir -p "$LOGS"
+
+# Registra que esta fila está em execução, para que
+# scripts/retomar_apos_reboot.sh saiba o que retomar se a máquina cair.
+echo "run_etapa3_v2.sh" > "$LOGS/fila_pendente"
+trap 'rm -f "$LOGS/fila_pendente"' EXIT
 agora() { date '+%H:%M:%S'; }
 
-while pgrep -f "run_modulo3_v2.sh" > /dev/null \
-   || pgrep -f "lift3d_dstformer_h3wb_robusto" > /dev/null; do sleep 60; done
+# Espera a GPU esvaziar em vez de procurar o processo pelo nome.
+#
+# `pgrep -f <padrão>` casa com qualquer linha de comando que contenha o padrão,
+# **inclusive a do shell que escreveu este arquivo**: o heredoc que o criou tem
+# o padrão dentro dele. A fila ficou 2h10 esperando o próprio criador terminar,
+# que é algo que não acontece enquanto ela roda. Já tinha mordido antes com
+# `pkill -f`, matando o shell que emitia o comando.
+#
+# A memória da GPU não mente e não se auto-referencia.
+ocupada() {
+    local usada
+    usada=$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits)
+    [ "${usada:-0}" -gt 1500 ]
+}
+while ocupada; do sleep 60; done
 echo "[$(agora)] GPU livre; treinando a Etapa 3 v2"
 
 for tentativa in 1 2 3; do

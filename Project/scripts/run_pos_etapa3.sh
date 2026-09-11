@@ -10,6 +10,11 @@ source venv/bin/activate
 
 LOGS=work_dirs/logs
 mkdir -p "$LOGS"
+
+# Registra que esta fila está em execução, para que
+# scripts/retomar_apos_reboot.sh saiba o que retomar se a máquina cair.
+echo "run_pos_etapa3.sh" > "$LOGS/fila_pendente"
+trap 'rm -f "$LOGS/fila_pendente"' EXIT
 agora() { date '+%H:%M:%S'; }
 IMAGEM=data/raw/val2017/000000000139.jpg
 
