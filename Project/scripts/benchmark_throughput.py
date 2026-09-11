@@ -30,7 +30,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 DETECTOR_CONFIG = 'configs/detectors/rtmdet_nano_person_infer.py'
 DETECTOR_CHECKPOINT = ('checkpoints/rtmdet_nano_8xb32-100e_coco-obj365-person-'
                        '05d8511e.pth')
-DETECTOR_SCORE_THRESHOLD = 0.3
 
 
 def parse_args():
@@ -69,7 +68,8 @@ def main():
 
     from src.evaluation.throughput import (describe_device, measure,
                                            synthetic_frame)
-    from src.models.pose_pipeline import FullBodyPosePipeline, PersonDetector
+    from src.models.pose_pipeline import (DEFAULT_DETECTOR_SCORE,
+                                      FullBodyPosePipeline, PersonDetector)
 
     if args.detector and not args.image:
         raise SystemExit('--detector exige --image com um frame real')
@@ -86,7 +86,7 @@ def main():
     cfg.dump(patched)
 
     detector = (PersonDetector(DETECTOR_CONFIG, DETECTOR_CHECKPOINT,
-                               args.device, DETECTOR_SCORE_THRESHOLD)
+                               args.device, DEFAULT_DETECTOR_SCORE)
                 if args.detector else None)
     pipeline = FullBodyPosePipeline(patched, args.ckpt, device=args.device,
                                     detector=detector)

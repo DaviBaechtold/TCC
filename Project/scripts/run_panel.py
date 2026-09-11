@@ -32,7 +32,8 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.models.observability import reliable_keypoints
-from src.models.pose_pipeline import FullBodyPosePipeline, PersonDetector
+from src.models.pose_pipeline import (DEFAULT_DETECTOR_SCORE,
+                                      FullBodyPosePipeline, PersonDetector)
 from src.visualization.panel import PanelState, ValidationPanel
 from src.visualization.skeleton import draw_box, draw_pose
 
@@ -94,11 +95,10 @@ def parse_args():
                         help='Resposta mínima para contar um keypoint como '
                              'detectado. Não é probabilidade: a saída do SimCC '
                              'não tem teto em 1'),
-    parser.add_argument('--bbox-thr', type=float, default=0.3,
-                        help='Confiança mínima do detector de pessoas. Medido '
-                             'em 40 imagens do COCO val: em 0.3 o detector '
-                             'produz 84 caixas para 73 pessoas anotadas, '
-                             'enquanto em 0.5 recupera apenas 60%% delas')
+    parser.add_argument('--bbox-thr', type=float,
+                        default=DEFAULT_DETECTOR_SCORE,
+                        help='Confiança mínima do detector de pessoas; '
+                             'calibrada por medição em src/models/pose_pipeline.py')
     parser.add_argument('--cam-width', type=int, default=1280)
     parser.add_argument('--cam-height', type=int, default=720)
     parser.add_argument('--color', action='store_true',

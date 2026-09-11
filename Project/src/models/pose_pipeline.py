@@ -77,6 +77,12 @@ class PoseResult:
         return counts
 
 
+# Calibrado por medição, não arbitrado: em 40 imagens do COCO val com 73 pessoas
+# anotadas, 0,3 recupera todas com 84 caixas propostas, enquanto 0,5 recupera
+# 60%. O excesso de caixas o estágio seguinte tolera; a omissão é irrecuperável.
+DEFAULT_DETECTOR_SCORE = 0.3
+
+
 class PersonDetector:
     """Estágio 1: localiza pessoas no frame.
 

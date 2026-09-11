@@ -37,10 +37,6 @@ from src.models.observability import MIRROR_VIEW_OBSERVABLE as OBSERVABLE_KEYPOI
 
 ROOT_KEYPOINT = 0
 
-# Resposta média do estimador 2D nos keypoints observáveis do Drive&Act, medida
-# sobre 150 quadros. Serve de escala para levar a resposta bruta ao intervalo
-# que o treino do lifting viu.
-OBSERVABLE_RESPONSE = 8.30
 
 
 def parse_args():
@@ -109,7 +105,8 @@ def main():
     from src.models import torch_compat  # noqa: F401
     from src.data.driveact import read_pose_csv
     from src.models.pose_pipeline import FullBodyPosePipeline
-    from src.models.sequence_lifter import SequenceLifter
+    from src.models.sequence_lifter import (OBSERVED_RESPONSE,
+                                            SequenceLifter)
 
     import importlib.util
     spec = importlib.util.spec_from_file_location(
@@ -160,7 +157,7 @@ def main():
             if args.confidence == 'constante':
                 scores = np.ones_like(scores)
             elif args.confidence == 'normalizada':
-                scores = np.clip(scores / OBSERVABLE_RESPONSE, 0.0, 1.0)
+                scores = np.clip(scores / OBSERVED_RESPONSE, 0.0, 1.0)
             predicted = lifter(result.keypoints[0], scores, (width, height))
             if lifter.warming_up or image['frame_id'] not in reference:
                 continue

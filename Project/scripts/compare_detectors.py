@@ -47,15 +47,10 @@ YOLO_CHECKPOINTS = {
     'YOLOv12n': 'checkpoints/yolo12n.pt',
     'YOLOv26n-pose': 'checkpoints/yolo26n-pose.pt',
 }
-DETECTOR_SCORE_THRESHOLD = 0.3
-
-LEFT_SHOULDER, RIGHT_SHOULDER = 5, 6
-LEFT_HIP, RIGHT_HIP = 11, 12
 
 # Sem detecção, o erro é indefinido. Contabilizar como zero premiaria a falha;
 # contabilizar como infinito tornaria a média inútil. A taxa de quadros sem
 # detecção é reportada à parte, que é a informação honesta.
-MIN_TORSO_PIXELS = 1.0
 
 
 def parse_args():
@@ -74,25 +69,16 @@ def parse_args():
     return p.parse_args()
 
 
-def torso_length(keypoints: np.ndarray, visible: np.ndarray) -> float | None:
-    """Distância entre o centro dos ombros e o centro dos quadris, em pixels."""
-    shoulders = [k for k in (LEFT_SHOULDER, RIGHT_SHOULDER) if visible[k]]
-    hips = [k for k in (LEFT_HIP, RIGHT_HIP) if visible[k]]
-    if not shoulders or not hips:
-        return None
-    length = float(np.linalg.norm(
-        keypoints[shoulders].mean(axis=0) - keypoints[hips].mean(axis=0)))
-    return length if length >= MIN_TORSO_PIXELS else None
-
-
 def main():
     args = parse_args()
 
     import cv2
     import torch
 
+    from src.evaluation.normalized_keypoint_error import torso_length
     from src.models import torch_compat  # noqa: F401
-    from src.models.pose_pipeline import FullBodyPosePipeline, PersonDetector
+    from src.models.pose_pipeline import (DEFAULT_DETECTOR_SCORE,
+                                      FullBodyPosePipeline, PersonDetector)
     from src.models.yolo_detector import YoloPersonDetector
 
     import importlib.util
@@ -114,13 +100,13 @@ def main():
         'caixa de ground truth': 'gt',
         'RTMDet-nano': PersonDetector(panel.DETECTOR_CONFIG,
                                       panel.DETECTOR_CHECKPOINT, args.device,
-                                      DETECTOR_SCORE_THRESHOLD),
+                                      DEFAULT_DETECTOR_SCORE),
         'sem detector': None,
     }
     for label, checkpoint in YOLO_CHECKPOINTS.items():
         if Path(checkpoint).exists():
             configurations[label] = YoloPersonDetector(
-                checkpoint, args.device, DETECTOR_SCORE_THRESHOLD)
+                checkpoint, args.device, DEFAULT_DETECTOR_SCORE)
 
     report = {}
     for label, detector in configurations.items():

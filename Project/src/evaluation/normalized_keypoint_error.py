@@ -61,7 +61,7 @@ class TorsoNormalizedError(BaseMetric):
             target = np.asarray(ground_truth['keypoints'])
             visible = np.asarray(ground_truth['keypoints_visible']) > 0
 
-            torso = _torso_length(target[0], visible[0])
+            torso = torso_length(target[0], visible[0])
             if torso is None:
                 continue  # sem tronco não há normalizador; a amostra é omitida
 
@@ -96,7 +96,7 @@ class TorsoNormalizedError(BaseMetric):
         return metrics
 
 
-def _torso_length(keypoints: np.ndarray, visible: np.ndarray) -> float | None:
+def torso_length(keypoints: np.ndarray, visible: np.ndarray) -> float | None:
     """Distância entre o centro dos ombros e o centro dos quadris, em pixels."""
     shoulders = (LEFT_SHOULDER, RIGHT_SHOULDER)
     hips = (LEFT_HIP, RIGHT_HIP)
