@@ -57,6 +57,10 @@ def parse_args():
                         'lifting, e uma sequência inteira do Drive&Act tem '
                         'milhares — sem teto a medição leva mais tempo que o '
                         'treino que ela deveria avaliar')
+    p.add_argument('--pose-ckpt', default=None,
+                   help='Estimador 2D a usar. O padrão é o modelo corrente do '
+                        'painel; passar outro permite medir quanto a adaptação '
+                        'do Módulo 2 melhora o 3D que depende dela')
     p.add_argument('--device', default='cuda:0')
     p.add_argument('--out', type=Path,
                    default=Path('results/lifting_driveact.json'))
@@ -110,7 +114,7 @@ def main():
     work_dir.mkdir(parents=True, exist_ok=True)
     pose = FullBodyPosePipeline(
         panel._config_without_flip_test(panel.POSE_CONFIG, work_dir),
-        panel.POSE_CHECKPOINT, args.device, detector=None)
+        args.pose_ckpt or panel.POSE_CHECKPOINT, args.device, detector=None)
     lifter = SequenceLifter(panel.LIFT_CONFIG, panel.LIFT_CHECKPOINT,
                             args.device)
 
@@ -167,6 +171,7 @@ def main():
         'keypoints': list(OBSERVABLE_KEYPOINTS),
         'alignment': 'procrustes',
         'reference': 'Drive&Act OpenPose 3D (triangulação, não marcadores)',
+        'pose_checkpoint': Path(args.pose_ckpt or panel.POSE_CHECKPOINT).name,
     }
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(report, indent=2, ensure_ascii=False))
