@@ -60,6 +60,11 @@ class PanelState:
     latency_ms: dict[str, float] = field(default_factory=dict)
     num_people: int = 0
     source_label: str = ''
+    # Limiar de resposta usado para contar um keypoint como detectado. Fica no
+    # estado, e não numa constante, porque o painel precisa exibi-lo: a pontuação
+    # do SimCC não é probabilidade e não tem teto em 1, de modo que um número
+    # como "17/17 detectados" não significa nada sem o limiar ao lado.
+    score_threshold: float = 0.0
     frame_index: int = 0
     paused: bool = False
     message: str = ''
@@ -165,12 +170,14 @@ class ValidationPanel:
     def _draw_3d_placeholder(self, canvas):
         x, y, w, h = _panel(canvas, self.rect_3d, 'Visualizacao 3D')
         center_y = y + h // 2
-        _put(canvas, 'Modulo 3 (lifting 2D->3D) nao implementado',
-             (x + 10, center_y - 14), 0.5, WARNING)
-        _put(canvas, 'Requer treino em Human3.6M. Ate la este painel',
-             (x + 10, center_y + 8), 0.44, TEXT_MUTED)
-        _put(canvas, 'permanece vazio em vez de exibir pose simulada.',
-             (x + 10, center_y + 28), 0.44, TEXT_MUTED)
+        _put(canvas, 'Modulo 3 treinado, ainda nao ligado ao painel',
+             (x + 10, center_y - 22), 0.5, WARNING)
+        _put(canvas, 'Lifting mede 38.96mm de MPJPE full-body no H3WB.',
+             (x + 10, center_y), 0.44, TEXT_MUTED)
+        _put(canvas, 'Falta o buffer temporal de 16 frames ao vivo; ate la',
+             (x + 10, center_y + 20), 0.44, TEXT_MUTED)
+        _put(canvas, 'este painel fica vazio em vez de exibir pose simulada.',
+             (x + 10, center_y + 40), 0.44, TEXT_MUTED)
 
     def _draw_region_metrics(self, canvas, state):
         x, y, w, h = _panel(canvas, self.rect_metrics_2d,
@@ -206,7 +213,7 @@ class ValidationPanel:
 
         # A ausência de AP aqui é deliberada e precisa ficar explícita: AP exige
         # ground truth, que não existe numa captura ao vivo.
-        _put(canvas, 'AP/AR exigem ground truth: indisponivel ao vivo.',
+        _put(canvas, f'Resposta SimCC, nao probabilidade. Limiar {state.score_threshold:.1f}.',
              (x + 6, y + h - 6), 0.4, TEXT_MUTED)
 
     def _draw_performance(self, canvas, state):
@@ -233,7 +240,7 @@ class ValidationPanel:
             _put(canvas, value, (x + w - 96, row_y), 0.44, TEXT_PRIMARY)
             row_y += 22
 
-        _put(canvas, 'MPJPE/PA-MPJPE: dependem do Modulo 3.',
+        _put(canvas, 'MPJPE/PA-MPJPE: exigem o Modulo 3 ligado ao painel.',
              (x + 6, y + h - 6), 0.4, TEXT_MUTED)
 
     def _draw_buttons(self, canvas):

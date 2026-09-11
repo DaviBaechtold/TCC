@@ -4,13 +4,11 @@
 Controller: lê argumentos, liga câmera, pipeline e painel, e trata a entrada do
 usuário. Nenhuma regra de estimação ou de desenho vive aqui.
 
-Exemplo:
-    python scripts/run_panel.py \\
-        --cfg work_dirs/ft_smoke/rtmpose_m_wholebody_gray_ft.py \\
-        --ckpt work_dirs/ft_smoke/best_coco-wholebody_AP_epoch_10.pth \\
-        --det-cfg configs/detectors/rtmdet_nano_person_infer.py \\
-        --det-ckpt checkpoints/rtmdet_nano_8xb32-100e_coco-obj365-person-05d8511e.pth \\
-        --source 0
+Sem argumentos, usa o modelo corrente do projeto com a webcam padrão:
+
+    python scripts/run_panel.py
+
+Os demais argumentos servem para comparar modelos ou reproduzir um vídeo.
 
 Teclas: espaço pausa, r grava, s salva frame, k alterna esqueleto, q sai.
 """
@@ -39,23 +37,50 @@ FPS_WINDOW = 30
 
 MESSAGE_DURATION_S = 2.5
 
+# Modelo corrente do projeto. Manter aqui, e não no exemplo da docstring, é o
+# que evita que a demonstração rode com um checkpoint antigo porque alguém
+# copiou a linha de comando errada — já apontava para o treino descartado do
+# RTMPose-m, que mede 0,51 de AP contra 0,69 deste.
+POSE_CONFIG = 'configs/eval/rtmw_x_wholebody_eval.py'
+POSE_CHECKPOINT = ('work_dirs/rtmw_x_gray_lora/'
+                   'best_coco-wholebody_AP_epoch_5_merged.pth')
+DETECTOR_CONFIG = 'configs/detectors/rtmdet_nano_person_infer.py'
+DETECTOR_CHECKPOINT = ('checkpoints/rtmdet_nano_8xb32-100e_coco-obj365-person-'
+                       '05d8511e.pth')
+
+# A pontuação do SimCC é a magnitude do máximo do mapa de resposta, **não** uma
+# probabilidade: ela não tem teto em 1. O padrão anterior, 0,3, estava abaixo de
+# qualquer valor observado, e o painel mostrava "133 de 133 keypoints
+# detectados" apontado para um quarto vazio. Medido sobre 40 imagens do COCO com
+# pessoa, a mediana é 2,83 e o percentil 90 é 9,16; num frame sem pessoa a
+# mediana cai para 2,28 e o percentil 90 para 3,46. As distribuições se
+# sobrepõem, então nenhum limiar separa perfeitamente, mas 3,0 descarta a maior
+# parte da resposta espúria sem perder os keypoints de fato localizados.
+DEFAULT_SCORE_THRESHOLD = 3.0
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('--cfg', required=True, help='Config do estimador de pose')
-    parser.add_argument('--ckpt', required=True, help='Checkpoint do estimador')
-    parser.add_argument('--det-cfg', default='', help='Config do detector (opcional)')
-    parser.add_argument('--det-ckpt', default='', help='Checkpoint do detector')
+    parser.add_argument('--cfg', default=POSE_CONFIG,
+                        help='Config do estimador de pose')
+    parser.add_argument('--ckpt', default=POSE_CHECKPOINT,
+                        help='Checkpoint do estimador')
+    parser.add_argument('--det-cfg', default=DETECTOR_CONFIG,
+                        help='Config do detector; vazio dispensa o estágio')
+    parser.add_argument('--det-ckpt', default=DETECTOR_CHECKPOINT,
+                        help='Checkpoint do detector')
     parser.add_argument('--source', default='0', help='Índice de câmera ou caminho de vídeo')
     parser.add_argument('--device', default='cuda:0')
-    parser.add_argument('--score-thr', type=float, default=0.3,
-                        help='Confiança mínima para desenhar um keypoint')
+    parser.add_argument('--score-thr', type=float, default=DEFAULT_SCORE_THRESHOLD,
+                        help='Resposta mínima para contar um keypoint como '
+                             'detectado. Não é probabilidade: a saída do SimCC '
+                             'não tem teto em 1'),
     parser.add_argument('--bbox-thr', type=float, default=0.3,
                         help='Confiança mínima do detector de pessoas. Medido '
                              'em 40 imagens do COCO val: em 0.3 o detector '
                              'produz 84 caixas para 73 pessoas anotadas, '
-                             'enquanto em 0.5 recupera apenas 60% delas')
+                             'enquanto em 0.5 recupera apenas 60%% delas')
     parser.add_argument('--cam-width', type=int, default=1280)
     parser.add_argument('--cam-height', type=int, default=720)
     parser.add_argument('--color', action='store_true',
@@ -99,6 +124,25 @@ def to_model_domain(frame: np.ndarray, keep_color: bool) -> np.ndarray:
     return cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
 
 
+def _config_without_flip_test(config_path: str, out_dir: Path) -> str:
+    """Desliga o flip test, que dobra o custo da pose sem valor em operação.
+
+    Ele executa o modelo também sobre a imagem espelhada e faz a média dos mapas
+    de resposta. Isso compra precisão, que é o que a avaliação de AP mede, e
+    custa metade da taxa de quadros: medidos 12,44 ms por pessoa sem ele contra
+    cerca de 24,9 ms com ele. Num painel ao vivo a métrica é latência.
+    """
+    from mmengine.config import Config
+
+    cfg = Config.fromfile(config_path)
+    cfg.model.test_cfg = dict(cfg.model.get('test_cfg', {}))
+    cfg.model.test_cfg['flip_test'] = False
+
+    patched = out_dir / 'pose_config_ao_vivo.py'
+    cfg.dump(patched)
+    return str(patched)
+
+
 def main():
     args = parse_args()
     args.out_dir.mkdir(parents=True, exist_ok=True)
@@ -112,11 +156,13 @@ def main():
         print('Sem detector: o frame inteiro e usado como regiao de interesse.')
 
     print('Carregando estimador de pose...')
-    pipeline = FullBodyPosePipeline(args.cfg, args.ckpt, args.device, detector)
+    pipeline = FullBodyPosePipeline(_config_without_flip_test(args.cfg, args.out_dir),
+                                    args.ckpt, args.device, detector)
 
     capture, source_label = open_source(args.source, args.cam_width, args.cam_height)
     panel = ValidationPanel()
-    state = PanelState(source_label=source_label)
+    state = PanelState(source_label=source_label,
+                       score_threshold=args.score_thr)
 
     clicked: dict[str, str | None] = {'key': None}
 

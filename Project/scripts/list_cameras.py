@@ -52,7 +52,7 @@ def list_cameras(max_test=10):
     else:
         print(f"\n📊 Total: {len(available_cameras)} câmera(s) disponível(is)")
         print("\n💡 Para usar uma câmera específica, use:")
-        print("   python src/evaluation/run_realtime.py --source <INDEX> ...")
+        print("   python scripts/run_panel.py --source <INDEX>")
         print("\nExemplos:")
         for cam in available_cameras:
             print(f"   --source {cam['index']}  # Câmera {cam['index']} ({cam['width']}x{cam['height']})")
