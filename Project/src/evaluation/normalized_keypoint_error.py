@@ -77,10 +77,18 @@ class TorsoNormalizedError(BaseMetric):
         normalized = np.concatenate([
             r['distances'][r['visible']] / r['torso'] for r in results])
 
+        # A média e a mediana discordam sobre qual época é melhor, e a razão
+        # entre elas diz por quê: medida na adaptação ao Drive&Act, 10,0 contra
+        # 7,5 pixels, ou 1,34. Numa distribuição simétrica seria 1,0. A média é
+        # puxada por uma cauda de quadros ruins, de modo que escolher o melhor
+        # checkpoint por ela é escolher pelos piores casos. O percentil 90
+        # dimensiona essa cauda em vez de deixá-la implícita.
         metrics = {
             'px_mean': float(distances.mean()),
             'px_median': float(np.median(distances)),
+            'px_p90': float(np.percentile(distances, 90)),
             'normalized_mean': float(normalized.mean()),
+            'normalized_median': float(np.median(normalized)),
             'samples': float(len(results)),
         }
         for threshold in PCK_THRESHOLDS:
