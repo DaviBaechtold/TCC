@@ -1,0 +1,171 @@
+#!/usr/bin/env python
+"""Valida o lifting 3D no domínio veicular, contra a referência do Drive&Act.
+
+O Módulo 2 tem duas etapas de adaptação de domínio; o Módulo 3 não tem nenhuma:
+ele é treinado no H3WB, com pessoas em pé num laboratório, e aplicado a um
+ocupante sentado num habitáculo. Esta é a primeira medição desse salto.
+
+Reporta **PA-MPJPE**, com alinhamento de Procrustes, e não MPJPE. O motivo não é
+preferência: sem calibração da câmera o fator de escala do lifting é
+desconhecido, e o MPJPE absoluto mediria sobretudo esse fator, não a pose. O
+alinhamento remove escala e rotação e isola o que se quer avaliar, que é a forma.
+
+Duas ressalvas que acompanham qualquer número daqui:
+
+1. A referência do Drive&Act vem de triangulação por OpenPose, e não de captura
+   com marcadores. Ela própria é estimativa, o que torna esta uma análise
+   exploratória e não critério de aceite.
+2. Só os keypoints observáveis da posição de retrovisor entram na conta. Os
+   demais não estão na imagem, e cobrar o modelo por eles mediria outra coisa.
+
+Exemplo:
+    python scripts/validate_lifting_driveact.py \\
+        --poses ~/Downloads/extracted/openpose_3d --max-sequences 5
+"""
+
+import argparse
+import sys
+from pathlib import Path
+
+import numpy as np
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+SEQUENCE_LENGTH = 16
+
+# Keypoints visíveis em mais de 80% dos quadros da vista de retrovisor, medidos
+# sobre as 20.288 instâncias do conjunto de validação. Joelhos (13, 14) aparecem
+# em 0,2% e 3,7%, e tornozelos em 0%.
+OBSERVABLE_KEYPOINTS = (0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12)
+
+ROOT_KEYPOINT = 0
+
+
+def parse_args():
+    p = argparse.ArgumentParser(description=__doc__,
+                                formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument('--frames', type=Path,
+                   default=Path('data/processed/driveact/val'))
+    p.add_argument('--annotations', type=Path,
+                   default=Path('data/processed/driveact/'
+                                'driveact_midlevel.chunks_90.split_0.val.json'))
+    p.add_argument('--poses', type=Path, required=True,
+                   help='Diretório openpose_3d/ com a referência tridimensional')
+    p.add_argument('--max-sequences', type=int, default=5)
+    p.add_argument('--device', default='cuda:0')
+    p.add_argument('--out', type=Path,
+                   default=Path('results/lifting_driveact.json'))
+    return p.parse_args()
+
+
+def procrustes_align(predicted: np.ndarray, target: np.ndarray) -> np.ndarray:
+    """Alinha `predicted` a `target` por similaridade, sem deformar a pose.
+
+    Rotação, escala e translação são livres; a forma não. É o alinhamento do
+    PA-MPJPE, e remove exatamente as três grandezas que uma câmera não calibrada
+    deixa indeterminadas.
+    """
+    predicted_center = predicted - predicted.mean(axis=0)
+    target_center = target - target.mean(axis=0)
+
+    covariance = predicted_center.T @ target_center
+    left, singular, right = np.linalg.svd(covariance)
+    rotation = right.T @ left.T
+    if np.linalg.det(rotation) < 0:          # evita reflexão
+        right[-1] *= -1
+        rotation = right.T @ left.T
+        singular[-1] *= -1
+
+    scale = singular.sum() / (predicted_center ** 2).sum()
+    return scale * (predicted_center @ rotation.T) + target.mean(axis=0)
+
+
+def main():
+    import json
+
+    args = parse_args()
+
+    from src.models import torch_compat  # noqa: F401
+    from src.data.driveact import read_pose_csv
+    from src.models.pose_pipeline import FullBodyPosePipeline
+    from src.models.sequence_lifter import SequenceLifter
+
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        'panel_defaults', Path(__file__).with_name('run_panel.py'))
+    panel = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(panel)
+
+    annotations = json.loads(args.annotations.read_text())
+    by_sequence: dict[str, list[dict]] = {}
+    for image in annotations['images']:
+        by_sequence.setdefault(image['file_id'], []).append(image)
+
+    work_dir = Path('work_dirs/lifting_driveact')
+    work_dir.mkdir(parents=True, exist_ok=True)
+    pose = FullBodyPosePipeline(
+        panel._config_without_flip_test(panel.POSE_CONFIG, work_dir),
+        panel.POSE_CHECKPOINT, args.device, detector=None)
+    lifter = SequenceLifter(panel.LIFT_CONFIG, panel.LIFT_CHECKPOINT,
+                            args.device)
+
+    import cv2
+
+    errors = []
+    for file_id in sorted(by_sequence)[:args.max_sequences]:
+        subject, run = file_id.split('/')
+        csv_path = args.poses / subject / f'{run}.openpose.3d.csv'
+        if not csv_path.exists():
+            print(f'  {file_id}: sem referência 3D, ignorado')
+            continue
+
+        reference = {frame.frame_id: frame for frame in read_pose_csv(csv_path)}
+        images = sorted(by_sequence[file_id], key=lambda i: i['frame_id'])
+        lifter.reset()
+        matched = 0
+
+        for image in images:
+            frame = cv2.imread(str(args.frames / image['file_name']))
+            if frame is None:
+                continue
+            result = pose(frame)
+            if not result.num_people:
+                continue
+
+            height, width = frame.shape[:2]
+            predicted = lifter(result.keypoints[0], result.scores[0],
+                               (width, height))
+            if lifter.warming_up or image['frame_id'] not in reference:
+                continue
+
+            truth = reference[image['frame_id']].points_3d
+            visible = reference[image['frame_id']].confidence > 0
+            usable = [k for k in OBSERVABLE_KEYPOINTS if visible[k]]
+            if len(usable) < 6:   # Procrustes sobre poucos pontos é instável
+                continue
+
+            aligned = procrustes_align(predicted[usable], truth[usable])
+            errors.append(
+                np.linalg.norm(aligned - truth[usable], axis=-1).mean() * 1000)
+            matched += 1
+
+        print(f'  {file_id}: {matched} quadros comparados')
+
+    if not errors:
+        raise SystemExit('nenhum quadro comparável')
+
+    report = {
+        'pa_mpjpe_mm': round(float(np.mean(errors)), 2),
+        'pa_mpjpe_median_mm': round(float(np.median(errors)), 2),
+        'frames': len(errors),
+        'keypoints': list(OBSERVABLE_KEYPOINTS),
+        'alignment': 'procrustes',
+        'reference': 'Drive&Act OpenPose 3D (triangulação, não marcadores)',
+    }
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    args.out.write_text(json.dumps(report, indent=2, ensure_ascii=False))
+    print(json.dumps(report, indent=2, ensure_ascii=False))
+
+
+if __name__ == '__main__':
+    main()
