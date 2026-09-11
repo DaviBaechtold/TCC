@@ -166,6 +166,9 @@ python scripts/train_wholebody.py \
 # Painel de validação ao vivo, com os modelos correntes por padrão
 python scripts/run_panel.py
 
+# Confere se o documento cita as medições correntes (a regra dos dois repos)
+python scripts/check_document_numbers.py
+
 # Taxa de processamento, com as condições registradas junto do resultado
 python scripts/benchmark_throughput.py --cfg configs/eval/rtmw_x_wholebody_eval.py \
   --ckpt <checkpoint> --tag <nome> --image <imagem com pessoas> [--flip-test] [--detector]
