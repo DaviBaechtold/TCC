@@ -251,8 +251,12 @@ consertar quando a tarefa em curso passar por elas.
 - **`src/evaluation/evaluate_pose.py` e `evaluate_pose_video.py`** ainda misturam
   as três camadas num arquivo, e comparam RGB contra IR num protocolo que a
   medição de domain gap substituiu. São as próximas a passar pela regra.
-- **`scripts/test_quick.py`, `evaluate_accuracy_comparison.py`** — nomes que não
-  dizem o que verificam, e nenhum dos dois foi executado na retomada.
+- **`scripts/evaluate_accuracy_comparison.py`** funciona, mas chama de
+  "bottom-up" o que na verdade é usar o frame inteiro como caixa única. O que
+  ele mede — acurácia com caixa do detector contra caixa única — é justamente a
+  metade ainda aberta da QP1, então vale reaproveitar em vez de descartar. O
+  caminho mais curto para essa resposta, porém, é gerar um arquivo de detecções
+  e rodar o `eval_checkpoint.py` duas vezes.
 - O remendo do `torch.load` ainda aparece copiado em alguns scripts antigos;
   `src/models/torch_compat.py` é o lugar dele.
 
