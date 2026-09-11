@@ -56,12 +56,8 @@ def main():
     args = parse_args()
 
     import cv2
-    import torch
 
-    # Checkpoints do OpenMMLab carregam objetos numpy; PyTorch >= 2.6 usa
-    # weights_only=True por padrão e os rejeita.
-    _orig_load = torch.load
-    torch.load = lambda *a, **kw: _orig_load(*a, **{'weights_only': False, **kw})
+    from src.models import torch_compat  # noqa: F401
 
     from mmengine.config import Config
 

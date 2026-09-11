@@ -42,15 +42,7 @@ def main():
     import torch
     import numpy as np
 
-    # Checkpoints do OpenMMLab (2023) carregam objetos numpy; PyTorch >= 2.6
-    # usa weights_only=True por padrão e os rejeita.
-    _orig_load = torch.load
-
-    def _load_trusted(*a, **kw):
-        kw.setdefault('weights_only', False)
-        return _orig_load(*a, **kw)
-
-    torch.load = _load_trusted
+    from src.models import torch_compat  # noqa: F401
 
     from mmengine.config import Config
     from mmengine.runner import Runner

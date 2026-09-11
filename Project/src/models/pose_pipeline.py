@@ -15,21 +15,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
-import torch
 from mmengine.registry import DefaultScope
 
-# Checkpoints do OpenMMLab de 2023 serializam objetos numpy. O PyTorch >= 2.6
-# usa weights_only=True por padrão e os rejeita, então o carregamento precisa
-# ser relaxado antes de qualquer import que dispare o loader do mmengine.
-_TORCH_LOAD = torch.load
-
-
-def _load_trusting_checkpoint(*args, **kwargs):
-    kwargs.setdefault('weights_only', False)
-    return _TORCH_LOAD(*args, **kwargs)
-
-
-torch.load = _load_trusting_checkpoint
+# Precisa vir antes de qualquer import que dispare o loader do mmengine.
+from src.models import torch_compat  # noqa: F401
 
 from mmpose.apis import inference_topdown, init_model  # noqa: E402
 
