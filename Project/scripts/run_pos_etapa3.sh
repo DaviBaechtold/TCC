@@ -20,7 +20,7 @@ MELHOR=$(ls -t work_dirs/rtmw_x_driveact_ft/best_torso_px_mean_*.pth 2>/dev/null
 [ -z "$MELHOR" ] && { echo "sem checkpoint da Etapa 3"; exit 1; }
 echo "[$(agora)] melhor checkpoint: $MELHOR"
 
-echo "[$(agora)] 1/3 avaliação final no Drive&Act, com percentil 90"
+echo "[$(agora)] 1/4 avaliação final no Drive&Act, com percentil 90"
 python scripts/eval_checkpoint.py --cfg configs/eval/rtmw_x_driveact_eval.py \
     --ckpt "$MELHOR" --data-root data/processed/driveact/ --img-prefix val/ \
     --ann-file driveact_midlevel.chunks_90.split_0.val.json \
@@ -30,7 +30,7 @@ python scripts/eval_checkpoint.py --cfg configs/eval/rtmw_x_driveact_eval.py \
 # Módulo 2, e é ele que as medições seguintes usam.
 FUNDIDO="${MELHOR%.pth}_merged.pth"
 
-echo "[$(agora)] 2/3 throughput, quatro configurações de otimização"
+echo "[$(agora)] 2/4 throughput, quatro configurações de otimização"
 for flags in "" "--channels-last" "--compile" "--channels-last --compile"; do
     tag="etapa3$(echo "$flags" | tr -d ' -' | tr 'A-Z' 'a-z')"
     python scripts/benchmark_throughput.py \
@@ -39,7 +39,11 @@ for flags in "" "--channels-last" "--compile" "--channels-last --compile"; do
         >> "$LOGS/pos_etapa3.log" 2>&1
 done
 
-echo "[$(agora)] 3/3 lifting no domínio veicular, com o estimador 2D adaptado"
+echo "[$(agora)] 3/4 QP1: as quatro configurações de detecção"
+python scripts/compare_detectors.py --pose-ckpt "$FUNDIDO" --max-frames 1500 \
+    >> "$LOGS/pos_etapa3.log" 2>&1
+
+echo "[$(agora)] 4/4 lifting no domínio veicular, com o estimador 2D adaptado"
 python scripts/validate_lifting_driveact.py \
     --poses ~/Downloads/extracted/openpose_3d --pose-ckpt "$FUNDIDO" \
     --max-sequences 4 --max-frames-per-sequence 120 \

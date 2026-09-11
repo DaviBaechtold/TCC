@@ -124,17 +124,24 @@ class FullBodyPosePipeline:
                                       device=device)
         self._detector = detector
 
-    def __call__(self, frame: np.ndarray) -> PoseResult:
+    def __call__(self, frame: np.ndarray,
+                 boxes: np.ndarray | None = None) -> PoseResult:
         """
         Args:
             frame: [H, W, 3] BGR uint8.
+            boxes: [N, 4] em (x1, y1, x2, y2). Quando fornecidas, o estágio de
+                detecção é pulado. É o protocolo de avaliação com caixa de
+                ground truth, que mede o estimador isolado do erro do detector;
+                não é operável, porque em operação não existe anotação.
 
         Returns:
             PoseResult com keypoints já no sistema de coordenadas do frame.
         """
         started = time.perf_counter()
 
-        if self._detector is None:
+        if boxes is not None:
+            boxes = np.asarray(boxes, dtype=np.float32)
+        elif self._detector is None:
             height, width = frame.shape[:2]
             boxes = np.array([[0, 0, width, height]], dtype=np.float32)
         else:
