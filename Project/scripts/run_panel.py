@@ -31,6 +31,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from src.models.observability import reliable_keypoints
 from src.models.pose_pipeline import FullBodyPosePipeline, PersonDetector
 from src.visualization.panel import PanelState, ValidationPanel
 from src.visualization.skeleton import draw_box, draw_pose
@@ -238,8 +239,12 @@ def main():
                         state.keypoints_3d = lifter(result.keypoints[0],
                                                     result.scores[0],
                                                     (width, height))
-                        state.keypoints_3d_reliable = (
-                            result.scores[0] >= args.score_thr)
+                        # O limiar sozinho deixa passar 92% das juntas que a
+                        # câmera não enxerga, porque a adaptação ao domínio as
+                        # tornou confiantes sem torná-las corretas. A geometria
+                        # da montagem é o que separa as duas populações.
+                        state.keypoints_3d_reliable = reliable_keypoints(
+                            result.scores[0], args.score_thr)
                         state.lifting_warming_up = lifter.warming_up
                     else:
                         state.keypoints_3d = None

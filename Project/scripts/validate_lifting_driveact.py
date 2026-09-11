@@ -33,10 +33,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 SEQUENCE_LENGTH = 16
 
-# Keypoints visíveis em mais de 80% dos quadros da vista de retrovisor, medidos
-# sobre as 20.288 instâncias do conjunto de validação. Joelhos (13, 14) aparecem
-# em 0,2% e 3,7%, e tornozelos em 0%.
-OBSERVABLE_KEYPOINTS = (0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12)
+from src.models.observability import MIRROR_VIEW_OBSERVABLE as OBSERVABLE_KEYPOINTS
 
 ROOT_KEYPOINT = 0
 
