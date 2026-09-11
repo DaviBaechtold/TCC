@@ -61,6 +61,11 @@ def parse_args():
                    help='Estimador 2D a usar. O padrão é o modelo corrente do '
                         'painel; passar outro permite medir quanto a adaptação '
                         'do Módulo 2 melhora o 3D que depende dela')
+    p.add_argument('--lift-cfg', default=None,
+                   help='Config do lifting; o padrão é o do painel')
+    p.add_argument('--lift-ckpt', default=None,
+                   help='Checkpoint do lifting. Permite comparar o modelo base '
+                        'com o treinado para tolerar entrada incompleta')
     p.add_argument('--device', default='cuda:0')
     p.add_argument('--out', type=Path,
                    default=Path('results/lifting_driveact.json'))
@@ -115,7 +120,8 @@ def main():
     pose = FullBodyPosePipeline(
         panel._config_without_flip_test(panel.POSE_CONFIG, work_dir),
         args.pose_ckpt or panel.POSE_CHECKPOINT, args.device, detector=None)
-    lifter = SequenceLifter(panel.LIFT_CONFIG, panel.LIFT_CHECKPOINT,
+    lifter = SequenceLifter(args.lift_cfg or panel.LIFT_CONFIG,
+                            args.lift_ckpt or panel.LIFT_CHECKPOINT,
                             args.device)
 
     import cv2
@@ -172,6 +178,7 @@ def main():
         'alignment': 'procrustes',
         'reference': 'Drive&Act OpenPose 3D (triangulação, não marcadores)',
         'pose_checkpoint': Path(args.pose_ckpt or panel.POSE_CHECKPOINT).name,
+        'lift_checkpoint': Path(args.lift_ckpt or panel.LIFT_CHECKPOINT).name,
     }
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(report, indent=2, ensure_ascii=False))
