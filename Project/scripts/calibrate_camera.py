@@ -44,7 +44,13 @@ from src.data.camera_calibration import (DEFAULT_PATTERN, MIN_VIEWS,
 # cobertura. Meio segundo entre capturas é o suficiente para mover o tabuleiro.
 MIN_INTERVAL_S = 0.5
 
-JANELA = 'Calibracao — espaco captura, c calibra, q sai'
+# Só ASCII: o highgui com Qt converte o título mal e o travessão virou "?".
+JANELA = 'Calibracao - espaco captura, c calibra, q sai'
+
+# Tamanho inicial da janela. Sem ele o Qt abria a janela com a área de imagem
+# minúscula e preta até o primeiro repintar, e parecia que a câmera não
+# funcionava — a câmera entregava 25 quadros por segundo normalmente.
+JANELA_TAMANHO = (960, 540)
 
 
 def parse_args():
@@ -90,13 +96,16 @@ def main():
     import time
 
     fonte = int(args.source) if args.source.isdigit() else args.source
-    captura = cv2.VideoCapture(fonte)
+    captura = cv2.VideoCapture(fonte, cv2.CAP_V4L2)
     # MJPG evita o teto de ~5 FPS que o YUYV impõe em 1280x720 nas webcams USB.
     captura.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
     captura.set(cv2.CAP_PROP_FRAME_WIDTH, args.largura)
     captura.set(cv2.CAP_PROP_FRAME_HEIGHT, args.altura)
     if not captura.isOpened():
         raise SystemExit(f'não foi possível abrir a câmera {args.source}')
+
+    cv2.namedWindow(JANELA, cv2.WINDOW_NORMAL)
+    cv2.resizeWindow(JANELA, *JANELA_TAMANHO)
 
     vistas = []
     tamanho = None
