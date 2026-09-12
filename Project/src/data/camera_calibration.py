@@ -147,3 +147,86 @@ def chessboard_image(pattern: tuple[int, int] = DEFAULT_PATTERN,
 
     return cv2.copyMakeBorder(tabuleiro, margin_px, margin_px, margin_px,
                               margin_px, cv2.BORDER_CONSTANT, value=255)
+
+
+# A4 em milímetros. O tabuleiro sai em paisagem porque dez quadrados de 25mm
+# ocupam 250mm, que não cabem na largura de 210mm do retrato.
+A4_LANDSCAPE_MM = (297.0, 210.0)
+MILLIMETERS_PER_INCH = 25.4
+
+# Régua impressa junto, para conferir se a impressora reescalou. É a verificação
+# que separa uma calibração boa de uma que devolve números plausíveis e errados:
+# "ajustar à página" encolhe o padrão em alguns por cento sem aviso, e o lado do
+# quadrado informado ao script passa a estar errado na mesma proporção.
+RULER_LENGTH_MM = 100.0
+
+
+def chessboard_pdf(path: Path,
+                   pattern: tuple[int, int] = DEFAULT_PATTERN,
+                   square_size_mm: float = 25.0) -> None:
+    """Grava o tabuleiro em PDF com dimensão física exata.
+
+    O PNG serve para conferir a detecção na tela, mas não carrega escala: quem
+    imprime decide o tamanho. Aqui o quadrado tem o tamanho declarado no papel,
+    de modo que não é preciso medir com régua --- só conferir.
+    """
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Rectangle
+
+    largura_mm, altura_mm = A4_LANDSCAPE_MM
+    colunas, linhas = pattern
+    quadrados_x, quadrados_y = colunas + 1, linhas + 1
+    tabuleiro_w = quadrados_x * square_size_mm
+    tabuleiro_h = quadrados_y * square_size_mm
+
+    if tabuleiro_w > largura_mm or tabuleiro_h > altura_mm:
+        raise ValueError(
+            f'tabuleiro de {tabuleiro_w:.0f}x{tabuleiro_h:.0f}mm não cabe em '
+            f'A4 paisagem; reduza o lado do quadrado')
+
+    figura = plt.figure(figsize=(largura_mm / MILLIMETERS_PER_INCH,
+                                 altura_mm / MILLIMETERS_PER_INCH))
+    eixo = figura.add_axes([0, 0, 1, 1])
+    eixo.set_xlim(0, largura_mm)
+    eixo.set_ylim(0, altura_mm)
+    eixo.axis('off')
+
+    # Centrado horizontalmente; deslocado para cima para abrir espaço ao rodapé.
+    origem_x = (largura_mm - tabuleiro_w) / 2
+    origem_y = altura_mm - tabuleiro_h - 8.0
+
+    for linha in range(quadrados_y):
+        for coluna in range(quadrados_x):
+            if (linha + coluna) % 2:
+                continue
+            eixo.add_patch(Rectangle(
+                (origem_x + coluna * square_size_mm,
+                 origem_y + linha * square_size_mm),
+                square_size_mm, square_size_mm,
+                facecolor='black', edgecolor='none'))
+
+    _draw_ruler(eixo, origem_x, origem_y - 14.0)
+    eixo.text(origem_x, origem_y - 22.0,
+              f'{colunas}x{linhas} cantos internos  ·  quadrado de '
+              f'{square_size_mm:.0f} mm  ·  imprimir em A4 paisagem, escala 100%',
+              fontsize=8, va='top')
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    figura.savefig(path, format='pdf')
+    plt.close(figura)
+
+
+def _draw_ruler(eixo, x: float, y: float) -> None:
+    """Segmento de comprimento conhecido, para conferir a escala da impressão."""
+    from matplotlib.patches import Rectangle
+
+    eixo.add_patch(Rectangle((x, y), RULER_LENGTH_MM, 1.2,
+                             facecolor='black', edgecolor='none'))
+    for extremo in (x, x + RULER_LENGTH_MM):
+        eixo.add_patch(Rectangle((extremo - 0.3, y - 2.0), 0.6, 5.2,
+                                 facecolor='black', edgecolor='none'))
+    eixo.text(x + RULER_LENGTH_MM + 4.0, y + 0.6,
+              f'{RULER_LENGTH_MM:.0f} mm — confira com régua antes de calibrar',
+              fontsize=8, va='center')

@@ -11,11 +11,13 @@ câmera própria ampliou a pose em 3,8 vezes no Drive&Act, e o erro absoluto foi
 
 Uso, em duas etapas:
 
-    # 1. Gera o tabuleiro e imprime. Papel A4, sem "ajustar à página" — a
-    #    impressora não pode reescalar, ou o lado do quadrado sai errado.
-    python scripts/calibrate_camera.py --gerar-tabuleiro tabuleiro.png
+    # 1. Gera o tabuleiro em PDF com o quadrado do tamanho pedido e imprime.
+    #    Escala 100%, sem "ajustar à página": o PDF traz uma régua de 100mm
+    #    justamente para que o reescalonamento seja detectado antes de calibrar.
+    python scripts/calibrate_camera.py --gerar-tabuleiro tabuleiro.pdf
 
-    # 2. Meça o lado de um quadrado impresso com régua e informe em metros.
+    # 2. Calibra. O lado é o mesmo declarado na geração, salvo se a régua
+    #    impressa acusar que a impressora reescalou.
     python scripts/calibrate_camera.py --lado-quadrado 0.025
 
 Durante a captura: mova o tabuleiro pelo campo de visão, inclinando-o em
@@ -36,7 +38,7 @@ import cv2
 
 from src.data.camera_calibration import (DEFAULT_PATTERN, MIN_VIEWS,
                                          calibrate, chessboard_image,
-                                         find_corners)
+                                         chessboard_pdf, find_corners)
 
 # Vistas quase idênticas não acrescentam informação e dão falsa confiança de
 # cobertura. Meio segundo entre capturas é o suficiente para mover o tabuleiro.
@@ -65,12 +67,24 @@ def main():
     args = parse_args()
 
     if args.gerar_tabuleiro:
-        cv2.imwrite(str(args.gerar_tabuleiro), chessboard_image())
         colunas, linhas = DEFAULT_PATTERN
-        print(f'Tabuleiro em {args.gerar_tabuleiro}: {colunas}x{linhas} cantos '
-              f'internos, {colunas + 1}x{linhas + 1} quadrados.')
-        print('Imprima sem redimensionar e cole numa superfície rígida — papel '
-              'ondulado curva o plano e contamina a distorção.')
+        if args.gerar_tabuleiro.suffix.lower() == '.pdf':
+            # PDF porque ele carrega dimensão física; o PNG não, e quem imprime
+            # decide o tamanho sem que nada registre qual foi.
+            chessboard_pdf(args.gerar_tabuleiro,
+                           square_size_mm=args.lado_quadrado * 1000)
+            print(f'Tabuleiro em {args.gerar_tabuleiro}: {colunas}x{linhas} '
+                  f'cantos internos, quadrado de '
+                  f'{args.lado_quadrado * 1000:.0f}mm, A4 paisagem.')
+            print('Imprima em escala 100%, sem "ajustar à página". Confira a '
+                  'régua de 100mm impressa no rodapé antes de calibrar.')
+        else:
+            cv2.imwrite(str(args.gerar_tabuleiro), chessboard_image())
+            print(f'Tabuleiro em {args.gerar_tabuleiro}: {colunas}x{linhas} '
+                  f'cantos internos, {colunas + 1}x{linhas + 1} quadrados. '
+                  f'Sem escala física — prefira o PDF para imprimir.')
+        print('Cole numa superfície rígida: papel ondulado curva o plano e '
+              'contamina a distorção.')
         return
 
     import time
