@@ -166,6 +166,11 @@ python scripts/train_wholebody.py \
 # Painel de validação ao vivo, com os modelos correntes por padrão
 python scripts/run_panel.py
 
+# Calibração da webcam (Logitech C922, 1280x720). Já feita em 12/09/2026:
+# fx 959,4  fy 957,9  centro (618,1; 342,7)  reprojeção 0,414px em 21 vistas.
+# Refazer só se trocar a câmera, a resolução ou o foco.
+python scripts/calibrate_camera.py --lado-quadrado 0.026
+
 # Confere se o documento cita as medições correntes (a regra dos dois repos)
 python scripts/check_document_numbers.py
 
