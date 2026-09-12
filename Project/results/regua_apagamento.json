@@ -27,5 +27,7 @@
     "vp15/run1_2018-05-30-13-05-35.ids_1": 93.72,
     "vp15/run2_2018-05-30-13-34-33.ids_1": 93.59
   },
-  "coerencia_osso_mm": 95.71
+  "coerencia_osso_mm": 95.71,
+  "coerencia_forma": 0.0811,
+  "movimento_mm": 31.95
 }

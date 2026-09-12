@@ -1,0 +1,33 @@
+{
+  "pa_mpjpe_mm": 92.11,
+  "pa_mpjpe_median_mm": 92.78,
+  "frames": 740,
+  "keypoints": [
+    0,
+    1,
+    2,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12
+  ],
+  "alignment": "procrustes",
+  "reference": "Drive&Act OpenPose 3D (triangulação, não marcadores)",
+  "pose_checkpoint": "best_coco-wholebody_AP_epoch_5_merged.pth",
+  "lift_checkpoint": "best_MPJPE_whole_epoch_15.pth",
+  "confidence": "normalizada",
+  "por_sequencia": {
+    "vp14/run1_2018-05-30-10-11-09.ids_1": 90.62,
+    "vp14/run2_2018-05-30-10-42-33.ids_1": 80.13,
+    "vp15/run1_2018-05-30-13-05-35.ids_1": 98.7,
+    "vp15/run2_2018-05-30-13-34-33.ids_1": 98.99
+  },
+  "coerencia_osso_mm": 89.57,
+  "coerencia_forma": 0.0736,
+  "movimento_mm": 37.32
+}

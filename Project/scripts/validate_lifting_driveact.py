@@ -104,7 +104,8 @@ def main():
 
     args = parse_args()
 
-    from src.evaluation.bone_consistency import MIN_FRAMES, consistency
+    from src.evaluation.bone_consistency import (MIN_FRAMES, consistency,
+                                                 motion)
     from src.models import torch_compat  # noqa: F401
     from src.data.driveact import read_pose_csv
     from src.models.pose_pipeline import FullBodyPosePipeline
@@ -140,6 +141,8 @@ def main():
     errors: list[float] = []
     por_sequencia: dict[str, float] = {}
     coerencia: list[float] = []
+    coerencia_forma: list[float] = []
+    movimento: list[float] = []
     for file_id in sorted(by_sequence)[:args.max_sequences]:
         subject, run = file_id.split('/')
         csv_path = args.poses / subject / f'{run}.openpose.3d.csv'
@@ -193,9 +196,12 @@ def main():
             por_sequencia[file_id] = round(
                 float(np.mean(errors[-matched:])), 2)
         if len(predicoes) >= MIN_FRAMES:
-            desvio = consistency(np.stack(predicoes)).get('mediana')
-            if desvio is not None:
-                coerencia.append(desvio)
+            desvios = consistency(np.stack(predicoes))
+            if 'mediana' in desvios:
+                coerencia.append(desvios['mediana'])
+            if 'mediana_relativa' in desvios:
+                coerencia_forma.append(desvios['mediana_relativa'])
+            movimento.append(motion(np.stack(predicoes)))
         print(f'  {file_id}: {matched} quadros comparados'
               f'{f", PA-MPJPE {por_sequencia[file_id]:.1f}mm" if matched else ""}')
 
@@ -218,6 +224,15 @@ def main():
         # do próprio Drive&Act mede 30,1mm nesta métrica.
         'coerencia_osso_mm': (round(float(np.median(coerencia)), 2)
                               if coerencia else None),
+        # Invariante a escala: divide cada osso pelo tronco do mesmo quadro.
+        # O absoluto acima ainda carrega a deriva de escala, que é ambiguidade
+        # legítima do lifting monocular e não erro do modelo.
+        'coerencia_forma': (round(float(np.median(coerencia_forma)), 4)
+                            if coerencia_forma else None),
+        # Controle: uma pose congelada tem coerência perfeita. Sem comparar o
+        # movimento, um ganho de coerência pode ser suavização disfarçada.
+        'movimento_mm': (round(float(np.median(movimento)), 2)
+                         if movimento else None),
     }
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(report, indent=2, ensure_ascii=False))

@@ -109,3 +109,21 @@ def consistency(sequence: np.ndarray,
             desvios['mediana_relativa'] = float(np.median(relativos))
 
     return desvios
+
+
+def motion(sequence: np.ndarray) -> float:
+    """Deslocamento mediano de um keypoint entre quadros vizinhos, em mm.
+
+    Controle obrigatório da coerência de osso, e não um número de interesse
+    próprio. A coerência tem um ponto cego grave: **uma pose congelada tem
+    coerência perfeita**. Um modelo que aprenda a devolver sempre a pose média,
+    ignorando a entrada, pontuaria melhor que um estimador correto.
+
+    Comparar dois modelos pela coerência só é válido se ambos se moverem de
+    forma parecida. Se o mais coerente também for o mais parado, o ganho é
+    suavização disfarçada.
+    """
+    if len(sequence) < 2:
+        return 0.0
+    deslocamento = np.linalg.norm(np.diff(sequence, axis=0), axis=-1)
+    return float(np.median(deslocamento) * MILLIMETERS)
