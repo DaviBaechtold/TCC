@@ -104,6 +104,7 @@ def main():
 
     args = parse_args()
 
+    from src.evaluation.bone_consistency import MIN_FRAMES, consistency
     from src.models import torch_compat  # noqa: F401
     from src.data.driveact import read_pose_csv
     from src.models.pose_pipeline import FullBodyPosePipeline
@@ -138,6 +139,7 @@ def main():
 
     errors: list[float] = []
     por_sequencia: dict[str, float] = {}
+    coerencia: list[float] = []
     for file_id in sorted(by_sequence)[:args.max_sequences]:
         subject, run = file_id.split('/')
         csv_path = args.poses / subject / f'{run}.openpose.3d.csv'
@@ -146,6 +148,7 @@ def main():
             continue
 
         reference = {frame.frame_id: frame for frame in read_pose_csv(csv_path)}
+        predicoes: list[np.ndarray] = []
         images = sorted(by_sequence[file_id],
                         key=lambda i: i['frame_id'])[:args.max_frames_per_sequence]
         lifter.reset()
@@ -163,7 +166,12 @@ def main():
             scores = (np.ones_like(result.scores[0])
                       if args.confidence == 'constante' else result.scores[0])
             predicted = lifter(result.keypoints[0], scores, (width, height))
-            if lifter.warming_up or image['frame_id'] not in reference:
+            if lifter.warming_up:
+                continue
+            # A coerência de osso não precisa de referência, então acumula
+            # mesmo nos quadros em que o Drive&Act não tem anotação.
+            predicoes.append(predicted)
+            if image['frame_id'] not in reference:
                 continue
 
             truth = reference[image['frame_id']].points_3d
@@ -184,6 +192,10 @@ def main():
         if matched:
             por_sequencia[file_id] = round(
                 float(np.mean(errors[-matched:])), 2)
+        if len(predicoes) >= MIN_FRAMES:
+            desvio = consistency(np.stack(predicoes)).get('mediana')
+            if desvio is not None:
+                coerencia.append(desvio)
         print(f'  {file_id}: {matched} quadros comparados'
               f'{f", PA-MPJPE {por_sequencia[file_id]:.1f}mm" if matched else ""}')
 
@@ -201,6 +213,11 @@ def main():
         'lift_checkpoint': Path(args.lift_ckpt or panel.LIFT_CHECKPOINT).name,
         'confidence': args.confidence,
         'por_sequencia': por_sequencia,
+        # Coerência de osso: desvio do comprimento, que é fisicamente constante.
+        # Não precisa de referência, e por isso não herda a incerteza dela — a
+        # do próprio Drive&Act mede 30,1mm nesta métrica.
+        'coerencia_osso_mm': (round(float(np.median(coerencia)), 2)
+                              if coerencia else None),
     }
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(report, indent=2, ensure_ascii=False))
