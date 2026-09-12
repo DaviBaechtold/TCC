@@ -136,7 +136,8 @@ def main():
 
     import cv2
 
-    errors = []
+    errors: list[float] = []
+    por_sequencia: dict[str, float] = {}
     for file_id in sorted(by_sequence)[:args.max_sequences]:
         subject, run = file_id.split('/')
         csv_path = args.poses / subject / f'{run}.openpose.3d.csv'
@@ -176,7 +177,15 @@ def main():
                 np.linalg.norm(aligned - truth[usable], axis=-1).mean() * 1000)
             matched += 1
 
-        print(f'  {file_id}: {matched} quadros comparados')
+        # Por sequência, e não só agregado: a referência tem erro correlacionado
+        # dentro de uma sequência — mesma pessoa, mesma calibração, mesma pose
+        # de fundo — e a média global esconde se uma diferença é consistente ou
+        # se veio de uma sequência só.
+        if matched:
+            por_sequencia[file_id] = round(
+                float(np.mean(errors[-matched:])), 2)
+        print(f'  {file_id}: {matched} quadros comparados'
+              f'{f", PA-MPJPE {por_sequencia[file_id]:.1f}mm" if matched else ""}')
 
     if not errors:
         raise SystemExit('nenhum quadro comparável')
@@ -191,6 +200,7 @@ def main():
         'pose_checkpoint': Path(args.pose_ckpt or panel.POSE_CHECKPOINT).name,
         'lift_checkpoint': Path(args.lift_ckpt or panel.LIFT_CHECKPOINT).name,
         'confidence': args.confidence,
+        'por_sequencia': por_sequencia,
     }
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(report, indent=2, ensure_ascii=False))
