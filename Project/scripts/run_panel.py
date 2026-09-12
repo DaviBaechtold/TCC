@@ -69,6 +69,16 @@ DEFAULT_SCORE_THRESHOLD = 3.0
 LIFT_CONFIG = 'configs/lift3d_dstformer_h3wb_16frm.py'
 LIFT_CHECKPOINT = 'work_dirs/lift3d_dstformer_h3wb/best_MPJPE_whole_epoch_30.pth'
 
+# Calibração da câmera própria, produzida por scripts/calibrate_camera.py. Sem
+# ela a escala da pose 3D é herdada de outro dataset, o que no Drive&Act ampliou
+# a pose em 3,8 vezes — e o painel declara a diferença em vez de escondê-la.
+CAMERA_CALIBRATION = 'configs/camera/webcam.calibration.json'
+
+# Distância típica da câmera ao ocupante. É a única grandeza que a câmera
+# monocular não observa, e por isso precisa ser informada ou medida uma vez.
+# O padrão é o do retrovisor do Drive&Act; para uma webcam de mesa, medir.
+DEFAULT_SUBJECT_DEPTH_M = 0.664
+
 # Uma volta completa a cada ~12 segundos a 30 FPS. Mais rápido cansa a leitura,
 # mais lento não chega a revelar a profundidade.
 AZIMUTH_STEP_RADIANS = 0.0175
@@ -89,6 +99,13 @@ def parse_args():
                         help='Config do lifting 2D para 3D')
     parser.add_argument('--lift-ckpt', default=LIFT_CHECKPOINT,
                         help='Checkpoint do lifting; vazio desliga o painel 3D')
+    parser.add_argument('--calibracao', default=CAMERA_CALIBRATION,
+                        help='Calibração da câmera. Sem ela a escala da pose 3D '
+                             'é herdada e apenas aproximada')
+    parser.add_argument('--distancia', type=float,
+                        default=DEFAULT_SUBJECT_DEPTH_M,
+                        help='Distância da câmera ao ocupante, em metros. '
+                             'Medir uma vez: é o que a câmera não observa')
     parser.add_argument('--source', default='0', help='Índice de câmera ou caminho de vídeo')
     parser.add_argument('--device', default='cuda:0')
     parser.add_argument('--score-thr', type=float, default=DEFAULT_SCORE_THRESHOLD,
@@ -142,6 +159,22 @@ def to_model_domain(frame: np.ndarray, keep_color: bool) -> np.ndarray:
     return cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
 
 
+def _focal_length(caminho: str) -> float | None:
+    """Lê a distância focal de um arquivo de calibração, se houver.
+
+    Aceita o formato dos arquivos do Drive&Act, que é o mesmo que
+    `scripts/calibrate_camera.py` grava — assim o painel não distingue uma
+    câmera calibrada por nós de uma calibrada pelos autores do dataset.
+    """
+    import json
+
+    arquivo = Path(caminho)
+    if not caminho or not arquivo.exists():
+        return None
+    dados = json.loads(arquivo.read_text())
+    return float(dados['intrinsics']['focallength']['fx'])
+
+
 def _config_without_flip_test(config_path: str, out_dir: Path) -> str:
     """Desliga o flip test, que dobra o custo da pose sem valor em operação.
 
@@ -174,10 +207,23 @@ def main():
         print('Sem detector: o frame inteiro e usado como regiao de interesse.')
 
     lifter = None
+    calibrado = False
     if args.lift_ckpt:
         print('Carregando lifting 3D...')
-        from src.models.sequence_lifter import SequenceLifter
-        lifter = SequenceLifter(args.lift_cfg, args.lift_ckpt, args.device)
+        from src.models.sequence_lifter import (DEFAULT_FACTOR, SequenceLifter,
+                                                factor_from_camera)
+        fator, calibrado = DEFAULT_FACTOR, False
+        focal = _focal_length(args.calibracao)
+        if focal is not None:
+            fator = factor_from_camera(focal, args.distancia)
+            calibrado = True
+            print(f'  calibração: fx {focal:.1f}px, ocupante a '
+                  f'{args.distancia:.2f}m -> escala {fator:.3f}')
+        else:
+            print(f'  sem calibração em {args.calibracao}; escala herdada do '
+                  f'H3WB ({fator:.3f}), pose aproximada em tamanho')
+        lifter = SequenceLifter(args.lift_cfg, args.lift_ckpt, args.device,
+                                factor=fator)
     else:
         print('Sem lifting: o painel 3D fica vazio.')
 
@@ -188,7 +234,8 @@ def main():
     capture, source_label = open_source(args.source, args.cam_width, args.cam_height)
     panel = ValidationPanel()
     state = PanelState(source_label=source_label,
-                       score_threshold=args.score_thr)
+                       score_threshold=args.score_thr,
+                       calibrated=calibrado)
 
     clicked: dict[str, str | None] = {'key': None}
 

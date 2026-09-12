@@ -21,13 +21,15 @@
   "pose_checkpoint": "best_coco-wholebody_AP_epoch_5_merged.pth",
   "lift_checkpoint": "best_MPJPE_whole_epoch_30.pth",
   "confidence": "normalizada",
+  "factor": 1.1711,
+  "mpjpe_mm": 173.1,
   "por_sequencia": {
     "vp14/run1_2018-05-30-10-11-09.ids_1": 86.43,
     "vp14/run2_2018-05-30-10-42-33.ids_1": 67.84,
     "vp15/run1_2018-05-30-13-05-35.ids_1": 84.14,
     "vp15/run2_2018-05-30-13-34-33.ids_1": 81.63
   },
-  "coerencia_osso_mm": 119.12,
+  "coerencia_osso_mm": 31.15,
   "coerencia_forma": 0.0836,
-  "movimento_mm": 43.65
+  "movimento_mm": 11.41
 }
