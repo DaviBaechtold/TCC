@@ -30,13 +30,44 @@ import torch
 SEQUENCE_LENGTH = 16
 NUM_KEYPOINTS = 133
 
-# Escala que o decodificador aplica para levar a saída normalizada a metros. Ela
-# depende da geometria da câmera e **não é recuperável de uma imagem monocular
-# sem os parâmetros intrínsecos**: no H3WB, onde eles existem, varia de 2,67 a
-# 5,62 com mediana 4,478. Ao vivo, sem calibração, o padrão é essa mediana, o que
-# torna a pose correta em forma e apenas aproximada em escala absoluta. Para
-# visualização isso basta; para medir distâncias reais, não.
-DEFAULT_FACTOR = 4.478
+# Escala que o decodificador aplica para levar a saída normalizada a metros.
+#
+# Ela **não é um número universal**: sai da geometria da câmera, e o padrão
+# antigo deste módulo era a mediana do H3WB (4,478), onde a pessoa está a cinco
+# metros de uma lente de 1145 pixels. Aplicá-lo ao habitáculo, onde o ocupante
+# está a 0,66m de uma lente de 567 pixels, ampliava a pose em 3,8 vezes.
+#
+# A dedução vem do próprio codec. Ele projeta dois pontos a uma unidade de
+# distância da raiz e mede a separação em pixels, que vale `2·fx/Z`; o fator é o
+# inverso dela vezes dois, isto é `Z/fx`. Ver `factor_from_camera`.
+H3WB_FACTOR = 4.478
+
+# Câmera do retrovisor interno do Drive&Act, dos arquivos de calibração do
+# dataset. O ocupante fica a 0,66m em mediana, medido na referência 3D.
+DRIVEACT_FOCAL_PX = 567.0
+DRIVEACT_OCCUPANT_DEPTH_M = 0.664
+
+DEFAULT_FACTOR = H3WB_FACTOR
+
+
+def factor_from_camera(focal_length_px: float, root_depth_m: float) -> float:
+    """Escala de decodificação a partir da geometria da câmera.
+
+    O codec projeta dois pontos separados por duas unidades na profundidade da
+    raiz e mede a separação resultante em pixels. Essa separação vale
+    `2·fx/Z` com `fx` em milhares de pixels, de modo que o fator, definido como
+    duas unidades divididas por ela, se reduz a `Z/fx`.
+
+    Args:
+        focal_length_px: distância focal em pixels, da calibração da câmera.
+        root_depth_m: profundidade da raiz da pose, em metros. É a única
+            grandeza que uma câmera monocular não observa --- daí a escala
+            absoluta depender de conhecê-la, por calibração de cena ou por
+            suposição declarada.
+    """
+    if focal_length_px <= 0:
+        raise ValueError('distância focal precisa ser positiva')
+    return root_depth_m / (focal_length_px / 1000.0)
 
 # O codec do MotionBERT normaliza o 2D para [-1, 1] pela largura da imagem, e
 # desloca o eixo vertical por h/w para preservar a razão de aspecto. Replicar a

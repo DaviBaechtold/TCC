@@ -71,6 +71,11 @@ def parse_args():
                         '10; `normalizada` divide pela resposta média nos '
                         'keypoints observados; `constante` entrega 1,0, que é '
                         'o que o treino original do H3WB viu')
+    p.add_argument('--factor', type=float, default=None,
+                   help='Escala de decodificação. O padrão deriva da calibração '
+                        'do Drive&Act — lente de 567px, ocupante a 0,664m — em '
+                        'vez de usar a mediana do H3WB, que amplia a pose em '
+                        '3,8 vezes neste domínio')
     p.add_argument('--device', default='cuda:0')
     p.add_argument('--out', type=Path,
                    default=Path('results/lifting_driveact.json'))
@@ -109,8 +114,10 @@ def main():
     from src.models import torch_compat  # noqa: F401
     from src.data.driveact import read_pose_csv
     from src.models.pose_pipeline import FullBodyPosePipeline
-    from src.models.sequence_lifter import (OBSERVED_RESPONSE,
-                                            SequenceLifter)
+    from src.models.sequence_lifter import (DRIVEACT_FOCAL_PX,
+                                            DRIVEACT_OCCUPANT_DEPTH_M,
+                                            OBSERVED_RESPONSE, SequenceLifter,
+                                            factor_from_camera)
 
     import importlib.util
     spec = importlib.util.spec_from_file_location(
@@ -132,13 +139,16 @@ def main():
     # o lifter dividia de novo, entregando confiança na casa de 0,1 a um modelo
     # treinado entre 0,37 e 1,0 — e o resultado dessa medição foi descartado.
     escala = OBSERVED_RESPONSE if args.confidence == 'normalizada' else 1.0
+    fator = args.factor if args.factor is not None else factor_from_camera(
+        DRIVEACT_FOCAL_PX, DRIVEACT_OCCUPANT_DEPTH_M)
     lifter = SequenceLifter(args.lift_cfg or panel.LIFT_CONFIG,
                             args.lift_ckpt or panel.LIFT_CHECKPOINT,
-                            args.device, response_scale=escala)
+                            args.device, factor=fator, response_scale=escala)
 
     import cv2
 
     errors: list[float] = []
+    absolutos: list[float] = []
     por_sequencia: dict[str, float] = {}
     coerencia: list[float] = []
     coerencia_forma: list[float] = []
@@ -186,6 +196,14 @@ def main():
             aligned = procrustes_align(predicted[usable], truth[usable])
             errors.append(
                 np.linalg.norm(aligned - truth[usable], axis=-1).mean() * 1000)
+
+            # MPJPE absoluto, só ancorado na raiz. Ele só é interpretável com o
+            # fator vindo da calibração: com a mediana do H3WB a pose sai 3,8
+            # vezes maior e o número mediria sobretudo esse erro de escala.
+            raiz_pred = predicted[usable] - predicted[ROOT_KEYPOINT]
+            raiz_ref = truth[usable] - truth[ROOT_KEYPOINT]
+            absolutos.append(
+                np.linalg.norm(raiz_pred - raiz_ref, axis=-1).mean() * 1000)
             matched += 1
 
         # Por sequência, e não só agregado: a referência tem erro correlacionado
@@ -218,6 +236,11 @@ def main():
         'pose_checkpoint': Path(args.pose_ckpt or panel.POSE_CHECKPOINT).name,
         'lift_checkpoint': Path(args.lift_ckpt or panel.LIFT_CHECKPOINT).name,
         'confidence': args.confidence,
+        'factor': round(fator, 4),
+        # MPJPE absoluto, sem alinhamento: só é interpretável com o fator
+        # correto, e por isso não era reportado antes.
+        'mpjpe_mm': (round(float(np.mean(absolutos)), 2)
+                     if absolutos else None),
         'por_sequencia': por_sequencia,
         # Coerência de osso: desvio do comprimento, que é fisicamente constante.
         # Não precisa de referência, e por isso não herda a incerteza dela — a
