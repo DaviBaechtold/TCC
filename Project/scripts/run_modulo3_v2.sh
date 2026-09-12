@@ -10,7 +10,11 @@ LOGS=work_dirs/logs; mkdir -p "$LOGS"
 # Registra que esta fila está em execução, para que
 # scripts/retomar_apos_reboot.sh saiba o que retomar se a máquina cair.
 echo "run_modulo3_v2.sh" > "$LOGS/fila_pendente"
-trap 'rm -f "$LOGS/fila_pendente"' EXIT
+# O marcador só some quando a fila **conclui**, e é por isso que não há `trap
+# EXIT` aqui. O trap dispara também quando o shell é morto no desligamento da
+# máquina — exatamente o momento em que o marcador precisa sobreviver. Foi o que
+# aconteceu em 12/09: a máquina reiniciou, o trap apagou o marcador antes de
+# morrer, e a retomada automática não achou o que religar.
 agora() { date '+%H:%M:%S'; }
 
 for tentativa in 1 2 3; do
@@ -31,3 +35,5 @@ python scripts/validate_lifting_driveact.py \
     --max-sequences 4 --max-frames-per-sequence 120 \
     --out results/lifting_driveact_v2.json >> "$LOGS/lift_v2.log" 2>&1
 echo "[$(agora)] concluído"
+
+rm -f "$LOGS/fila_pendente"
