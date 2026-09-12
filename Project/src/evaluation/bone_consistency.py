@@ -64,19 +64,48 @@ def bone_lengths(sequence: np.ndarray,
     }
 
 
+# Osso de referência para a versão invariante a escala. O tronco é o mais
+# estável do corpo e o mais confiável na vista de retrovisor.
+SCALE_REFERENCE = ('tronco esquerdo', 'tronco direito')
+
+
 def consistency(sequence: np.ndarray,
                 bones: dict[str, tuple[int, int]] = OBSERVABLE_BONES
                 ) -> dict[str, float]:
     """Desvio do comprimento de cada osso ao longo da sequência, em milímetros.
 
+    Mede duas coisas de uma vez, e a distinção importa:
+
+    **Absoluto** (`mediana`) capta incoerência temporal **e** deriva de escala.
+    O lifting monocular não conhece a escala real, de modo que o tamanho
+    aparente da pessoa --- que muda quando ela se inclina para frente ou para
+    trás --- se traduz em tamanho predito. Parte do desvio absoluto é, portanto,
+    ambiguidade legítima da tarefa, e não erro.
+
+    **Relativo** (`mediana_relativa`) divide cada osso pelo comprimento do
+    tronco no mesmo quadro, e com isso mede só a coerência de **forma**. É a
+    mesma lógica que leva o PA-MPJPE a alinhar antes de comparar: separa o que o
+    método não se propõe a resolver do que ele deveria resolver.
+
     Returns:
-        Desvio por osso, mais a chave `mediana` agregando todos. Vazio se a
-        sequência for curta demais para o número significar algo.
+        Desvio por osso em milímetros, `mediana`, e `mediana_relativa` em
+        proporção do tronco. Vazio se a sequência for curta demais.
     """
     if len(sequence) < MIN_FRAMES:
         return {}
 
+    comprimentos = bone_lengths(sequence, bones)
     desvios = {nome: float(np.std(valores) * MILLIMETERS)
-               for nome, valores in bone_lengths(sequence, bones).items()}
+               for nome, valores in comprimentos.items()}
     desvios['mediana'] = float(np.median(list(desvios.values())))
+
+    escala = np.mean([comprimentos[nome] for nome in SCALE_REFERENCE
+                      if nome in comprimentos], axis=0)
+    if escala.ndim and np.all(escala > 1e-6):
+        relativos = [float(np.std(valores / escala))
+                     for nome, valores in comprimentos.items()
+                     if nome not in SCALE_REFERENCE]
+        if relativos:
+            desvios['mediana_relativa'] = float(np.median(relativos))
+
     return desvios

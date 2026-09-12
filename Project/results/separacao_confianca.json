@@ -1,0 +1,9 @@
+{
+  "checkpoint": "best_torso_px_mean_epoch_6_merged.pth",
+  "resposta_observaveis": 8.38,
+  "resposta_ausentes": 0.51,
+  "separacao": 16.33,
+  "ausentes_acima_do_limiar": 0.074,
+  "observaveis_acima_do_limiar": 1.0,
+  "quadros": 150
+}
