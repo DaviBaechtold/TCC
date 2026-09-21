@@ -1,0 +1,184 @@
+{
+  "checkpoint": "best_MPJPE_whole_epoch_15.pth",
+  "config": "lift3d_dstformer_h3wb_robusto.py",
+  "tag": "v2_com_teto",
+  "janelas": 1200,
+  "janelas_sentadas": 124,
+  "quadro": "causal, último da janela de 16",
+  "entrada_2d": "ground truth do H3WB, sujeito retido S7",
+  "teto_de_confianca": 0.3,
+  "nivel_do_corte_mesa": 0.35,
+  "condicoes": {
+    "completa": {
+      "mpjpe_mm": 39.92805099487305,
+      "mpjpe_visivel_mm": 39.92805099487305,
+      "mpjpe_oculto_mm": null,
+      "mpjpe_corpo_mm": 44.50165939331055,
+      "mpjpe_quadris_mm": 54.084259033203125,
+      "mpjpe_pernas_mm": 67.25614929199219,
+      "mpjpe_pes_mm": 73.46300506591797,
+      "mpjpe_face_mm": 7.760313034057617,
+      "mpjpe_maos_mm": 85.36722564697266,
+      "pa_mpjpe_mm": 35.52776336669922,
+      "ossos": {
+        "ombro-quadril esquerdo": {
+          "predito_mm": 449.6,
+          "verdadeiro_mm": 453.8,
+          "erro_mm": -4.3
+        },
+        "ombro-quadril direito": {
+          "predito_mm": 450.3,
+          "verdadeiro_mm": 451.6,
+          "erro_mm": -1.3
+        },
+        "coxa esquerda": {
+          "predito_mm": 400.9,
+          "verdadeiro_mm": 400.9,
+          "erro_mm": 0.0
+        },
+        "coxa direita": {
+          "predito_mm": 388.3,
+          "verdadeiro_mm": 397.7,
+          "erro_mm": -9.5
+        },
+        "canela esquerda": {
+          "predito_mm": 371.4,
+          "verdadeiro_mm": 368.6,
+          "erro_mm": 2.8
+        },
+        "canela direita": {
+          "predito_mm": 376.6,
+          "verdadeiro_mm": 371.6,
+          "erro_mm": 5.0
+        }
+      },
+      "juntas_ocultas_por_janela": 0.0,
+      "sentado": {
+        "mpjpe_mm": 67.42648315429688,
+        "mpjpe_visivel_mm": 67.42648315429688,
+        "mpjpe_oculto_mm": null,
+        "mpjpe_corpo_mm": 91.68528747558594,
+        "mpjpe_quadris_mm": 125.22439575195312,
+        "mpjpe_pernas_mm": 164.93228149414062,
+        "mpjpe_pes_mm": 193.76260375976562,
+        "mpjpe_face_mm": 9.644179344177246,
+        "mpjpe_maos_mm": 133.11170959472656,
+        "pa_mpjpe_mm": 54.56060028076172
+      }
+    },
+    "retrovisor": {
+      "mpjpe_mm": 53.68788146972656,
+      "mpjpe_visivel_mm": 38.82762908935547,
+      "mpjpe_oculto_mm": 236.46896362304688,
+      "mpjpe_corpo_mm": 82.47261047363281,
+      "mpjpe_quadris_mm": 58.10032653808594,
+      "mpjpe_pernas_mm": 220.9199676513672,
+      "mpjpe_pes_mm": 246.83493041992188,
+      "mpjpe_face_mm": 8.004570007324219,
+      "mpjpe_maos_mm": 88.40792846679688,
+      "pa_mpjpe_mm": 50.4053955078125,
+      "ossos": {
+        "ombro-quadril esquerdo": {
+          "predito_mm": 448.6,
+          "verdadeiro_mm": 453.8,
+          "erro_mm": -5.3
+        },
+        "ombro-quadril direito": {
+          "predito_mm": 450.9,
+          "verdadeiro_mm": 451.6,
+          "erro_mm": -0.7
+        },
+        "coxa esquerda": {
+          "predito_mm": 420.5,
+          "verdadeiro_mm": 400.9,
+          "erro_mm": 19.6
+        },
+        "coxa direita": {
+          "predito_mm": 405.3,
+          "verdadeiro_mm": 397.7,
+          "erro_mm": 7.5
+        },
+        "canela esquerda": {
+          "predito_mm": 385.6,
+          "verdadeiro_mm": 368.6,
+          "erro_mm": 17.0
+        },
+        "canela direita": {
+          "predito_mm": 371.5,
+          "verdadeiro_mm": 371.6,
+          "erro_mm": -0.1
+        }
+      },
+      "juntas_ocultas_por_janela": 10.0,
+      "sentado": {
+        "mpjpe_mm": 93.9361801147461,
+        "mpjpe_visivel_mm": 61.52730941772461,
+        "mpjpe_oculto_mm": 492.5653076171875,
+        "mpjpe_corpo_mm": 167.33409118652344,
+        "mpjpe_quadris_mm": 145.13784790039062,
+        "mpjpe_pernas_mm": 468.68487548828125,
+        "mpjpe_pes_mm": 508.4857177734375,
+        "mpjpe_face_mm": 9.193441390991211,
+        "mpjpe_maos_mm": 142.2086944580078,
+        "pa_mpjpe_mm": 88.77059936523438
+      }
+    },
+    "mesa": {
+      "mpjpe_mm": 130.33151245117188,
+      "mpjpe_visivel_mm": 53.670440673828125,
+      "mpjpe_oculto_mm": 356.49713134765625,
+      "mpjpe_corpo_mm": 194.7840118408203,
+      "mpjpe_quadris_mm": 609.869873046875,
+      "mpjpe_pernas_mm": 242.65625,
+      "mpjpe_pes_mm": 290.8305969238281,
+      "mpjpe_face_mm": 10.1022367477417,
+      "mpjpe_maos_mm": 275.9721374511719,
+      "pa_mpjpe_mm": 134.6690673828125,
+      "ossos": {
+        "ombro-quadril esquerdo": {
+          "predito_mm": 258.4,
+          "verdadeiro_mm": 453.8,
+          "erro_mm": -195.4
+        },
+        "ombro-quadril direito": {
+          "predito_mm": 227.1,
+          "verdadeiro_mm": 451.6,
+          "erro_mm": -224.5
+        },
+        "coxa esquerda": {
+          "predito_mm": 938.6,
+          "verdadeiro_mm": 400.9,
+          "erro_mm": 537.7
+        },
+        "coxa direita": {
+          "predito_mm": 913.9,
+          "verdadeiro_mm": 397.7,
+          "erro_mm": 516.1
+        },
+        "canela esquerda": {
+          "predito_mm": 319.2,
+          "verdadeiro_mm": 368.6,
+          "erro_mm": -49.4
+        },
+        "canela direita": {
+          "predito_mm": 293.5,
+          "verdadeiro_mm": 371.6,
+          "erro_mm": -78.2
+        }
+      },
+      "juntas_ocultas_por_janela": 33.7,
+      "sentado": {
+        "mpjpe_mm": 170.77960205078125,
+        "mpjpe_visivel_mm": 69.58679962158203,
+        "mpjpe_oculto_mm": 377.3831481933594,
+        "mpjpe_corpo_mm": 251.30897521972656,
+        "mpjpe_quadris_mm": 516.8120727539062,
+        "mpjpe_pernas_mm": 443.5351257324219,
+        "mpjpe_pes_mm": 490.8468017578125,
+        "mpjpe_face_mm": 17.670024871826172,
+        "mpjpe_maos_mm": 340.35223388671875,
+        "pa_mpjpe_mm": 154.45521545410156
+      }
+    }
+  }
+}

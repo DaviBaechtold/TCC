@@ -75,6 +75,25 @@ def coletar(results: Path) -> list[tuple[str, float]]:
         dados = json.loads(arquivo.read_text())
         numeros.append((arquivo.stem, dados['pa_mpjpe_mm']))
 
+    # A régua do Drive&Act existe em duas normalizações de entrada, e as duas
+    # aparecem no documento lado a lado: a antiga, pela largura do quadro, e a
+    # corrigida pela geometria da câmera. Citar uma e medir a outra foi o modo
+    # de falha que a Subseção da escala de entrada registra.
+    for arquivo in sorted(results.glob('regua_*.json')):
+        dados = json.loads(arquivo.read_text())
+        numeros.append((f'{arquivo.stem} PA-MPJPE', dados['pa_mpjpe_mm']))
+        if dados.get('mpjpe_mm') is not None:
+            numeros.append((f'{arquivo.stem} MPJPE', dados['mpjpe_mm']))
+
+    # Do protocolo de corte interessam as juntas que a câmera não enxerga: é
+    # por elas que o documento defende o treino com corte de quadro.
+    for arquivo in sorted(results.glob('truncamento_*.json')):
+        dados = json.loads(arquivo.read_text())
+        for condicao, valores in dados['condicoes'].items():
+            for regiao in ('quadris', 'pernas'):
+                numeros.append((f'{arquivo.stem} {condicao} {regiao}',
+                                valores[f'mpjpe_{regiao}_mm']))
+
     for arquivo in sorted((results / 'throughput').glob('*.json')):
         dados = json.loads(arquivo.read_text())
         numeros.append((f'throughput {dados["label"]}', dados['median_ms']))
