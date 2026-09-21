@@ -5,10 +5,17 @@ O Módulo 2 tem duas etapas de adaptação de domínio; o Módulo 3 não tem nen
 ele é treinado no H3WB, com pessoas em pé num laboratório, e aplicado a um
 ocupante sentado num habitáculo. Esta é a primeira medição desse salto.
 
-Reporta **PA-MPJPE**, com alinhamento de Procrustes, e não MPJPE. O motivo não é
-preferência: sem calibração da câmera o fator de escala do lifting é
-desconhecido, e o MPJPE absoluto mediria sobretudo esse fator, não a pose. O
-alinhamento remove escala e rotação e isola o que se quer avaliar, que é a forma.
+Reporta **PA-MPJPE**, com alinhamento de Procrustes, e também MPJPE absoluto. O
+alinhamento remove escala e rotação e isola a forma da pose; o absoluto mede a
+escala junto, e só é interpretável porque a calibração do retrovisor é conhecida
+— lente de 567px, ocupante a 0,664m da câmera, medido na própria referência 3D.
+Os dois são necessários: um lifting pode acertar a forma e errar o tamanho, e é
+exatamente isso que acontece quando o 2D entra fora da escala de treino.
+
+A escala entra por dois lugares independentes, e confundi-los já descartou uma
+medição. `--normalizacao camera` reprojeta o 2D na geometria em que o H3WB
+treinou, corrigindo a **entrada**; o fator de decodificação corrige a **saída**.
+Com a entrada 3,8 vezes fora de escala, nenhum fator de saída conserta a pose.
 
 Duas ressalvas que acompanham qualquer número daqui:
 
@@ -21,6 +28,9 @@ Duas ressalvas que acompanham qualquer número daqui:
 Exemplo:
     python scripts/validate_lifting_driveact.py \\
         --poses ~/Downloads/extracted/openpose_3d --max-sequences 5
+
+`--normalizacao largura` reproduz o caminho antigo, e é sob ele que os números
+publicados antes desta correção se repetem.
 """
 
 import argparse
@@ -33,6 +43,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 SEQUENCE_LENGTH = 16
 
+from src.evaluation.pose_alignment import procrustes_align
 from src.models.observability import MIRROR_VIEW_OBSERVABLE as OBSERVABLE_KEYPOINTS
 
 ROOT_KEYPOINT = 0
@@ -71,37 +82,23 @@ def parse_args():
                         '10; `normalizada` divide pela resposta média nos '
                         'keypoints observados; `constante` entrega 1,0, que é '
                         'o que o treino original do H3WB viu')
+    p.add_argument('--normalizacao', default='camera',
+                   choices=['camera', 'largura'],
+                   help='Como o 2D chega ao lifting. `camera` reprojeta os '
+                        'pontos na geometria em que o H3WB treinou, usando a '
+                        'calibração do retrovisor; `largura` normaliza pela '
+                        'largura do quadro, que é o caminho antigo e o único '
+                        'sob o qual os números já publicados se reproduzem')
     p.add_argument('--factor', type=float, default=None,
-                   help='Escala de decodificação. O padrão deriva da calibração '
-                        'do Drive&Act — lente de 567px, ocupante a 0,664m — em '
-                        'vez de usar a mediana do H3WB, que amplia a pose em '
-                        '3,8 vezes neste domínio')
+                   help='Escala de decodificação, só usada com `--normalizacao '
+                        'largura`. O padrão deriva da calibração do Drive&Act '
+                        '— lente de 567px, ocupante a 0,664m — em vez de usar a '
+                        'mediana do H3WB, que amplia a pose em 3,8 vezes neste '
+                        'domínio')
     p.add_argument('--device', default='cuda:0')
     p.add_argument('--out', type=Path,
                    default=Path('results/lifting_driveact.json'))
     return p.parse_args()
-
-
-def procrustes_align(predicted: np.ndarray, target: np.ndarray) -> np.ndarray:
-    """Alinha `predicted` a `target` por similaridade, sem deformar a pose.
-
-    Rotação, escala e translação são livres; a forma não. É o alinhamento do
-    PA-MPJPE, e remove exatamente as três grandezas que uma câmera não calibrada
-    deixa indeterminadas.
-    """
-    predicted_center = predicted - predicted.mean(axis=0)
-    target_center = target - target.mean(axis=0)
-
-    covariance = predicted_center.T @ target_center
-    left, singular, right = np.linalg.svd(covariance)
-    rotation = right.T @ left.T
-    if np.linalg.det(rotation) < 0:          # evita reflexão
-        right[-1] *= -1
-        rotation = right.T @ left.T
-        singular[-1] *= -1
-
-    scale = singular.sum() / (predicted_center ** 2).sum()
-    return scale * (predicted_center @ rotation.T) + target.mean(axis=0)
 
 
 def main():
@@ -116,8 +113,9 @@ def main():
     from src.models.pose_pipeline import FullBodyPosePipeline
     from src.models.sequence_lifter import (DRIVEACT_FOCAL_PX,
                                             DRIVEACT_OCCUPANT_DEPTH_M,
-                                            OBSERVED_RESPONSE, SequenceLifter,
-                                            factor_from_camera)
+                                            DRIVEACT_PRINCIPAL_POINT_PX,
+                                            OBSERVED_RESPONSE, CameraView,
+                                            SequenceLifter, factor_from_camera)
 
     import importlib.util
     spec = importlib.util.spec_from_file_location(
@@ -141,9 +139,18 @@ def main():
     escala = OBSERVED_RESPONSE if args.confidence == 'normalizada' else 1.0
     fator = args.factor if args.factor is not None else factor_from_camera(
         DRIVEACT_FOCAL_PX, DRIVEACT_OCCUPANT_DEPTH_M)
+    # Os 29 arquivos de calibração do retrovisor do Drive&Act trazem a mesma
+    # câmera, e o quadro de 1280x1024 que eles declaram é o das imagens em
+    # data/processed/driveact/val. Com `largura` a câmera não é construída, e
+    # é a largura do quadro que normaliza — o caminho que produziu os números
+    # já publicados.
+    camera = (None if args.normalizacao == 'largura' else
+              CameraView(DRIVEACT_FOCAL_PX, DRIVEACT_PRINCIPAL_POINT_PX,
+                         DRIVEACT_OCCUPANT_DEPTH_M))
     lifter = SequenceLifter(args.lift_cfg or panel.LIFT_CONFIG,
                             args.lift_ckpt or panel.LIFT_CHECKPOINT,
-                            args.device, factor=fator, response_scale=escala)
+                            args.device, camera=camera, factor=fator,
+                            response_scale=escala)
 
     import cv2
 
@@ -197,9 +204,9 @@ def main():
             errors.append(
                 np.linalg.norm(aligned - truth[usable], axis=-1).mean() * 1000)
 
-            # MPJPE absoluto, só ancorado na raiz. Ele só é interpretável com o
-            # fator vindo da calibração: com a mediana do H3WB a pose sai 3,8
-            # vezes maior e o número mediria sobretudo esse erro de escala.
+            # MPJPE absoluto, só ancorado na raiz. Mede escala junto com forma,
+            # e por isso é o número que denuncia entrada fora de escala — o que
+            # o PA-MPJPE, que alinha a escala antes de medir, esconde.
             raiz_pred = predicted[usable] - predicted[ROOT_KEYPOINT]
             raiz_ref = truth[usable] - truth[ROOT_KEYPOINT]
             absolutos.append(
@@ -236,7 +243,10 @@ def main():
         'pose_checkpoint': Path(args.pose_ckpt or panel.POSE_CHECKPOINT).name,
         'lift_checkpoint': Path(args.lift_ckpt or panel.LIFT_CHECKPOINT).name,
         'confidence': args.confidence,
-        'factor': round(fator, 4),
+        'normalizacao': args.normalizacao,
+        # Com `camera` quem decodifica é a geometria virtual do H3WB, e este
+        # fator não é aplicado; fica no relatório só para o modo `largura`.
+        'factor': round(fator, 4) if camera is None else None,
         # MPJPE absoluto, sem alinhamento: só é interpretável com o fator
         # correto, e por isso não era reportado antes.
         'mpjpe_mm': (round(float(np.mean(absolutos)), 2)
