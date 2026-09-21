@@ -19,6 +19,8 @@ from dataclasses import dataclass, field
 import cv2
 import numpy as np
 
+from src.visualization.skeleton import COLOR_TORSO
+
 FONT = cv2.FONT_HERSHEY_SIMPLEX
 
 BACKGROUND = (26, 22, 20)
@@ -32,6 +34,13 @@ GOOD = (120, 200, 130)
 
 PADDING = 14
 HEADER_HEIGHT = 42
+
+# Legenda do painel 3D. A amostra usa a cor do tronco, importada e não copiada:
+# uma legenda com cor própria mente na primeira vez que a paleta muda.
+LEGEND_SWATCH_COLOR = COLOR_TORSO
+LEGEND_SWATCH_WIDTH = 22
+LEGEND_ROW_HEIGHT = 16
+LEGEND_BOTTOM_OFFSET = 40
 STATUS_HEIGHT = 34
 BUTTON_HEIGHT = 38
 TITLE_HEIGHT = 24
@@ -66,14 +75,21 @@ class PanelState:
     # como "17/17 detectados" não significa nada sem o limiar ao lado.
     score_threshold: float = 0.0
     keypoints_3d: np.ndarray | None = None
-    # Quais keypoints o estimador 2D localizou de fato. O lifting devolve
-    # posição para todos os 133, inclusive os que nunca estiveram na imagem.
-    keypoints_3d_reliable: np.ndarray | None = None
-    # Ângulo da vista 3D, girado continuamente para dar noção de volume: numa
-    # projeção ortográfica estática a pose é ambígua em profundidade.
+    # Quais keypoints o sistema de fato observou neste quadro. O lifting devolve
+    # posição para todos os 133, inclusive os que nunca estiveram na imagem; o
+    # corpo inteiro é desenhado, e esta máscara é o que separa o que foi medido
+    # do que foi predito.
+    keypoints_3d_observed: np.ndarray | None = None
+    # Ângulo da vista 3D. Quem o produz é o controlador, com um balanço de
+    # amplitude limitada: numa projeção ortográfica estática a pose é ambígua em
+    # profundidade, e uma volta completa contínua tira a referência de frente.
     azimuth: float = 0.0
     lifting_warming_up: bool = False
     calibrated: bool = False
+    # Distância suposta da câmera ao ocupante, em metros. Fica no estado porque
+    # o painel precisa exibi-la: é a única grandeza que a câmera monocular não
+    # observa, e o tamanho absoluto da pose 3D depende inteiramente dela.
+    subject_depth_m: float = 0.0
     frame_index: int = 0
     paused: bool = False
     message: str = ''
@@ -187,19 +203,49 @@ class ValidationPanel:
                  (x + 10, center_y + 10), 0.44, TEXT_MUTED)
             return
 
+        # Import local: `skeleton3d` lê a paleta daqui, e importá-lo no topo
+        # fecharia o ciclo entre os dois módulos da View.
         from src.visualization.skeleton3d import draw_pose_3d
 
         draw_pose_3d(canvas, state.keypoints_3d, (x, y), (w, h),
-                     state.azimuth, state.keypoints_3d_reliable)
+                     state.azimuth, state.keypoints_3d_observed,
+                     state.calibrated)
+
+        self._draw_3d_legend(canvas, (x, y, w, h))
 
         # A escala só é métrica quando a câmera está calibrada: sem o fator de
-        # geometria o erro cresce 68%, então exibir metros seria enganoso.
-        rodape = ('Escala metrica (camera calibrada)' if state.calibrated
+        # geometria o erro cresce 68%, então exibir metros seria enganoso. Com
+        # ela, o número exibido junto é a suposição de que o tamanho depende.
+        rodape = (f'Escala metrica, ocupante suposto a '
+                  f'{state.subject_depth_m:.2f} m' if state.calibrated
                   else 'Forma correta, escala aproximada: camera sem calibracao')
         _put(canvas, rodape, (x + 6, y + h - 6), 0.4, TEXT_MUTED)
         if state.lifting_warming_up:
             _put(canvas, 'Buffer temporal enchendo', (x + 6, y + 18), 0.42,
                  WARNING)
+
+    def _draw_3d_legend(self, canvas, rect):
+        """Distingue o que foi observado do que o lifting previu.
+
+        A legenda desenha com a mesma espessura e a mesma cor esmaecida do
+        esqueleto, importadas de lá. Reproduzi-las com valores próprios faria a
+        legenda mentir na primeira vez que o desenho mudasse.
+        """
+        from src.visualization.skeleton3d import (OBSERVED_THICKNESS,
+                                                  PREDICTED_THICKNESS,
+                                                  muted_color)
+
+        x, y, w, h = rect
+        base_y = y + h - LEGEND_BOTTOM_OFFSET
+        for row, (label, color, thickness) in enumerate(
+                [('observado', LEGEND_SWATCH_COLOR, OBSERVED_THICKNESS),
+                 ('previsto pelo lifting', muted_color(LEGEND_SWATCH_COLOR),
+                  PREDICTED_THICKNESS)]):
+            row_y = base_y + row * LEGEND_ROW_HEIGHT
+            cv2.line(canvas, (x + 6, row_y), (x + 6 + LEGEND_SWATCH_WIDTH, row_y),
+                     color, thickness, cv2.LINE_AA)
+            _put(canvas, label, (x + 12 + LEGEND_SWATCH_WIDTH, row_y + 4), 0.4,
+                 TEXT_MUTED)
 
     def _draw_region_metrics(self, canvas, state):
         x, y, w, h = _panel(canvas, self.rect_metrics_2d,

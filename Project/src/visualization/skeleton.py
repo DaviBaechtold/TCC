@@ -78,6 +78,14 @@ def _build_links() -> list[tuple[int, int, tuple[int, int, int]]]:
     add(_hand_links(LEFT_HAND_START), COLOR_LEFT_HAND)
     add(_hand_links(RIGHT_HAND_START), COLOR_RIGHT_HAND)
 
+    # Punho até a raiz da mão. O metainfo `coco_wholebody` do MMPose **não** tem
+    # estas duas ligações entre suas 65: na anotação a raiz da mão *é* o punho,
+    # e a ligação seria degenerada. O estimador, porém, não coloca as duas no
+    # mesmo lugar — medidos 12,6 px de separação mediana em 2D e 28mm em 3D,
+    # 12% do antebraço — e sem a ligação a mão inteira aparece solta no ar.
+    add([(9, LEFT_HAND_START)], COLOR_LEFT_HAND)
+    add([(10, RIGHT_HAND_START)], COLOR_RIGHT_HAND)
+
     return links
 
 

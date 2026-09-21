@@ -4,13 +4,19 @@
 Controller: lê argumentos, liga câmera, pipeline e painel, e trata a entrada do
 usuário. Nenhuma regra de estimação ou de desenho vive aqui.
 
-Sem argumentos, usa o modelo corrente do projeto com a webcam padrão:
+Sem argumentos, usa o modelo corrente do projeto com a webcam de mesa:
 
     python scripts/run_panel.py
 
-Os demais argumentos servem para comparar modelos ou reproduzir um vídeo.
-`--lift-ckpt ""` desliga o painel 3D, o que é útil para isolar o custo do
-Módulo 3 ao medir a taxa de quadros.
+Para um vídeo do Drive&Act, a montagem muda o que o sistema considera
+observável:
+
+    python scripts/run_panel.py --source video.mp4 --montagem retrovisor \\
+        --calibracao run.calibration.json --distancia 0.66
+
+Os demais argumentos servem para comparar modelos. `--lift-ckpt ""` desliga o
+painel 3D, o que é útil para isolar o custo do Módulo 3 ao medir a taxa de
+quadros.
 
 **Não rode com um treino em andamento.** A disputa pela GPU derruba a taxa para
 cerca de um terço da real: medidos 63ms por quadro sob contenção contra 20ms com
@@ -31,9 +37,12 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src.models.observability import reliable_keypoints
+from src.data.camera_calibration import load_intrinsics
+from src.data.estimator_noise import UNOBSERVED_CONFIDENCE_CAP
+from src.models.observability import MOUNTING_ABSENT, observed_keypoints
 from src.models.pose_pipeline import (DEFAULT_DETECTOR_SCORE,
                                       FullBodyPosePipeline, PersonDetector)
+from src.models.temporal_filter import OneEuroFilter
 from src.visualization.panel import PanelState, ValidationPanel
 from src.visualization.skeleton import draw_box, draw_pose
 
@@ -66,22 +75,60 @@ DETECTOR_CHECKPOINT = ('checkpoints/rtmdet_nano_8xb32-100e_coco-obj365-person-'
 # parte da resposta espúria sem perder os keypoints de fato localizados.
 DEFAULT_SCORE_THRESHOLD = 3.0
 
-LIFT_CONFIG = 'configs/lift3d_dstformer_h3wb_16frm.py'
-LIFT_CHECKPOINT = 'work_dirs/lift3d_dstformer_h3wb/best_MPJPE_whole_epoch_30.pth'
+# Lifting treinado com o corte de quadro, que é o regime desta montagem: numa
+# webcam de mesa o quadril fica fora da imagem, e o estimador 2D o gruda na
+# borda inferior com resposta alta. Medido no protocolo de corte sobre o S7
+# (`scripts/measure_lifting_truncation.py`), condição `mesa`: erro de quadril
+# 72,0mm contra 495,8mm do v2, pernas 117,5 contra 237,2, e o tronco predito
+# sai em 464,8mm contra 453,8mm de ground truth — o v2 colapsa o tronco para
+# 181,6mm. Na entrada íntegra não custa nada: 39,6 contra 39,9mm.
+LIFT_CONFIG = 'configs/lift3d_dstformer_h3wb_robusto_v3.py'
+LIFT_CHECKPOINT = 'work_dirs/lift3d_robusto_v3/best_MPJPE_whole_epoch_12.pth'
+
+# Teto de confiança das juntas que o sistema sabe não ter observado. É contrato
+# entre treino e inferência, e por isso anda junto do checkpoint: só vale para
+# quem treinou com ele. Aplicá-lo ao v2, que não treinou, piora o quadril de
+# 495,8 para 609,9mm no mesmo protocolo. `None` desliga.
+LIFT_UNOBSERVED_CONFIDENCE = UNOBSERVED_CONFIDENCE_CAP
 
 # Calibração da câmera própria, produzida por scripts/calibrate_camera.py. Sem
 # ela a escala da pose 3D é herdada de outro dataset, o que no Drive&Act ampliou
 # a pose em 3,8 vezes — e o painel declara a diferença em vez de escondê-la.
 CAMERA_CALIBRATION = 'configs/camera/webcam.calibration.json'
 
-# Distância típica da câmera ao ocupante. É a única grandeza que a câmera
-# monocular não observa, e por isso precisa ser informada ou medida uma vez.
-# O padrão é o do retrovisor do Drive&Act; para uma webcam de mesa, medir.
-DEFAULT_SUBJECT_DEPTH_M = 0.664
+# Distância típica da câmera ao ocupante, por montagem. É a única grandeza que a
+# câmera monocular não observa, e o tamanho absoluto da pose depende dela.
+#
+# Mesa: medido nesta gravação pela distância interocular, 45,1 px em mediana
+# contra 63mm de distância pupilar de adulto, o que dá 1,35m. A largura de ombros
+# dá 1,65m pelo mesmo caminho, e é a estimativa pior — o ombro encurta quando o
+# tronco gira. Retrovisor: 0,66m, mediana medida na referência 3D do Drive&Act.
+DEFAULT_SUBJECT_DEPTH_M = {'mesa': 1.35, 'retrovisor': 0.664}
 
-# Uma volta completa a cada ~12 segundos a 30 FPS. Mais rápido cansa a leitura,
-# mais lento não chega a revelar a profundidade.
-AZIMUTH_STEP_RADIANS = 0.0175
+# Taxa nominal do painel, que o One Euro assume constante. Um desvio de alguns
+# hertz desloca o corte efetivo na mesma proporção, sem quebrar o filtro.
+FILTER_RATE_HZ = 30.0
+
+# Balanço da vista 3D, em lugar da volta completa que havia aqui. Uma volta
+# contínua tira a referência de frente justo quando se quer conferir a pose;
+# ±25° dão paralaxe suficiente para separar em profundidade dois membros
+# sobrepostos mantendo o corpo de frente. O período em quadros, e não em
+# segundos, mantém o balanço idêntico entre a câmera e a reprodução de um vídeo;
+# 180 quadros são cerca de seis segundos a 30 FPS.
+SWAY_AMPLITUDE_RADIANS = np.deg2rad(25.0)
+SWAY_PERIOD_FRAMES = 180
+
+
+def confianca_opcional(texto: str) -> float | None:
+    """Lê o teto de confiança, aceitando "nenhum" para desligá-lo.
+
+    Existe porque o teto não é um número sempre presente: ele é contrato com o
+    treino do checkpoint, e um checkpoint que não o viu precisa recebê-lo
+    ausente, não zerado --- zero é uma confiança, ausência não é.
+    """
+    if texto.strip().lower() in ('', 'nenhum', 'none'):
+        return None
+    return float(texto)
 
 
 def parse_args():
@@ -99,19 +146,29 @@ def parse_args():
                         help='Config do lifting 2D para 3D')
     parser.add_argument('--lift-ckpt', default=LIFT_CHECKPOINT,
                         help='Checkpoint do lifting; vazio desliga o painel 3D')
+    parser.add_argument('--teto-confianca', type=confianca_opcional,
+                        default=LIFT_UNOBSERVED_CONFIDENCE,
+                        help='Teto de confiança das juntas não '
+                             'observadas. Precisa casar com o que o '
+                             'checkpoint de lifting viu no treino')
+    parser.add_argument('--montagem', default='mesa',
+                        choices=sorted(MOUNTING_ABSENT),
+                        help='Onde a câmera está montada. Decide quais juntas '
+                             'não aparecem em quadro algum: no retrovisor, '
+                             'joelhos, tornozelos e pés')
     parser.add_argument('--calibracao', default=CAMERA_CALIBRATION,
                         help='Calibração da câmera. Sem ela a escala da pose 3D '
                              'é herdada e apenas aproximada')
-    parser.add_argument('--distancia', type=float,
-                        default=DEFAULT_SUBJECT_DEPTH_M,
+    parser.add_argument('--distancia', type=float, default=None,
                         help='Distância da câmera ao ocupante, em metros. '
-                             'Medir uma vez: é o que a câmera não observa')
+                             'Medir uma vez: é o que a câmera não observa. '
+                             'O padrão depende da montagem')
     parser.add_argument('--source', default='0', help='Índice de câmera ou caminho de vídeo')
     parser.add_argument('--device', default='cuda:0')
     parser.add_argument('--score-thr', type=float, default=DEFAULT_SCORE_THRESHOLD,
                         help='Resposta mínima para contar um keypoint como '
                              'detectado. Não é probabilidade: a saída do SimCC '
-                             'não tem teto em 1'),
+                             'não tem teto em 1')
     parser.add_argument('--bbox-thr', type=float,
                         default=DEFAULT_DETECTOR_SCORE,
                         help='Confiança mínima do detector de pessoas; '
@@ -123,7 +180,11 @@ def parse_args():
                              'escala de cinza, que é o domínio em que o modelo '
                              'foi treinado como proxy de infravermelho')
     parser.add_argument('--out-dir', type=Path, default=Path('work_dirs/panel'))
-    return parser.parse_args()
+
+    args = parser.parse_args()
+    if args.distancia is None:
+        args.distancia = DEFAULT_SUBJECT_DEPTH_M[args.montagem]
+    return args
 
 
 def open_source(source: str, width: int, height: int) -> tuple[cv2.VideoCapture, str]:
@@ -159,22 +220,6 @@ def to_model_domain(frame: np.ndarray, keep_color: bool) -> np.ndarray:
     return cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
 
 
-def _focal_length(caminho: str) -> float | None:
-    """Lê a distância focal de um arquivo de calibração, se houver.
-
-    Aceita o formato dos arquivos do Drive&Act, que é o mesmo que
-    `scripts/calibrate_camera.py` grava — assim o painel não distingue uma
-    câmera calibrada por nós de uma calibrada pelos autores do dataset.
-    """
-    import json
-
-    arquivo = Path(caminho)
-    if not caminho or not arquivo.exists():
-        return None
-    dados = json.loads(arquivo.read_text())
-    return float(dados['intrinsics']['focallength']['fx'])
-
-
 def _config_without_flip_test(config_path: str, out_dir: Path) -> str:
     """Desliga o flip test, que dobra o custo da pose sem valor em operação.
 
@@ -194,6 +239,38 @@ def _config_without_flip_test(config_path: str, out_dir: Path) -> str:
     return str(patched)
 
 
+def build_lifter(args):
+    """Monta o lifting 3D com a geometria da câmera, se ela for conhecida.
+
+    Returns:
+        (lifter, calibrado). `lifter` é `None` quando o painel 3D está desligado.
+    """
+    if not args.lift_ckpt:
+        print('Sem lifting: o painel 3D fica vazio.')
+        return None, False
+
+    print('Carregando lifting 3D...')
+    from src.models.sequence_lifter import CameraView, SequenceLifter
+
+    intrinsics = load_intrinsics(args.calibracao)
+    camera = None
+    if intrinsics is not None:
+        camera = CameraView(focal_length_px=intrinsics.fx,
+                            principal_point=(intrinsics.cx, intrinsics.cy),
+                            subject_depth_m=args.distancia)
+        print(f'  calibração: fx {intrinsics.fx:.1f}px, centro '
+              f'({intrinsics.cx:.0f}, {intrinsics.cy:.0f}), ocupante a '
+              f'{args.distancia:.2f}m')
+    else:
+        print(f'  sem calibração em {args.calibracao}; escala herdada do H3WB, '
+              f'pose aproximada em tamanho')
+
+    lifter = SequenceLifter(args.lift_cfg, args.lift_ckpt, args.device,
+                            camera=camera,
+                            unobserved_confidence=args.teto_confianca)
+    return lifter, camera is not None
+
+
 def main():
     args = parse_args()
     args.out_dir.mkdir(parents=True, exist_ok=True)
@@ -206,26 +283,11 @@ def main():
     else:
         print('Sem detector: o frame inteiro e usado como regiao de interesse.')
 
-    lifter = None
-    calibrado = False
-    if args.lift_ckpt:
-        print('Carregando lifting 3D...')
-        from src.models.sequence_lifter import (DEFAULT_FACTOR, SequenceLifter,
-                                                factor_from_camera)
-        fator, calibrado = DEFAULT_FACTOR, False
-        focal = _focal_length(args.calibracao)
-        if focal is not None:
-            fator = factor_from_camera(focal, args.distancia)
-            calibrado = True
-            print(f'  calibração: fx {focal:.1f}px, ocupante a '
-                  f'{args.distancia:.2f}m -> escala {fator:.3f}')
-        else:
-            print(f'  sem calibração em {args.calibracao}; escala herdada do '
-                  f'H3WB ({fator:.3f}), pose aproximada em tamanho')
-        lifter = SequenceLifter(args.lift_cfg, args.lift_ckpt, args.device,
-                                factor=fator)
-    else:
-        print('Sem lifting: o painel 3D fica vazio.')
+    lifter, calibrado = build_lifter(args)
+    # O One Euro trabalha na saída 3D, em metros. Medido: filtrar ali reduz 69%
+    # do tremor a 0,14 quadro de atraso, e filtrar o 2D de entrada rende menos,
+    # porque a rede é temporal e espalha o ruído pela janela de dezesseis.
+    smoother = OneEuroFilter(FILTER_RATE_HZ)
 
     print('Carregando estimador de pose...')
     pipeline = FullBodyPosePipeline(_config_without_flip_test(args.cfg, args.out_dir),
@@ -235,7 +297,8 @@ def main():
     panel = ValidationPanel()
     state = PanelState(source_label=source_label,
                        score_threshold=args.score_thr,
-                       calibrated=calibrado)
+                       calibrated=calibrado,
+                       subject_depth_m=args.distancia)
 
     clicked: dict[str, str | None] = {'key': None}
 
@@ -266,51 +329,53 @@ def main():
                     frame = to_model_domain(raw, args.color)
                     result = pipeline(frame)
 
+                    height, width = frame.shape[:2]
+                    # Uma única máscara por quadro alimenta o overlay 2D, as
+                    # métricas por região, a confiança que o lifting recebe e o
+                    # traço do painel 3D. Calculá-la em cada lugar deixaria o
+                    # sistema afirmando num quadrante o que nega no outro — um
+                    # print do painel exibia "Pes 2/6" sem um pé desenhado.
+                    observed = observed_keypoints(
+                        result.keypoints, result.scores, (width, height),
+                        args.score_thr, args.montagem)
+
                     if show_skeleton:
                         for index in range(result.num_people):
                             draw_box(frame, result.boxes[index])
-                            # A mesma máscara do painel 3D: o sistema não pode
-                            # afirmar num quadrante o que nega no outro. Uma
-                            # junta que a câmera não enxerga não é desenhada em
-                            # lugar nenhum.
-                            trusted = reliable_keypoints(result.scores[index],
-                                                         args.score_thr)
                             draw_pose(frame, result.keypoints[index],
-                                      np.where(trusted, result.scores[index],
-                                               0.0), args.score_thr)
+                                      np.where(observed[index],
+                                               result.scores[index], 0.0),
+                                      args.score_thr)
 
                     frame_times.append(time.perf_counter() - started)
                     state.frame = frame
                     state.num_people = result.num_people
                     state.latency_ms = result.latency_ms
-                    state.region_confidence = result.region_confidence(args.score_thr)
-                    state.region_counts = result.region_counts(args.score_thr)
+                    state.region_confidence = result.region_confidence(
+                        args.score_thr, observed)
+                    state.region_counts = result.region_counts(
+                        args.score_thr, observed)
                     state.fps = len(frame_times) / sum(frame_times) if frame_times else 0.0
                     state.frame_index += 1
 
                     if lifter is not None and result.num_people:
-                        height, width = frame.shape[:2]
-                        state.keypoints_3d = lifter(result.keypoints[0],
-                                                    result.scores[0],
-                                                    (width, height))
-                        # O limiar sozinho deixa passar 92% das juntas que a
-                        # câmera não enxerga, porque a adaptação ao domínio as
-                        # tornou confiantes sem torná-las corretas. A geometria
-                        # da montagem é o que separa as duas populações.
-                        state.keypoints_3d_reliable = reliable_keypoints(
-                            result.scores[0], args.score_thr)
+                        state.keypoints_3d = smoother(
+                            lifter(result.keypoints[0], result.scores[0],
+                                   (width, height), observed=observed[0]))
+                        state.keypoints_3d_observed = observed[0]
                         state.lifting_warming_up = lifter.warming_up
                     else:
                         state.keypoints_3d = None
                         if lifter is not None:
                             # Sem pessoa o buffer perderia continuidade
                             # temporal; recomeçar é melhor que misturar
-                            # trechos separados por uma lacuna.
+                            # trechos separados por uma lacuna. O filtro
+                            # acompanha, ou carregaria a pose antiga.
                             lifter.reset()
+                            smoother.reset()
 
-                    # Gira a vista continuamente: numa projeção ortográfica
-                    # estática a profundidade é ambígua a olho nu.
-                    state.azimuth += AZIMUTH_STEP_RADIANS
+                    state.azimuth = SWAY_AMPLITUDE_RADIANS * np.sin(
+                        2 * np.pi * state.frame_index / SWAY_PERIOD_FRAMES)
 
                     if writer is not None:
                         writer.write(frame)

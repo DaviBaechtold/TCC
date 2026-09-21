@@ -80,6 +80,43 @@ class Intrinsics:
         path.write_text(json.dumps(self.as_driveact_json(), indent=2))
 
 
+def load_intrinsics(path: Path | str) -> Intrinsics | None:
+    """Lê intrínsecos de um arquivo de calibração, ou `None` se não houver.
+
+    Aceita tanto o que `Intrinsics.save` grava quanto os `.calibration.json` que
+    acompanham o Drive&Act — é o mesmo formato, de propósito, para que o resto
+    do sistema não precise distinguir uma câmera calibrada por nós de uma
+    calibrada pelos autores do dataset.
+
+    Existe aqui, e não em quem chama, porque a escala métrica da pose 3D depende
+    destes números: um controlador que lesse o JSON por conta própria seria o
+    lugar onde `fy` entraria no lugar de `fx` sem que nada acusasse.
+    """
+    arquivo = Path(path)
+    if not str(path) or not arquivo.exists():
+        return None
+
+    bruto = json.loads(arquivo.read_text())
+    dados = bruto['intrinsics']
+    focal, centro = dados['focallength'], dados['principal_point']
+    tamanho, distorcao = dados['img_size'], dados['distortion']
+
+    # Os arquivos do Drive&Act não trazem `quality`: a qualidade da calibração
+    # deles não é nossa e não foi medida aqui. NaN diz isso; zero diria que a
+    # reprojeção foi perfeita.
+    qualidade = bruto.get('quality', {})
+
+    return Intrinsics(
+        fx=float(focal['fx']), fy=float(focal['fy']),
+        cx=float(centro['cx']), cy=float(centro['cy']),
+        distortion=tuple(float(distorcao[k])
+                         for k in ('k1', 'k2', 'p1', 'p2', 'k3')),
+        width=int(tamanho['width']), height=int(tamanho['height']),
+        reprojection_error=float(qualidade.get('reprojection_error_px',
+                                               float('nan'))),
+        views=int(qualidade.get('views', 0)))
+
+
 def find_corners(image: np.ndarray,
                  pattern: tuple[int, int] = DEFAULT_PATTERN
                  ) -> np.ndarray | None:

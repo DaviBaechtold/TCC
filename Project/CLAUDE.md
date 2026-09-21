@@ -58,9 +58,9 @@ carregado, porque o MMPose não converte bfloat16 para NumPy.
 |---|---|
 | Dataset COCO-WholeBody grayscale | Pronto: 118.287 treino / 5.000 val |
 | Módulo 2 — estimação 2D top-down | Funcional (RTMDet-nano + RTMW-x); adaptação de domínio por LoRA em curso |
-| Módulo 1 — aquisição | Parcial: captura OK, calibração/undistort pendentes |
-| Módulo 3 — lifting 3D | DSTFormer 42,4M params sobre H3WB; batch 4 é o teto dos 8 GB (3,66 GB, 5,1 min/época) |
-| Módulo 4 — visualização | Painel de validação funcional (2D, métricas, FPS); visualização 3D pendente do Módulo 3 |
+| Módulo 1 — aquisição | Parcial: captura e calibração OK (fx 959,4, reprojeção 0,414px). **A distância ao ocupante é o parâmetro mais frágil do sistema** — dela dependem a escala de entrada e a de saída do lifting, e os 0,97m informados na demo são desmentidos pela pose reconstruída (interpupilar 43,3mm; a 1,40m daria 63,7mm). Medir com trena. |
+| Módulo 3 — lifting 3D | DSTFormer 42,4M params sobre H3WB; batch 4 é o teto dos 8 GB. Checkpoint corrente: `work_dirs/lift3d_robusto_v3/best_MPJPE_whole_epoch_12.pth` (treino com corte de quadro) |
+| Módulo 4 — visualização | Painel completo: 2D, 3D de corpo inteiro com previsto distinto de observado, escala métrica fixa, filtro One Euro, métricas por região coerentes com o desenho |
 | Drive&Act | Vídeos e anotações baixados; conversor escrito e validado |
 | H3WB (lifting 3D) | Baixado e convertido: 60k treino / 20k teste, 133 keypoints |
 | Human3.6M (imagens) | Não necessário — a tarefa 2D→3D usa só coordenadas |
@@ -122,6 +122,45 @@ cada: COCO em cinza tem média 105,3 e desvio 56,4; o NIR do Drive&Act tem 29,6
 e 31,0. Três vezes e meia mais escuro, metade do contraste. É o que explica a
 saturação do LoRA e o que justifica a Etapa 3.
 
+**A calibração corrige a saída do lifting, não a entrada.** O codec normaliza o
+2D pela largura do quadro, de modo que a rede recebe `2·fx/(Z·W)` unidades
+normalizadas por metro: 0,447 no H3WB, 1,545 numa webcam a 0,97m — 3,46× fora da
+distribuição de treino, e o DSTFormer não normaliza escala internamente. Medido
+no S7 com a geometria da webcam: **276,3mm de erro contra 48,0mm** depois de
+remapear a entrada para a geometria de treino (referência 47,5mm). Ao vivo o
+tremor do tronco cai 2 a 3 vezes. `CameraView` em `src/models/sequence_lifter.py`
+faz o remapeamento; sem calibração o caminho antigo continua, declarado como
+aproximado.
+
+**O lifting corrente é o treinado com corte de quadro (v3).** Protocolo de corte
+sobre o S7 (`scripts/measure_lifting_truncation.py`), condição `mesa`, que é o
+enquadramento da webcam:
+
+| Modelo | MPJPE | Visíveis | Quadris | Pernas | Tronco (GT 453,8mm) |
+|---|---|---|---|---|---|
+| Base | 140,7mm | 39,7mm | 243,9mm | 747,2mm | 261,0mm |
+| Simulação (v2) | 103,7mm | 40,2mm | 495,8mm | 237,2mm | 181,6mm |
+| **Corte (v3)** | **55,7mm** | **29,5mm** | **72,0mm** | **117,5mm** | **464,8mm** |
+
+Na entrada íntegra não custa nada (39,6 contra 39,9mm; 36,32 na validação
+oficial). No Drive&Act os dois empatam dentro da incerteza da referência
+(81,79 contra 79,09mm de PA-MPJPE) e a coerência de osso melhora de 29,78 para
+25,20mm com movimento igual.
+
+**O teto de confiança é contrato entre treino e inferência.** `UNOBSERVED_CONFIDENCE_CAP = 0,3`
+em `src/data/estimator_noise.py`: o painel rebaixa a confiança das juntas que
+sabe não ter observado, e o v3 treinou vendo essa faixa. Aplicá-lo a um
+checkpoint que não treinou com ele **piora** — v2 vai de 495,8 para 609,9mm no
+quadril. Por isso ele anda junto do checkpoint (`--teto-confianca`), não do painel.
+
+**A simulação descreve parte do mecanismo, e a transferência é parcial.** Na
+gravação real o v3 corta pela metade a incoerência de forma (0,3625 → 0,1800) e
+traz a largura de quadril para a faixa adulta, mas o tronco previsto continua em
+319,4mm contra 450 a 550mm esperados — contra 464,8mm no corte simulado. O
+estimador real prende o quadril na borda (o que a simulação reproduz) e espalha
+joelhos e tornozelos sobre tronco e braços (o que ela não reproduz). Próximo
+passo medido, não suposto: caracterizar onde ele coloca joelho e tornozelo.
+
 Quatro conclusões que orientam todo trabalho futuro:
 
 1. **O RTMW-x é o modelo do projeto.** 0,6857 em grayscale sem treino nenhum,
@@ -164,7 +203,17 @@ python scripts/train_wholebody.py \
   --config configs/rtmpose_m_wholebody_gray_ft.py [--epochs 10]
 
 # Painel de validação ao vivo, com os modelos correntes por padrão
-python scripts/run_panel.py
+python scripts/run_panel.py [--montagem mesa|retrovisor] [--distancia 1.35]
+
+# Protocolo de corte: quanto o lifting erra nas juntas que a câmera não vê.
+# A condição `mesa` é o mecanismo que treina o v3 — para ele mede aderência ao
+# próprio treino, não generalização. A evidência independente é o Drive&Act.
+python scripts/measure_lifting_truncation.py --lift-cfg <cfg> --lift-ckpt <ckpt> --tag <nome>
+
+# Qualidade ao vivo sobre um vídeo, sem referência: tremor por região, controle
+# de movimento, coerência de osso e plausibilidade anatômica. O passo 2D fica em
+# cache, então comparar checkpoints roda o estimador uma vez só.
+python scripts/measure_live_quality.py --tag <nome> [--lift-ckpt <ckpt>] [--sem-filtro]
 
 # Calibração da webcam (Logitech C922, 1280x720). Já feita em 12/09/2026:
 # fx 959,4  fy 957,9  centro (618,1; 342,7)  reprojeção 0,414px em 21 vistas.

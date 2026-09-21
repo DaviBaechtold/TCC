@@ -52,8 +52,23 @@ class PoseResult:
     def num_people(self) -> int:
         return len(self.boxes)
 
-    def region_confidence(self, min_score: float) -> dict[str, float]:
-        """Confiança média por região anatômica, sobre keypoints acima do limiar.
+    def _detected(self, min_score: float,
+                  observed: np.ndarray | None) -> np.ndarray:
+        """Máscara [N, 133] do que o painel conta como detectado.
+
+        Quem chama pode passar a máscara de observabilidade, e então a contagem
+        é exatamente o que o overlay desenha. Sem ela sobra o limiar sozinho,
+        que conta junta encostada na borda do quadro: um print do painel exibia
+        "Pes 2/6" sem que houvesse um pé desenhado em lugar nenhum.
+        """
+        if observed is not None:
+            return observed
+        return self.scores >= min_score
+
+    def region_confidence(self, min_score: float,
+                          observed: np.ndarray | None = None
+                          ) -> dict[str, float]:
+        """Confiança média por região anatômica, sobre o que foi detectado.
 
         É a única métrica de qualidade computável ao vivo: AP e MPJPE exigem
         ground truth, que não existe numa captura de webcam.
@@ -61,19 +76,22 @@ class PoseResult:
         if self.num_people == 0:
             return {name: 0.0 for name in KEYPOINT_REGIONS}
 
+        detected = self._detected(min_score, observed)
         confidence = {}
         for name, region in KEYPOINT_REGIONS.items():
-            values = self.scores[:, region]
-            visible = values[values >= min_score]
-            confidence[name] = float(visible.mean()) if visible.size else 0.0
+            values = self.scores[:, region][detected[:, region]]
+            confidence[name] = float(values.mean()) if values.size else 0.0
         return confidence
 
-    def region_counts(self, min_score: float) -> dict[str, tuple[int, int]]:
+    def region_counts(self, min_score: float,
+                      observed: np.ndarray | None = None
+                      ) -> dict[str, tuple[int, int]]:
         """Keypoints detectados e total por região, somando todas as pessoas."""
+        detected = self._detected(min_score, observed)
         counts = {}
         for name, region in KEYPOINT_REGIONS.items():
-            values = self.scores[:, region]
-            counts[name] = (int((values >= min_score).sum()), int(values.size))
+            block = detected[:, region]
+            counts[name] = (int(block.sum()), int(block.size))
         return counts
 
 
