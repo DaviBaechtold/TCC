@@ -97,13 +97,17 @@ LIFT_UNOBSERVED_CONFIDENCE = UNOBSERVED_CONFIDENCE_CAP
 CAMERA_CALIBRATION = 'configs/camera/webcam.calibration.json'
 
 # Distância típica da câmera ao ocupante, por montagem. É a única grandeza que a
-# câmera monocular não observa, e o tamanho absoluto da pose depende dela.
+# câmera monocular não observa, e dela dependem tanto a escala da entrada da rede
+# quanto a da saída.
 #
-# Mesa: medido nesta gravação pela distância interocular, 45,1 px em mediana
-# contra 63mm de distância pupilar de adulto, o que dá 1,35m. A largura de ombros
-# dá 1,65m pelo mesmo caminho, e é a estimativa pior — o ombro encurta quando o
-# tronco gira. Retrovisor: 0,66m, mediana medida na referência 3D do Drive&Act.
-DEFAULT_SUBJECT_DEPTH_M = {'mesa': 1.35, 'retrovisor': 0.664}
+# Mesa: 1,17m medidos com trena da lente ao rosto em 21/09/2026. O valor
+# substitui a estimativa antropométrica de 1,35m que vigorava antes, e desloca
+# uma questão em aberto: com 1,17m a distância interpupilar reconstruída na
+# gravação de 12/09 sai em cerca de 50mm, impossível num adulto. Ou aquela
+# gravação foi feita a outra distância, ou o lifting subdimensiona a pose em
+# torno de 20%. A medição que decide é uma gravação nova à distância medida.
+# Retrovisor: 0,66m, mediana medida na referência 3D do Drive&Act.
+DEFAULT_SUBJECT_DEPTH_M = {'mesa': 1.17, 'retrovisor': 0.664}
 
 # Taxa nominal do painel, que o One Euro assume constante. Um desvio de alguns
 # hertz desloca o corte efetivo na mesma proporção, sem quebrar o filtro.

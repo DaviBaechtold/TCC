@@ -1,0 +1,157 @@
+{
+  "tag": "mesa",
+  "fonte": "webcam",
+  "quadros": 290,
+  "tamanho_do_quadro": [
+    1280,
+    720
+  ],
+  "pose_checkpoint": "best_coco-wholebody_AP_epoch_5_merged.pth",
+  "unidade": "larguras de ombro, origem no meio dos ombros, y para baixo",
+  "juntas": {
+    "11": {
+      "x_mediano": 0.347,
+      "y_mediano": 1.098,
+      "y_p10": 0.793,
+      "y_p90": 1.377,
+      "borda_mediana": 0.058,
+      "fracao_junto_da_borda": 0.983,
+      "fracao_alem_da_borda": 0.021,
+      "fracao_sobre_corpo_visivel": 0.007,
+      "resposta_mediana": 6.1,
+      "amostras": 290
+    },
+    "12": {
+      "x_mediano": -0.364,
+      "y_mediano": 1.113,
+      "y_p10": 0.818,
+      "y_p90": 1.399,
+      "borda_mediana": 0.055,
+      "fracao_junto_da_borda": 0.986,
+      "fracao_alem_da_borda": 0.066,
+      "fracao_sobre_corpo_visivel": 0.0,
+      "resposta_mediana": 6.08,
+      "amostras": 290
+    },
+    "13": {
+      "x_mediano": 0.862,
+      "y_mediano": 0.961,
+      "y_p10": 0.005,
+      "y_p90": 1.456,
+      "borda_mediana": 0.139,
+      "fracao_junto_da_borda": 0.528,
+      "fracao_alem_da_borda": 0.017,
+      "fracao_sobre_corpo_visivel": 0.166,
+      "resposta_mediana": 2.45,
+      "amostras": 290
+    },
+    "14": {
+      "x_mediano": -0.535,
+      "y_mediano": 0.718,
+      "y_p10": -0.213,
+      "y_p90": 1.269,
+      "borda_mediana": 0.525,
+      "fracao_junto_da_borda": 0.428,
+      "fracao_alem_da_borda": 0.003,
+      "fracao_sobre_corpo_visivel": 0.255,
+      "resposta_mediana": 1.84,
+      "amostras": 290
+    },
+    "15": {
+      "x_mediano": 0.749,
+      "y_mediano": 0.772,
+      "y_p10": -0.355,
+      "y_p90": 1.45,
+      "borda_mediana": 0.153,
+      "fracao_junto_da_borda": 0.493,
+      "fracao_alem_da_borda": 0.021,
+      "fracao_sobre_corpo_visivel": 0.166,
+      "resposta_mediana": 1.64,
+      "amostras": 290
+    },
+    "16": {
+      "x_mediano": -0.773,
+      "y_mediano": 0.627,
+      "y_p10": -0.455,
+      "y_p90": 1.344,
+      "borda_mediana": 0.587,
+      "fracao_junto_da_borda": 0.314,
+      "fracao_alem_da_borda": 0.003,
+      "fracao_sobre_corpo_visivel": 0.438,
+      "resposta_mediana": 1.61,
+      "amostras": 290
+    },
+    "17": {
+      "x_mediano": 0.329,
+      "y_mediano": 0.28,
+      "y_p10": -0.863,
+      "y_p90": 1.27,
+      "borda_mediana": 0.916,
+      "fracao_junto_da_borda": 0.062,
+      "fracao_alem_da_borda": 0.003,
+      "fracao_sobre_corpo_visivel": 0.031,
+      "resposta_mediana": 2.19,
+      "amostras": 290
+    },
+    "18": {
+      "x_mediano": 0.394,
+      "y_mediano": -0.609,
+      "y_p10": -0.912,
+      "y_p90": 1.032,
+      "borda_mediana": 1.42,
+      "fracao_junto_da_borda": 0.11,
+      "fracao_alem_da_borda": 0.0,
+      "fracao_sobre_corpo_visivel": 0.055,
+      "resposta_mediana": 2.64,
+      "amostras": 290
+    },
+    "19": {
+      "x_mediano": -0.426,
+      "y_mediano": 0.184,
+      "y_p10": -0.989,
+      "y_p90": 1.327,
+      "borda_mediana": 0.949,
+      "fracao_junto_da_borda": 0.317,
+      "fracao_alem_da_borda": 0.059,
+      "fracao_sobre_corpo_visivel": 0.203,
+      "resposta_mediana": 1.65,
+      "amostras": 290
+    },
+    "20": {
+      "x_mediano": -0.553,
+      "y_mediano": 0.287,
+      "y_p10": -0.967,
+      "y_p90": 1.253,
+      "borda_mediana": 0.907,
+      "fracao_junto_da_borda": 0.179,
+      "fracao_alem_da_borda": 0.0,
+      "fracao_sobre_corpo_visivel": 0.072,
+      "resposta_mediana": 2.57,
+      "amostras": 290
+    },
+    "21": {
+      "x_mediano": 0.5,
+      "y_mediano": 0.232,
+      "y_p10": -1.302,
+      "y_p90": 1.258,
+      "borda_mediana": 0.866,
+      "fracao_junto_da_borda": 0.186,
+      "fracao_alem_da_borda": 0.007,
+      "fracao_sobre_corpo_visivel": 0.062,
+      "resposta_mediana": 2.27,
+      "amostras": 290
+    },
+    "22": {
+      "x_mediano": -0.721,
+      "y_mediano": 0.945,
+      "y_p10": -0.408,
+      "y_p90": 1.288,
+      "borda_mediana": 0.188,
+      "fracao_junto_da_borda": 0.403,
+      "fracao_alem_da_borda": 0.017,
+      "fracao_sobre_corpo_visivel": 0.341,
+      "resposta_mediana": 1.69,
+      "amostras": 290
+    }
+  }
+}
