@@ -30,6 +30,24 @@ contra 5,13 --- e a rede é surda a ele.
 Esta transformação torna o canal informativo: quem recebe confiança baixa recebe
 também posição deslocada, de modo que a correlação entre os dois exista no treino
 e possa ser aprendida.
+
+**O corte de quadro (v3).** Os grupos anatômicos acima cobrem o membro que sai
+de quadro, mas nunca o quadril: `KEYPOINT_GROUPS` não contém os índices 11 e 12
+em grupo algum, de modo que o lifting v2 jamais viu um quadril escondido. É
+exatamente o que a webcam de mesa entrega. Medido na gravação do usuário, a
+Etapa 2 coloca os dois quadris em y mediano 706 e 708 num quadro de 720 px --- 13
+px acima da borda inferior --- com resposta 6,1 de 8,3, que passa o limiar de
+detecção em 95% dos quadros. Sob esse corte aplicado ao H3WB com verdade de
+campo, o v2 erra 507mm nos quadris: o tronco colapsa e os quadris sobem à altura
+dos ombros. Devolvendo os quadris verdadeiros, as pernas caem de 239mm para
+180mm --- o erro das pernas é consequência do quadril perdido, não das pernas.
+
+O corte modela isso como o que de fato é: **uma linha horizontal na imagem**,
+abaixo da qual tudo é extrapolado até a borda, qualquer que seja a anatomia da
+junta. A câmera é estática, então a linha é uma só por janela; o corpo se move,
+então a junta pode cruzá-la dentro da janela, e a pertinência é avaliada quadro a
+quadro. Isso não é a "ausência intermitente" que o sorteio por quadro produziria
+e que o projeto rejeita: a linha não muda, quem muda de lado é o corpo.
 """
 
 from __future__ import annotations
@@ -73,20 +91,81 @@ EXTRAPOLATED_JITTER = 0.13
 CONFIDENCE_OBSERVED = (0.85, 1.00)
 CONFIDENCE_EXTRAPOLATED = (0.37, 0.92)
 
+# Teto de confiança para a junta que o sistema **sabe** não ter observado.
+# Contrato compartilhado: o painel aplica o mesmo teto em inferência, em
+# `src/models/observability.py`, e o treino precisa ter visto essa faixa.
+#
+# O valor vem do limiar de detecção do estimador: 3,0 de resposta bruta sobre a
+# média 8,30 dos observáveis dá 0,36. Abaixo desse ponto a junta seria
+# descartada, de modo que 0,3 é o maior valor que ainda significa
+# inequivocamente "isto não foi visto", e fica abaixo dos 0,37 onde a faixa de
+# extrapolado começa --- uma faixa exclusiva que a rede pode aprender.
+UNOBSERVED_CONFIDENCE_CAP = 0.3
+
+# Fração das juntas cortadas que mesmo assim chega com a confiança alta de quem
+# parece observado. O critério de borda do painel erra para menos: com margem de
+# 28 px ele marca 99,3% dos quadris, ou seja perde 0,7% deles. Esse é o piso, não
+# a taxa: o critério só enxerga a borda da imagem, e um corte produzido por um
+# obstáculo *dentro* do quadro --- a quina da mesa acima da borda --- não dispara
+# nada. Um quinto é a margem escolhida para que a rede não aprenda "confiança
+# baixa" como condição necessária do corte; não é uma medição.
+CUT_LOOKS_OBSERVED_PROB = 0.20
+
+# Onde a linha de corte cai, em fração do vão entre a linha dos ombros e a dos
+# joelhos. O intervalo cobre as duas montagens sem precisar distingui-las: num
+# adulto o quadril fica perto de 0,45 desse vão, de modo que um sorteio uniforme
+# dá aproximadamente metade de cortes de mesa (acima do quadril) e metade de
+# cortes de retrovisor (entre quadril e joelho). O piso em 0,10 existe porque
+# abaixo dele a própria linha dos ombros, que define o corte, seria cortada.
+CUT_LEVEL_RANGE = (0.10, 1.00)
+
+# Quanto a junta extrapolada para antes da linha de corte, em larguras de ombro.
+# Medido na gravação: quadris em y mediano 706 e 708 num quadro de 720 px, ou
+# seja 13 px acima da borda, contra uma largura de ombros de 223 px.
+CUT_INSET_SHOULDER_WIDTHS = 13.0 / 223.0
+
+# Tremor por quadro da junta presa à borda, em larguras de ombro. A gravação dá
+# 7 px de segunda diferença quadro a quadro; para ruído independente entre
+# quadros a segunda diferença tem desvio sqrt(6) vezes o da posição, o que
+# devolve 2,9 px, ou 0,013 largura de ombro. É redesenhado a cada quadro --- ao
+# contrário do deslocamento por grupo, que é fixo na janela --- porque a borda
+# não segura a junta parada, ela a segura oscilando.
+CUT_JITTER_SHOULDER_WIDTHS = 2.9 / 223.0
+
+# Índices COCO-WholeBody das juntas que definem a geometria do corte.
+SHOULDER_INDICES = [5, 6]
+KNEE_INDICES = [13, 14]
+
 
 @TRANSFORMS.register_module()
 class SimulatedEstimatorNoise(BaseTransform):
-    """Desloca grupos anatômicos e rebaixa a confiança deles, em conjunto.
+    """Corrompe a entrada 2D como o estimador real corrompe, e rebaixa a
+    confiança junto.
+
+    Dois modos, exclusivos entre si: o grupo anatômico, que apaga um membro
+    inteiro, e o corte de quadro, que apaga tudo abaixo de uma linha horizontal.
 
     Args:
-        prob: probabilidade de aplicar a um exemplo.
+        prob: probabilidade de aplicar o modo de grupo anatômico a um exemplo.
         max_groups: quantos grupos podem ser afetados ao mesmo tempo.
+        frame_cut_prob: probabilidade de aplicar o corte de quadro. Os dois modos
+            são exclusivos: o deslocamento por grupo mede o envelope do corpo
+            visível, e medi-lo sobre um corpo já truncado empilharia dois
+            deslocamentos que nunca coexistem --- a câmera tem um enquadramento
+            só.
+        unobserved_confidence: teto de confiança das juntas deslocadas, para
+            casar com o teto que o painel aplica em inferência. Com `None` vale a
+            faixa de extrapolado medida no Drive&Act, que é o comportamento do v2.
     """
 
-    def __init__(self, prob: float = 0.6, max_groups: int = 2) -> None:
+    def __init__(self, prob: float = 0.6, max_groups: int = 2,
+                 frame_cut_prob: float = 0.0,
+                 unobserved_confidence: float | None = None) -> None:
         super().__init__()
         self.prob = prob
         self.max_groups = max_groups
+        self.frame_cut_prob = frame_cut_prob
+        self.unobserved_confidence = unobserved_confidence
         self._names = list(KEYPOINT_GROUPS)
         weights = np.array([GROUP_WEIGHTS[n] for n in self._names], float)
         self._probabilities = weights / weights.sum()
@@ -104,6 +183,13 @@ class SimulatedEstimatorNoise(BaseTransform):
         labels[..., 2] = np.random.uniform(*CONFIDENCE_OBSERVED,
                                            size=labels.shape[:-1])
 
+        # O curto-circuito é deliberado: com `frame_cut_prob` em zero nenhum
+        # número aleatório é consumido aqui, e a sequência do gerador continua
+        # idêntica à do v2, cujo config precisa seguir reprodutível.
+        # `tests/test_estimator_noise.py` trava isso contra o HEAD do git.
+        if self.frame_cut_prob > 0.0 and np.random.rand() < self.frame_cut_prob:
+            return self.apply_frame_cut(results, labels)[0]
+
         if np.random.rand() >= self.prob:
             results['keypoint_labels'] = labels
             return results
@@ -119,7 +205,7 @@ class SimulatedEstimatorNoise(BaseTransform):
             results['keypoint_labels'] = labels
             return results
 
-        self._extrapolate(labels, affected, retained)
+        self.extrapolate(labels, affected, retained)
         results['keypoint_labels'] = labels
 
         if 'keypoint_labels_visible' in results:
@@ -129,7 +215,118 @@ class SimulatedEstimatorNoise(BaseTransform):
 
         return results
 
-    def _extrapolate(self, labels: np.ndarray, affected: list[int],
+    def apply_frame_cut(self, results: dict, labels: np.ndarray,
+                        level: float | None = None
+                        ) -> tuple[dict, np.ndarray | None]:
+        """Prende à linha de corte tudo o que estiver abaixo dela.
+
+        Pública, e não privada, porque `src/evaluation/truncation_protocol.py`
+        precisa cortar exatamente como o treino corta. Reimplementar a
+        colocação do outro lado mediria um mecanismo diferente do treinado,
+        que é o erro de inferência que já custou 25mm a este projeto.
+
+        Args:
+            level: altura da linha, em fração do vão ombro-joelho. `None`
+                sorteia, que é o regime de treino; um valor fixo torna a
+                avaliação reproduzível.
+
+        Returns:
+            `results` corrompido e a máscara `(T, K)` do que ficou abaixo da
+            linha --- `None` quando a janela não sustenta corte algum.
+
+        A linha é horizontal e única na janela, porque a câmera é estática. A
+        pertinência é por quadro, porque o corpo não é: uma mão que desce abaixo
+        da quina da mesa some naquele quadro e reaparece no seguinte, e é isso
+        que a gravação mostra.
+        """
+        cut = self.cut_mask(labels, level)
+        if cut is None:
+            results['keypoint_labels'] = labels
+            return results, None
+
+        below, cut_y, body_scale = cut
+
+        # x fica onde a junta estava, y encosta na linha: é o que o estimador
+        # faz ao extrapolar um membro que continua fora de quadro.
+        jitter = np.random.normal(
+            0.0, CUT_JITTER_SHOULDER_WIDTHS * body_scale,
+            size=labels.shape[:-1] + (2, ))
+        pinned_y = cut_y - CUT_INSET_SHOULDER_WIDTHS * body_scale
+
+        labels[..., 0] = np.where(below, labels[..., 0] + jitter[..., 0],
+                                  labels[..., 0])
+        labels[..., 1] = np.where(below, pinned_y + jitter[..., 1],
+                                  labels[..., 1])
+        labels[..., 2] = np.where(below,
+                                  self._draw_low_confidence(labels.shape[:-1]),
+                                  labels[..., 2])
+
+        results['keypoint_labels'] = labels
+
+        if 'keypoint_labels_visible' in results:
+            visible = results['keypoint_labels_visible'].copy()
+            visible[below] = 0.0
+            results['keypoint_labels_visible'] = visible
+
+        return results, below
+
+    def cut_mask(self, labels: np.ndarray, level: float | None = None
+                 ) -> tuple[np.ndarray, float, float] | None:
+        """Sorteia a linha de corte e devolve quem cai abaixo dela.
+
+        Returns:
+            A máscara `(T, K)` de quem está abaixo, a altura da linha e a
+            largura de ombros que serve de escala --- ou `None`.
+
+        Devolve `None` quando a janela não tem geometria para sustentar um corte
+        --- ombros e joelhos colados, ou pose invertida --- em vez de inventar
+        uma linha arbitrária.
+        """
+        shoulders = labels[..., SHOULDER_INDICES, :2]
+        knees = labels[..., KNEE_INDICES, :2]
+
+        shoulder_y = float(np.median(shoulders[..., 1]))
+        knee_y = float(np.median(knees[..., 1]))
+        span = knee_y - shoulder_y
+
+        # A largura de ombros é a régua da gravação (223 px), e é o que converte
+        # os 13 px de recuo e os 2,9 px de tremor para a escala desta janela.
+        # Num perfil quase puro ela encolhe, e recuo e tremor encolhem junto: a
+        # junta para exatamente na linha, que é uma degradação inofensiva.
+        body_scale = float(np.median(np.linalg.norm(
+            shoulders[..., 0, :] - shoulders[..., 1, :], axis=-1)))
+        if span <= 0.0 or body_scale <= 0.0:
+            return None
+
+        if level is None:
+            level = np.random.uniform(*CUT_LEVEL_RANGE)
+        cut_y = shoulder_y + level * span
+
+        below = labels[..., 1] > cut_y
+        if not below.any():
+            return None
+        return below, cut_y, body_scale
+
+    def _draw_low_confidence(self, shape: tuple[int, ...]) -> np.ndarray:
+        """Confiança das juntas deslocadas, com ou sem o teto do contrato.
+
+        Sem teto vale a faixa medida no Drive&Act, que se sobrepõe à dos
+        observados de propósito. Com teto, a maioria cai na faixa exclusiva que o
+        painel produz ao reconhecer a junta como não observada, e a minoria de
+        `CUT_LOOKS_OBSERVED_PROB` continua na faixa alta --- que é onde o quadril
+        real de fato responde, 0,73 --- para o caso em que o critério de borda
+        não dispara.
+        """
+        if self.unobserved_confidence is None:
+            return np.random.uniform(*CONFIDENCE_EXTRAPOLATED, size=shape)
+
+        looks_observed = np.random.rand(*shape) < CUT_LOOKS_OBSERVED_PROB
+        return np.where(
+            looks_observed,
+            np.random.uniform(*CONFIDENCE_EXTRAPOLATED, size=shape),
+            np.random.uniform(0.0, self.unobserved_confidence, size=shape))
+
+    def extrapolate(self, labels: np.ndarray, affected: list[int],
                      retained: list[int]) -> None:
         """Move os keypoints afetados para a borda do corpo visível.
 
@@ -153,9 +350,11 @@ class SimulatedEstimatorNoise(BaseTransform):
                                    placed.shape)
 
         labels[..., affected, :2] = placed
-        labels[..., affected, 2] = np.random.uniform(
-            *CONFIDENCE_EXTRAPOLATED, size=labels.shape[:-2] + (count,))
+        labels[..., affected, 2] = self._draw_low_confidence(
+            labels.shape[:-2] + (count, ))
 
     def __repr__(self) -> str:
         return (f'{self.__class__.__name__}(prob={self.prob}, '
-                f'max_groups={self.max_groups})')
+                f'max_groups={self.max_groups}, '
+                f'frame_cut_prob={self.frame_cut_prob}, '
+                f'unobserved_confidence={self.unobserved_confidence})')

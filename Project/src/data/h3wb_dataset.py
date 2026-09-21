@@ -23,6 +23,7 @@ as anotações são carregadas.
 from __future__ import annotations
 
 import os.path as osp
+import re
 from pathlib import Path
 
 import numpy as np
@@ -37,6 +38,16 @@ from mmpose.registry import DATASETS
 # normalização.
 IMAGE_WIDTH = 1000
 IMAGE_HEIGHT = 1000
+
+# O Human3.6M numera as repetições de uma mesma ação: `Sitting`, `Sitting 1`,
+# `Sitting 2`. O sufixo distingue a tomada, não o movimento, e quem quer
+# reponderar uma postura quer as três.
+_SUFIXO_DE_TOMADA = re.compile(r'\s+\d+$')
+
+
+def _base_action(action: str) -> str:
+    """Nome da ação sem o número da tomada: `Sitting 2` vira `Sitting`."""
+    return _SUFIXO_DE_TOMADA.sub('', action)
 
 
 def _h36m_style_path(img_path: str) -> str:
@@ -71,12 +82,21 @@ class H3WBSeq2SeqDataset(H36MWholeBodyDataset):
 
     Aceita `seq_len == multiple_target`, configuração em que a rede recebe a
     janela inteira e prevê os 3D de todos os seus frames.
+
+    Args:
+        seq_len: quantos frames entram na janela.
+        multiple_target: quantos frames da janela são alvo.
+        window_stride: passo entre janelas vizinhas.
+        oversample_actions: quantas vezes repetir as janelas de cada ação, pelo
+            nome sem o número da tomada. Ignorado em `test_mode`: reponderar a
+            avaliação mudaria a métrica, não o treino.
     """
 
     def __init__(self,
                  seq_len: int = 1,
                  multiple_target: int = 0,
                  window_stride: int | None = None,
+                 oversample_actions: dict[str, int] | None = None,
                  **kwargs):
         # `lazy_init` impede que as anotações sejam carregadas durante a
         # construção da classe base, o que permite restaurar `multiple_target`
@@ -86,7 +106,26 @@ class H3WBSeq2SeqDataset(H36MWholeBodyDataset):
 
         self.multiple_target = multiple_target
         self.window_stride = window_stride or max(1, seq_len // 2)
+        self.oversample_actions = oversample_actions or {}
         self.full_init()
+
+    def _window_repeats(self, action: str) -> int:
+        """Quantas cópias da janela entram no conjunto, por ação.
+
+        O Human3.6M é majoritariamente de pé, e o ocupante de um veículo nunca
+        está: das janelas de treino, 8,97% vêm de `Sitting` ou `SittingDown`. A
+        consequência é medida. Sob o corte de mesa, as janelas sentadas deixam o
+        v2 em 356mm nas pernas, e uma linha de base que devolve sempre a pose
+        média erra 700 a 725mm --- ou seja, a pose média do conjunto não é a de
+        quem está sentado, e a rede tem pouco de onde tirar esse prior.
+
+        As cópias são idênticas, mas o que a rede vê não: o corte e o
+        espelhamento são sorteados por acesso, de modo que cada cópia chega com
+        uma corrupção diferente.
+        """
+        if self.test_mode:
+            return 1
+        return max(1, self.oversample_actions.get(_base_action(action), 1))
 
     def _target_indices(self) -> list[int]:
         """Quais frames da janela são alvo, na mesma convenção do dataset base.
@@ -132,6 +171,8 @@ class H3WBSeq2SeqDataset(H36MWholeBodyDataset):
                 if num_frames < self.seq_len:
                     continue
 
+                repeats = self._window_repeats(action)
+
                 for camera in self.camera_order_id:
                     if camera not in sequence:
                         continue
@@ -146,7 +187,7 @@ class H3WBSeq2SeqDataset(H36MWholeBodyDataset):
                         window_2d = keypoints_2d[start:stop]
                         window_3d = keypoints_3d[start:stop] / 1000
 
-                        instance_list.append({
+                        instance = {
                             'num_keypoints': window_2d.shape[1],
                             'keypoints': window_2d,
                             'keypoints_3d': window_3d,
@@ -157,7 +198,6 @@ class H3WBSeq2SeqDataset(H36MWholeBodyDataset):
                             'scale': np.zeros((1, 1), dtype=np.float32),
                             'center': np.zeros((1, 2), dtype=np.float32),
                             'factor': np.zeros((1, 1), dtype=np.float32),
-                            'id': instance_id,
                             'category_id': 1,
                             'iscrowd': 0,
                             'camera_param': camera_param,
@@ -173,8 +213,16 @@ class H3WBSeq2SeqDataset(H36MWholeBodyDataset):
                                                       frame_ids[stop - 1]),
                             'bbox_score': np.ones((self.seq_len, ),
                                                   dtype=np.float32),
-                        })
-                        instance_id += 1
+                        }
+
+                        # O `id` é o único campo que cada cópia precisa ter
+                        # próprio: é por ele que a métrica identifica a
+                        # predição. O resto é compartilhado, e pode ser, porque
+                        # `get_data_info` devolve uma cópia a cada acesso.
+                        for _ in range(repeats):
+                            instance_list.append({**instance,
+                                                  'id': instance_id})
+                            instance_id += 1
 
         return instance_list, []
 
