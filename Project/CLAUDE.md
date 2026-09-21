@@ -168,8 +168,19 @@ pela interocular) de 0,0359 para 0,2198, seis vezes; mãos de ~0,085 para ~0,205
 duas vezes e meia; corpo de 0,0408 para 0,0805. A resposta média na face cai de
 9,68 para 6,82. É o mesmo peso zero que produziu a impunidade nas pernas, com
 efeito oposto: onde a junta **não** está na imagem o modelo fica confiante e
-errado; onde ela **está**, ele esquece. O retreino da Etapa 3 precisa de lotes
-mistos com o COCO em cinza. Instrumento: `scripts/measure_region_error.py`.
+errado; onde ela **está**, ele esquece. Instrumento: `scripts/measure_region_error.py`.
+
+**O ensaio corrigiu.** `configs/rtmw_x_driveact_ensaio.py` intercala o Drive&Act
+com o subconjunto do COCO que anota face ou mãos (77.214 das 262.465 instâncias;
+no conjunto integral só 29,4% anotam, e o resto dilui o sinal). Parte do
+checkpoint da Etapa 2, não do v2. Medido: face de volta a 0,0367 contra 0,0359
+da Etapa 2, mãos 0,080/0,090, whole-body AP 0,6848, **ao custo de 0,42px de erro
+corporal** (9,94 contra 9,52 da v2, ainda 34% melhor que os 15,04 de partida). A
+supervisão de incerteza sobrevive: 7,5% das juntas ausentes acima do limiar
+contra 7,4% da v2. Checkpoint em
+`work_dirs/rtmw_x_driveact_ensaio/best_torso_px_mean_epoch_2_merged.pth` —
+**falta confirmar na gravação própria antes de virar padrão do painel**, que
+hoje ainda roda com a Etapa 2.
 
 Quatro conclusões que orientam todo trabalho futuro:
 

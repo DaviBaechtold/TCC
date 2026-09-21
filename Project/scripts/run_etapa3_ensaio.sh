@@ -55,7 +55,10 @@ python scripts/measure_region_error.py --tag ensaio --ckpt "$FUNDIDO" \
     >> "$LOGS/etapa3_ensaio.log" 2>&1
 
 echo "[$(agora)] separação de confiança nas juntas fora de quadro"
+# Com --out explícito: o padrão do script é o arquivo que o documento cita com
+# os números da v2, e a fila o sobrescreveu na primeira execução.
 python scripts/measure_confidence_separation.py --ckpt "$FUNDIDO" \
+    --out results/separacao_confianca_ensaio.json \
     >> "$LOGS/etapa3_ensaio.log" 2>&1
 echo "[$(agora)] concluído"
 

@@ -1,0 +1,41 @@
+{
+  "tag": "ensaio",
+  "checkpoint": "best_torso_px_mean_epoch_2_merged.pth",
+  "conjunto": "COCO-WholeBody val, escala de cinza, caixa de ground truth",
+  "flip_test": false,
+  "instancias": 300,
+  "erro_normalizado": {
+    "corpo": {
+      "mediana": 0.0415,
+      "media": 0.051,
+      "amostras": 300
+    },
+    "face": {
+      "mediana": 0.0367,
+      "media": 0.0658,
+      "amostras": 300
+    },
+    "mao esquerda": {
+      "mediana": 0.0795,
+      "media": 0.1254,
+      "amostras": 300
+    },
+    "mao direita": {
+      "mediana": 0.0904,
+      "media": 0.1849,
+      "amostras": 300
+    }
+  },
+  "resposta_media": {
+    "corpo": 6.56,
+    "face": 9.37,
+    "mao esquerda": 7.93,
+    "mao direita": 7.91
+  },
+  "keypoints_anotados_por_instancia": {
+    "corpo": 14.3,
+    "face": 68.0,
+    "mao esquerda": 20.9,
+    "mao direita": 20.9
+  }
+}
