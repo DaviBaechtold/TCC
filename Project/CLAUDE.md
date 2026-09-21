@@ -161,6 +161,16 @@ estimador real prende o quadril na borda (o que a simulação reproduz) e espalh
 joelhos e tornozelos sobre tronco e braços (o que ela não reproduz). Próximo
 passo medido, não suposto: caracterizar onde ele coloca joelho e tornozelo.
 
+**A Etapa 3 esqueceu face e mãos, e o checkpoint de operação é o da Etapa 2.**
+Medido no COCO em cinza, onde face e mãos têm anotação, caixa de GT, 300
+instâncias: whole-body AP de **0,6931 para 0,2330**; erro da face (normalizado
+pela interocular) de 0,0359 para 0,2198, seis vezes; mãos de ~0,085 para ~0,205,
+duas vezes e meia; corpo de 0,0408 para 0,0805. A resposta média na face cai de
+9,68 para 6,82. É o mesmo peso zero que produziu a impunidade nas pernas, com
+efeito oposto: onde a junta **não** está na imagem o modelo fica confiante e
+errado; onde ela **está**, ele esquece. O retreino da Etapa 3 precisa de lotes
+mistos com o COCO em cinza. Instrumento: `scripts/measure_region_error.py`.
+
 Quatro conclusões que orientam todo trabalho futuro:
 
 1. **O RTMW-x é o modelo do projeto.** 0,6857 em grayscale sem treino nenhum,
@@ -219,6 +229,11 @@ python scripts/measure_live_quality.py --tag <nome> [--lift-ckpt <ckpt>] [--sem-
 # fx 959,4  fy 957,9  centro (618,1; 342,7)  reprojeção 0,414px em 21 vistas.
 # Refazer só se trocar a câmera, a resolução ou o foco.
 python scripts/calibrate_camera.py --lado-quadrado 0.026
+
+# Erro por região anatômica com ground truth (face pela interocular, mãos pela
+# diagonal, corpo pelo tronco). O whole-body AP é um número só e não diz o que
+# quebrou — foi assim que o esquecimento da Etapa 3 passou despercebido.
+python scripts/measure_region_error.py --tag <nome> --ckpt <checkpoint>
 
 # Confere se o documento cita as medições correntes (a regra dos dois repos)
 python scripts/check_document_numbers.py

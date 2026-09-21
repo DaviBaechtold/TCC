@@ -1,0 +1,17 @@
+{
+  "tag": "rtmwx_etapa3v2_gray",
+  "checkpoint": "work_dirs/rtmw_x_driveact_ft_v2/best_torso_px_mean_epoch_6_merged.pth",
+  "data_root": "data/processed/grayscale/",
+  "metrics": {
+    "coco-wholebody/AP": 0.23298948125957974,
+    "coco-wholebody/AP .5": 0.5103761912823559,
+    "coco-wholebody/AP .75": 0.18112616794053224,
+    "coco-wholebody/AP (M)": 0.20517654815626113,
+    "coco-wholebody/AP (L)": 0.295599839342741,
+    "coco-wholebody/AR": 0.28576826196473554,
+    "coco-wholebody/AR .5": 0.5492758186397985,
+    "coco-wholebody/AR .75": 0.26212216624685136,
+    "coco-wholebody/AR (M)": 0.2335427478830921,
+    "coco-wholebody/AR (L)": 0.3582683017465626
+  }
+}
