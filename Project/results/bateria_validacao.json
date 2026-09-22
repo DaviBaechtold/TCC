@@ -1,0 +1,107 @@
+{
+  "pose_checkpoint": "best_coco-wholebody_AP_epoch_5_merged.pth",
+  "lift_checkpoint": "best_MPJPE_whole_epoch_12.pth",
+  "testes": {
+    "1_precisao_full_body": {
+      "fonte": "results/baselines/rtmwx_lora_gray.json",
+      "condicao": "COCO-WholeBody val em cinza, 5.000 imagens, caixa de GT, flip test ligado",
+      "ap": 0.6930748980405549,
+      "ar": 0.7478904282115869,
+      "criterio": "AP > 0,70 e AR > 0,75",
+      "aprovado": false
+    },
+    "1b_erro_corporal_veicular": {
+      "fonte": "results/baselines/rtmwx_etapa3v2_driveact.json",
+      "condicao": "Drive&Act val, 12 keypoints observáveis, erro normalizado por tronco",
+      "erro_normalizado": 0.02818189465089716,
+      "criterio": "< 0,040",
+      "aprovado": true
+    },
+    "4_detector": {
+      "fonte": "results/qp1_detectores.json",
+      "condicao": "seis configurações sobre 1.500 quadros do Drive&Act",
+      "erro_por_configuracao": {
+        "caixa de ground truth": 0.0288,
+        "RTMDet-nano": 0.03,
+        "sem detector": 0.0526,
+        "YOLOv11n-pose": 0.0295,
+        "YOLOv12n": 0.029,
+        "YOLOv26n-pose": 0.0292
+      },
+      "criterio": "limiar calibrado por medição e detector melhor que quadro inteiro",
+      "aprovado": true
+    },
+    "2_tempo_real": {
+      "condicao": "300 quadros consecutivos de rec_20260921_224039.mp4, caminho completo com detector, pose e lifting, com sincronização da GPU",
+      "criterio": "FPS >= 20 e latência p90 < 100ms",
+      "quadros": 300,
+      "latencia_mediana_ms": 49.38,
+      "latencia_p90_ms": 58.73,
+      "latencia_p99_ms": 65.71,
+      "fps_mediano": 20.3,
+      "aprovado": true
+    },
+    "3_oclusao": {
+      "condicao": "149 quadros do Drive&Act, oclusão quadrada de 0,35 comprimento de tronco sobre cada punho anotado, da ordem de uma mão",
+      "criterio": "degradação do erro corporal < 15%",
+      "erro_sem_oclusao": 0.0549,
+      "erro_com_oclusao": 0.0588,
+      "degradacao": 0.0703,
+      "aprovado": true,
+      "pose_checkpoint": "best_torso_px_mean_epoch_2_merged.pth"
+    },
+    "5_estimador": {
+      "condicao": "um quadro da gravação, caixa do detector",
+      "criterio": "keypoints no sistema do quadro e confiança decomposta por região",
+      "observados": 102,
+      "fracao_no_quadro": 0.9902,
+      "distancia_mediana_ao_centro_da_caixa": 0.193,
+      "aprovado": true,
+      "regioes": {
+        "body": 7.59,
+        "feet": 0.0,
+        "face": 9.77,
+        "left_hand": 9.2,
+        "right_hand": 0.0
+      },
+      "regioes_completas": true
+    },
+    "6_lifting": {
+      "condicao": "120 quadros, mesma pose 2D nos dois regimes; quadro único emulado preenchendo a janela com cópias",
+      "criterio": "a janela temporal reduz o tremor do corpo",
+      "tremor_com_janela": {
+        "cabeca": 1.94,
+        "face": 2.03,
+        "ombros": 7.21,
+        "cotovelos e pulsos": 13.05,
+        "quadris": 16.47,
+        "pernas e pes": 94.95,
+        "maos": 23.74
+      },
+      "tremor_quadro_unico": {
+        "cabeca": 2.16,
+        "face": 2.34,
+        "ombros": 9.8,
+        "cotovelos e pulsos": 16.08,
+        "quadris": 26.7,
+        "pernas e pes": 92.86,
+        "maos": 28.63
+      },
+      "reducao": 0.2172,
+      "aprovado": true
+    },
+    "7_pipeline": {
+      "memoria_inicial_mib": 894.5,
+      "memoria_final_mib": 894.5,
+      "crescimento_mib": 0.0,
+      "aprovado": true,
+      "condicao": "1000 quadros pelo caminho completo, memória amostrada a cada 50",
+      "criterio": "sem exceções e crescimento de memória < 64 MiB",
+      "quadros": 1000,
+      "excecoes": 0,
+      "pico_mib": 956.1
+    }
+  },
+  "aprovados": 7,
+  "total": 8
+}

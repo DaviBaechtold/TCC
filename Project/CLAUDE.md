@@ -242,6 +242,18 @@ Quatro conclusões que orientam todo trabalho futuro:
    em 10 epochs a 5e-4, por catastrophic forgetting. A adaptação de domínio
    tem que ser por LoRA ou LR muito baixo, nunca por fine-tuning agressivo.
 
+**Bateria de validação: 7 de 8 passam** (`results/bateria_validacao.json`,
+22/09/2026). A falha é o AP de 0,6931 contra a meta de 0,70. Os números novos
+que ela produziu: tempo real com folga de 1% (20,2 FPS medianos, latência p90
+59,3ms, caminho completo em 1280x720); degradação de 7,0% sob oclusão do punho
+(teto 15%); **a janela temporal reduz o tremor em 21,7%** contra a mesma rede
+sem contexto; mil quadros sem exceção e sem crescimento de memória.
+
+A primeira execução reprovou dois testes por defeito do arnês, não do sistema:
+o teste veicular usava o checkpoint da montagem de mesa (68% de degradação, que
+media troca de modelo) e o de coordenadas contava as pernas extrapoladas como
+keypoints fora do quadro. **Testar o instrumento antes de acreditar nele.**
+
 Sempre declare se um AP usa bbox de ground truth ou de detector. A diferença é
 de ~2 pontos e comparar as duas condições silenciosamente invalida o resultado.
 
@@ -292,6 +304,10 @@ python scripts/calibrate_camera.py --lado-quadrado 0.026
 # diagonal, corpo pelo tronco). O whole-body AP é um número só e não diz o que
 # quebrou — foi assim que o esquecimento da Etapa 3 passou despercebido.
 python scripts/measure_region_error.py --tag <nome> --ckpt <checkpoint>
+
+# Bateria de validação inteira, com critério de aceite por teste. Leva ~6min.
+# Três testes são citados de medições já gravadas; os outros são medidos na hora.
+python scripts/run_validation_battery.py
 
 # Confere se o documento cita as medições correntes (a regra dos dois repos)
 python scripts/check_document_numbers.py
