@@ -192,6 +192,33 @@ reconstrói coxa 411,0 e canela 455,3mm, dentro da faixa adulta; cortadas, viram
 574,6 e 324,6mm. A razão coxa/tronco degrada com o que se esconde: 1,24 com
 quadril visível, 1,39 sem ele, 1,57 no corte alto — contra 0,85 da anatomia.
 
+**O Módulo 3 recebeu a adaptação de domínio que nunca teve.**
+`configs/lift3d_veicular.py`: metade do lote é Drive&Act com 2D do estimador
+real e alvo da referência 3D (92.080 quadros, 11.481 janelas, extraídos por
+`scripts/build_driveact_lift_dataset.py`), metade H3WB por ensaio — sem ele a
+supervisão parcial (23 de 133 keypoints) repetiria o esquecimento da Etapa 3. A
+corrupção simulada é desligada sobre o Drive&Act, que já chega corrompido de
+verdade (marca `corrupcao_real`).
+
+| | v3 (corte) | veicular |
+|---|---|---|
+| Drive&Act PA-MPJPE | 81,79mm | **41,49mm** |
+| Drive&Act MPJPE | 183,71mm | **60,69mm** |
+| Coerência de osso | 25,20 | **19,58** (com mais movimento: 9,18 contra 7,99) |
+| H3WB whole | **36,32mm** | 39,77mm |
+| Webcam: canela / interpupilar | **297,5 / 62,1mm** | 18,9 / 35,8mm |
+
+**Duas ressalvas.** O modelo é treinado contra a mesma referência que o avalia,
+então os 41,49 medem concordância com a triangulação do OpenPose, não acurácia;
+a coerência de osso, que não usa referência, é a evidência limpa. E ele
+**quebra fora da montagem**: por isso o lifting também passa a seguir a
+montagem (`LIFT_CHECKPOINT_BY_MOUNTING`), como o estimador de pose já fazia.
+
+**Armadilha de leitura que me custou quatro medições:** a linha de validação do
+MMEngine traz `MPJPE` e `P-MPJPE` juntas. Uma regex gulosa captura a segunda, e
+eu "descobri" mãos a 16,8mm — que são o P-MPJPE, isto é, a forma da mão já
+medida em 11mm. Ler o campo, não a posição.
+
 **Simular a colocação medida não transferiu — resultado negativo.** O v4
 (`cut_placement='medido'`) reproduz a distribuição medida de onde cada junta
 cortada cai, e não melhora: no Drive&Act 81,08 contra 81,79mm de PA-MPJPE

@@ -1,0 +1,19 @@
+{
+  "tag": "veicular",
+  "checkpoint": "best_MPJPE_whole_epoch_4.pth",
+  "janelas": 1200,
+  "entrada_2d": "ground truth do H3WB, sujeito retido S7, entrada íntegra",
+  "quadro": "causal, último da janela de 16",
+  "esquerda_absoluto_mm": 97.25948333740234,
+  "esquerda_no_punho_mm": 39.15134048461914,
+  "esquerda_forma_mm": 11.164244651794434,
+  "esquerda_punho_mm": 85.03105163574219,
+  "esquerda_tamanho_predito_mm": 142.3385009765625,
+  "esquerda_tamanho_verdadeiro_mm": 157.2292938232422,
+  "direita_absoluto_mm": 83.05852508544922,
+  "direita_no_punho_mm": 36.888336181640625,
+  "direita_forma_mm": 11.654147148132324,
+  "direita_punho_mm": 74.57282257080078,
+  "direita_tamanho_predito_mm": 147.25961303710938,
+  "direita_tamanho_verdadeiro_mm": 160.0060577392578
+}

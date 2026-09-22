@@ -1,6 +1,6 @@
 {
-  "pa_mpjpe_mm": 79.09,
-  "pa_mpjpe_median_mm": 76.99,
+  "pa_mpjpe_mm": 41.49,
+  "pa_mpjpe_median_mm": 39.39,
   "frames": 420,
   "keypoints": [
     0,
@@ -19,19 +19,19 @@
   "alignment": "procrustes",
   "reference": "Drive&Act OpenPose 3D (triangulação, não marcadores)",
   "pose_checkpoint": "best_coco-wholebody_AP_epoch_5_merged.pth",
-  "lift_checkpoint": "best_MPJPE_whole_epoch_15.pth",
+  "lift_checkpoint": "best_MPJPE_whole_epoch_4.pth",
   "confidence": "normalizada",
   "detector": false,
   "normalizacao": "camera",
   "factor": null,
-  "mpjpe_mm": 180.11,
+  "mpjpe_mm": 60.69,
   "por_sequencia": {
-    "vp14/run1_2018-05-30-10-11-09.ids_1": 77.97,
-    "vp14/run2_2018-05-30-10-42-33.ids_1": 70.42,
-    "vp15/run1_2018-05-30-13-05-35.ids_1": 84.65,
-    "vp15/run2_2018-05-30-13-34-33.ids_1": 83.34
+    "vp14/run1_2018-05-30-10-11-09.ids_1": 50.64,
+    "vp14/run2_2018-05-30-10-42-33.ids_1": 40.06,
+    "vp15/run1_2018-05-30-13-05-35.ids_1": 39.44,
+    "vp15/run2_2018-05-30-13-34-33.ids_1": 35.84
   },
-  "coerencia_osso_mm": 29.78,
-  "coerencia_forma": 0.0718,
-  "movimento_mm": 7.82
+  "coerencia_osso_mm": 19.58,
+  "coerencia_forma": 0.0639,
+  "movimento_mm": 9.18
 }

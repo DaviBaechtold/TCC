@@ -95,6 +95,11 @@ def parse_args():
                         '— lente de 567px, ocupante a 0,664m — em vez de usar a '
                         'mediana do H3WB, que amplia a pose em 3,8 vezes neste '
                         'domínio')
+    p.add_argument('--detector', action='store_true',
+                   help='Usa o detector de pessoas em vez do quadro inteiro '
+                        'como caixa. É a condição de operação, e a do conjunto '
+                        'de treino veicular; sem a flag reproduz as medições '
+                        'anteriores desta régua')
     p.add_argument('--device', default='cuda:0')
     p.add_argument('--out', type=Path,
                    default=Path('results/lifting_driveact.json'))
@@ -130,9 +135,19 @@ def main():
 
     work_dir = Path('work_dirs/lifting_driveact')
     work_dir.mkdir(parents=True, exist_ok=True)
+    # Sem detector o quadro inteiro vira caixa única, que é como todas as
+    # medições anteriores desta régua foram feitas. Com `--detector` a entrada
+    # passa a ser a de operação, e é sob ela que o conjunto de treino veicular
+    # foi extraído --- comparar treino e medida exige a mesma condição.
+    detector = None
+    if args.detector:
+        from src.models.pose_pipeline import DEFAULT_DETECTOR_SCORE, PersonDetector
+        detector = PersonDetector(panel.DETECTOR_CONFIG,
+                                  panel.DETECTOR_CHECKPOINT, args.device,
+                                  DEFAULT_DETECTOR_SCORE)
     pose = FullBodyPosePipeline(
         panel._config_without_flip_test(panel.POSE_CONFIG, work_dir),
-        args.pose_ckpt or panel.POSE_CHECKPOINT, args.device, detector=None)
+        args.pose_ckpt or panel.POSE_CHECKPOINT, args.device, detector)
     # Quem normaliza é o lifter, e só ele. Antes o script dividia pela escala e
     # o lifter dividia de novo, entregando confiança na casa de 0,1 a um modelo
     # treinado entre 0,37 e 1,0 — e o resultado dessa medição foi descartado.
@@ -243,6 +258,7 @@ def main():
         'pose_checkpoint': Path(args.pose_ckpt or panel.POSE_CHECKPOINT).name,
         'lift_checkpoint': Path(args.lift_ckpt or panel.LIFT_CHECKPOINT).name,
         'confidence': args.confidence,
+        'detector': bool(args.detector),
         'normalizacao': args.normalizacao,
         # Com `camera` quem decodifica é a geometria virtual do H3WB, e este
         # fator não é aplicado; fica no relatório só para o modo `largura`.

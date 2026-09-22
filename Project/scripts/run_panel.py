@@ -99,15 +99,34 @@ DETECTOR_CHECKPOINT = ('checkpoints/rtmdet_nano_8xb32-100e_coco-obj365-person-'
 # parte da resposta espúria sem perder os keypoints de fato localizados.
 DEFAULT_SCORE_THRESHOLD = 3.0
 
-# Lifting treinado com o corte de quadro, que é o regime desta montagem: numa
-# webcam de mesa o quadril fica fora da imagem, e o estimador 2D o gruda na
-# borda inferior com resposta alta. Medido no protocolo de corte sobre o S7
-# (`scripts/measure_lifting_truncation.py`), condição `mesa`: erro de quadril
-# 72,0mm contra 495,8mm do v2, pernas 117,5 contra 237,2, e o tronco predito
-# sai em 464,8mm contra 453,8mm de ground truth — o v2 colapsa o tronco para
-# 181,6mm. Na entrada íntegra não custa nada: 39,6 contra 39,9mm.
-LIFT_CONFIG = 'configs/lift3d_dstformer_h3wb_robusto_v3.py'
-LIFT_CHECKPOINT = 'work_dirs/lift3d_robusto_v3/best_MPJPE_whole_epoch_12.pth'
+# Lifting por montagem, pelo mesmo motivo do estimador de pose: cada um foi
+# medido melhor no seu domínio, e aqui a diferença é grande demais para um
+# padrão só.
+#
+# Retrovisor: o adaptado ao domínio veicular, treinado com o 2D do estimador
+# real e a referência 3D do Drive&Act. Mede 41,5mm de PA-MPJPE contra 81,8 do
+# outro, erro absoluto 60,7 contra 183,7, e coerência de osso 19,6 contra 25,2
+# **com mais movimento** --- ou seja, o ganho não é suavização.
+#
+# Mesa: o treinado com corte de quadro. O veicular **quebra** fora da montagem
+# dele: na gravação da webcam a canela predita sai em 18,9mm e a distância
+# interpupilar em 35,8, contra 297,5 e 62,1 deste. Especializou-se numa câmera,
+# um enquadramento e oito sujeitos.
+LIFT_CONFIG_BY_MOUNTING = {
+    'mesa': 'configs/lift3d_dstformer_h3wb_robusto_v3.py',
+    'retrovisor': 'configs/lift3d_veicular.py',
+}
+LIFT_CHECKPOINT_BY_MOUNTING = {
+    'mesa': 'work_dirs/lift3d_robusto_v3/best_MPJPE_whole_epoch_12.pth',
+    'retrovisor': ('work_dirs/lift3d_veicular/'
+                   'best_MPJPE_whole_epoch_4.pth'),
+}
+
+# Config e checkpoint das medições já publicadas, que os scripts de medição
+# importam. Mantê-los explícitos evita que uma troca de padrão do painel mude
+# em silêncio o protocolo de um número que o documento cita.
+LIFT_CONFIG = LIFT_CONFIG_BY_MOUNTING['mesa']
+LIFT_CHECKPOINT = LIFT_CHECKPOINT_BY_MOUNTING['mesa']
 
 # Teto de confiança das juntas que o sistema sabe não ter observado. É contrato
 # entre treino e inferência, e por isso anda junto do checkpoint: só vale para
@@ -170,9 +189,9 @@ def parse_args():
                         help='Config do detector; vazio dispensa o estágio')
     parser.add_argument('--det-ckpt', default=DETECTOR_CHECKPOINT,
                         help='Checkpoint do detector')
-    parser.add_argument('--lift-cfg', default=LIFT_CONFIG,
+    parser.add_argument('--lift-cfg', default=None,
                         help='Config do lifting 2D para 3D')
-    parser.add_argument('--lift-ckpt', default=LIFT_CHECKPOINT,
+    parser.add_argument('--lift-ckpt', default=None,
                         help='Checkpoint do lifting; vazio desliga o painel 3D')
     parser.add_argument('--teto-confianca', type=confianca_opcional,
                         default=LIFT_UNOBSERVED_CONFIDENCE,
@@ -212,6 +231,10 @@ def parse_args():
     args = parser.parse_args()
     if args.ckpt is None:
         args.ckpt = POSE_CHECKPOINT_BY_MOUNTING[args.montagem]
+    if args.lift_cfg is None:
+        args.lift_cfg = LIFT_CONFIG_BY_MOUNTING[args.montagem]
+    if args.lift_ckpt is None:
+        args.lift_ckpt = LIFT_CHECKPOINT_BY_MOUNTING[args.montagem]
     if args.distancia is None:
         args.distancia = DEFAULT_SUBJECT_DEPTH_M[args.montagem]
     return args

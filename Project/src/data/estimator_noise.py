@@ -214,6 +214,13 @@ class SimulatedEstimatorNoise(BaseTransform):
         if labels is None:
             return results
 
+        # Entrada que já chega corrompida pelo estimador real não é simulada de
+        # novo: o Drive&Act traz as pernas grudadas na borda de verdade, e
+        # empilhar a simulação por cima ensinaria uma corrupção dupla que não
+        # ocorre. Ver `src/data/driveact_lift_dataset.py`.
+        if results.get('corrupcao_real'):
+            return results
+
         labels = labels.copy()
 
         # A confiança dos keypoints preservados também varia, ainda que pouco.
