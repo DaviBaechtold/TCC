@@ -29,6 +29,9 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from src.models.detector_config import (DEFAULT_DETECTOR,
+                                        DETECTOR_CHOICES)
+
 DEFAULT_VIDEO = Path('work_dirs/panel/rec_20260912_163434.mp4')
 CACHE_DIR = Path('work_dirs/live_quality')
 
@@ -73,6 +76,10 @@ def parse_args(panel):
                         help='Desliga o filtro temporal, para medir o que ele '
                              'contribui')
     parser.add_argument('--device', default='cuda:0')
+    parser.add_argument('--detector', default=DEFAULT_DETECTOR,
+                        choices=DETECTOR_CHOICES,
+                        help='Detector de pessoas do estágio 1; o '
+                             'padrão é o de operação')
     parser.add_argument('--out', type=Path, default=None)
     args = parser.parse_args()
     if args.distancia is None:
@@ -85,7 +92,7 @@ def detect_2d(panel, args) -> dict:
     import cv2
 
     from src.models.pose_pipeline import (DEFAULT_DETECTOR_SCORE,
-                                          FullBodyPosePipeline, PersonDetector)
+                                          FullBodyPosePipeline, build_person_detector)
 
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     cache = CACHE_DIR / f'{args.video.stem}_{Path(args.ckpt).stem}.npz'
@@ -94,9 +101,8 @@ def detect_2d(panel, args) -> dict:
         print(f'2D do cache: {cache}')
         return {chave: dados[chave] for chave in dados.files}
 
-    detector = PersonDetector(panel.DETECTOR_CONFIG, panel.DETECTOR_CHECKPOINT,
-                              args.device,
-                              args.bbox_thr or DEFAULT_DETECTOR_SCORE)
+    detector = build_person_detector(
+        args.detector, args.device, args.bbox_thr or DEFAULT_DETECTOR_SCORE)
     pipeline = FullBodyPosePipeline(
         panel._config_without_flip_test(args.cfg, CACHE_DIR),
         args.ckpt, args.device, detector)

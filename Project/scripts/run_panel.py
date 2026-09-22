@@ -40,8 +40,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.data.camera_calibration import load_intrinsics
 from src.data.estimator_noise import UNOBSERVED_CONFIDENCE_CAP
 from src.models.observability import MOUNTING_ABSENT, observed_keypoints
+from src.models.detector_config import (DEFAULT_DETECTOR, DETECTOR_CHOICES,
+                                        DETECTOR_NONE)
 from src.models.pose_pipeline import (DEFAULT_DETECTOR_SCORE,
-                                      FullBodyPosePipeline, PersonDetector)
+                                      FullBodyPosePipeline,
+                                      build_person_detector)
 from src.models.temporal_filter import OneEuroFilter, cutoffs_by_observation
 from src.visualization.panel import PanelState, ValidationPanel
 from src.visualization.skeleton import draw_box, draw_pose
@@ -84,10 +87,6 @@ POSE_CHECKPOINT_BY_MOUNTING = {
 # medição importam. Mantê-lo explícito evita que uma troca de padrão do painel
 # mude em silêncio o protocolo de um número que o documento cita.
 POSE_CHECKPOINT = POSE_CHECKPOINT_BY_MOUNTING['mesa']
-
-DETECTOR_CONFIG = 'configs/detectors/rtmdet_nano_person_infer.py'
-DETECTOR_CHECKPOINT = ('checkpoints/rtmdet_nano_8xb32-100e_coco-obj365-person-'
-                       '05d8511e.pth')
 
 # A pontuação do SimCC é a magnitude do máximo do mapa de resposta, **não** uma
 # probabilidade: ela não tem teto em 1. O padrão anterior, 0,3, estava abaixo de
@@ -185,10 +184,9 @@ def parse_args():
                         help='Config do estimador de pose')
     parser.add_argument('--ckpt', default=None,
                         help='Checkpoint do estimador')
-    parser.add_argument('--det-cfg', default=DETECTOR_CONFIG,
-                        help='Config do detector; vazio dispensa o estágio')
-    parser.add_argument('--det-ckpt', default=DETECTOR_CHECKPOINT,
-                        help='Checkpoint do detector')
+    parser.add_argument('--detector', default=DEFAULT_DETECTOR,
+                        choices=DETECTOR_CHOICES,
+                        help='Detector de pessoas do estágio 1')
     parser.add_argument('--lift-cfg', default=None,
                         help='Config do lifting 2D para 3D')
     parser.add_argument('--lift-ckpt', default=None,
@@ -328,13 +326,11 @@ def main():
     args = parse_args()
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
-    detector = None
-    if args.det_cfg and args.det_ckpt:
-        print('Carregando detector de pessoas...')
-        detector = PersonDetector(args.det_cfg, args.det_ckpt,
-                                  args.device, args.bbox_thr)
-    else:
+    if args.detector == DETECTOR_NONE:
         print('Sem detector: o frame inteiro e usado como regiao de interesse.')
+    else:
+        print(f'Carregando detector de pessoas ({args.detector})...')
+    detector = build_person_detector(args.detector, args.device, args.bbox_thr)
 
     lifter, calibrado = build_lifter(args)
     # O One Euro trabalha na saída 3D, em metros. Medido: filtrar ali reduz 69%

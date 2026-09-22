@@ -10,7 +10,7 @@ explícitas na linha de comando e registradas no arquivo de saída:
     --flip-test     dobra o custo do estágio de pose. Habilitado na avaliação
                     de AP, desabilitado em operação — medir com ele ligado e
                     reportar como taxa de operação seria enganoso.
-    --detector      inclui o RTMDet-nano. Numa câmera fixa no habitáculo o
+    --detector      escolhe o detector do estágio 1. Numa câmera fixa no habitáculo o
                     frame inteiro pode servir de caixa única e este estágio
                     desaparece, então as duas configurações interessam.
 
@@ -27,10 +27,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-DETECTOR_CONFIG = 'configs/detectors/rtmdet_nano_person_infer.py'
-DETECTOR_CHECKPOINT = ('checkpoints/rtmdet_nano_8xb32-100e_coco-obj365-person-'
-                       '05d8511e.pth')
-
+from src.models.detector_config import (DEFAULT_DETECTOR,
+                                        DETECTOR_CHOICES,
+                                        DETECTOR_NONE)
 
 def parse_args():
     p = argparse.ArgumentParser(description=__doc__)
@@ -43,8 +42,12 @@ def parse_args():
     p.add_argument('--warmup', type=int, default=20)
     p.add_argument('--flip-test', action='store_true',
                    help='Condição da avaliação de AP, não a de operação')
-    p.add_argument('--detector', action='store_true',
-                   help='Inclui o RTMDet-nano antes do estimador de pose')
+    p.add_argument('--detector', default=DEFAULT_DETECTOR,
+                   choices=DETECTOR_CHOICES,
+                   help='Detector de pessoas do estágio 1. O padrão é o de '
+                        'operação; `nenhum` mede o pipeline sem o estágio, '
+                        'que numa câmera fixa no habitáculo é alternativa '
+                        'real')
     p.add_argument('--image', default=None,
                    help='Frame real. Obrigatório com --detector, porque ruído '
                         'não produz detecções e deixaria a pose fora da conta')
@@ -69,10 +72,12 @@ def main():
     from src.evaluation.throughput import (describe_device, measure,
                                            synthetic_frame)
     from src.models.pose_pipeline import (DEFAULT_DETECTOR_SCORE,
-                                      FullBodyPosePipeline, PersonDetector)
+                                      FullBodyPosePipeline,
+                                      build_person_detector)
 
-    if args.detector and not args.image:
-        raise SystemExit('--detector exige --image com um frame real')
+    if args.detector != DETECTOR_NONE and not args.image:
+        raise SystemExit(f'--detector {args.detector} exige --image com um '
+                         'frame real')
 
     # O flip test vive no config, não na API de inferência; sobrescrevê-lo aqui
     # mantém uma única fonte de verdade para o resto dos parâmetros do modelo.
@@ -85,9 +90,8 @@ def main():
     patched.parent.mkdir(parents=True, exist_ok=True)
     cfg.dump(patched)
 
-    detector = (PersonDetector(DETECTOR_CONFIG, DETECTOR_CHECKPOINT,
-                               args.device, DEFAULT_DETECTOR_SCORE)
-                if args.detector else None)
+    detector = build_person_detector(args.detector, args.device,
+                                     DEFAULT_DETECTOR_SCORE)
     pipeline = FullBodyPosePipeline(patched, args.ckpt, device=args.device,
                                     detector=detector)
     _apply_inference_optimizations(pipeline, args)
@@ -112,7 +116,7 @@ def main():
         'frame': f'{frame.shape[1]}x{frame.shape[0]}',
         'people_in_frame': people,
         'flip_test': args.flip_test,
-        'detector': DETECTOR_CONFIG if args.detector else None,
+        'detector': args.detector,
         'batch_size': 1,
         'precision': 'fp32',
         'channels_last': args.channels_last,

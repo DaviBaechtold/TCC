@@ -24,6 +24,9 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from src.models.detector_config import (DEFAULT_DETECTOR,
+                                        DETECTOR_CHOICES)
+
 WEBCAM_VIDEO = Path('work_dirs/panel/rec_20260912_163434.mp4')
 CACHE_2D = Path('work_dirs/live_quality')
 DRIVEACT_FRAMES = Path('data/processed/driveact/val')
@@ -44,6 +47,10 @@ def parse_args():
     parser.add_argument('--tag', required=True)
     parser.add_argument('--max-frames', type=int, default=300)
     parser.add_argument('--device', default='cuda:0')
+    parser.add_argument('--detector', default=DEFAULT_DETECTOR,
+                        choices=DETECTOR_CHOICES,
+                        help='Detector de pessoas do estágio 1; o '
+                             'padrão é o de operação')
     parser.add_argument('--out', type=Path, default=None)
     return parser.parse_args()
 
@@ -53,7 +60,7 @@ def webcam_detections(panel, args):
     import cv2
 
     from src.models.pose_pipeline import (DEFAULT_DETECTOR_SCORE,
-                                          FullBodyPosePipeline, PersonDetector)
+                                          FullBodyPosePipeline, build_person_detector)
 
     cache = CACHE_2D / (f'{WEBCAM_VIDEO.stem}_'
                         f'{Path(panel.POSE_CHECKPOINT).stem}.npz')
@@ -63,8 +70,8 @@ def webcam_detections(panel, args):
         tamanho = (int(dados['frame_size'][0]), int(dados['frame_size'][1]))
         return dados['keypoints'], dados['scores'], tamanho
 
-    detector = PersonDetector(panel.DETECTOR_CONFIG, panel.DETECTOR_CHECKPOINT,
-                              args.device, DEFAULT_DETECTOR_SCORE)
+    detector = build_person_detector(args.detector, args.device,
+                                     DEFAULT_DETECTOR_SCORE)
     pipeline = FullBodyPosePipeline(
         panel._config_without_flip_test(panel.POSE_CONFIG, CACHE_2D),
         panel.POSE_CHECKPOINT, args.device, detector)
@@ -89,10 +96,10 @@ def driveact_detections(panel, args):
     import cv2
 
     from src.models.pose_pipeline import (DEFAULT_DETECTOR_SCORE,
-                                          FullBodyPosePipeline, PersonDetector)
+                                          FullBodyPosePipeline, build_person_detector)
 
-    detector = PersonDetector(panel.DETECTOR_CONFIG, panel.DETECTOR_CHECKPOINT,
-                              args.device, DEFAULT_DETECTOR_SCORE)
+    detector = build_person_detector(args.detector, args.device,
+                                     DEFAULT_DETECTOR_SCORE)
     pipeline = FullBodyPosePipeline(
         panel._config_without_flip_test(panel.POSE_CONFIG, CACHE_2D),
         panel.POSE_CHECKPOINT, args.device, detector)

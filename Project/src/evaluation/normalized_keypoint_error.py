@@ -119,3 +119,35 @@ def _visible_center(keypoints: np.ndarray, visible: np.ndarray,
     """
     chosen = [index for index in indices if visible[index]]
     return keypoints[chosen].mean(axis=0)
+
+
+def instance_error(predicted: np.ndarray,
+                   reference: np.ndarray) -> tuple[float, int] | None:
+    """Erro normalizado por tronco de uma instância, e quantas juntas entraram.
+
+    Args:
+        predicted: [K, 2] keypoints preditos, em pixels do quadro original.
+        reference: [K, 3] anotação no formato COCO, com o terceiro canal
+            indicando visibilidade.
+
+    Returns:
+        `(erro, juntas_visiveis)`, ou `None` quando o tronco é indeterminado ---
+        caso em que não há normalizador e medir em pixels crus compararia poses a
+        distâncias diferentes da câmera.
+
+    Vive aqui, e não nos controllers, porque três medições diferentes precisam
+    exatamente desta conta: a comparação de detectores, a bateria de validação e
+    a estratificação. Copiada, ela divergiria em silêncio --- e o erro de cada
+    cópia seria indistinguível de um efeito do que se está medindo.
+    """
+    visible = reference[:, 2] > 0
+    if not visible.any():
+        return None
+
+    scale = torso_length(reference[:, :2], visible)
+    if scale is None:
+        return None
+
+    distances = np.linalg.norm(
+        predicted[:len(reference)][visible] - reference[visible, :2], axis=-1)
+    return float(distances.mean() / scale), int(visible.sum())

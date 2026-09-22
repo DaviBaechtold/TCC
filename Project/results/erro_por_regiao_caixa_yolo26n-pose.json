@@ -1,0 +1,43 @@
+{
+  "tag": "caixa_yolo26n-pose",
+  "checkpoint": "best_coco-wholebody_AP_epoch_5_merged.pth",
+  "conjunto": "COCO-WholeBody val, escala de cinza",
+  "origem_da_caixa": "yolo26n-pose",
+  "instancias_sem_correspondencia": 5,
+  "flip_test": false,
+  "instancias": 295,
+  "erro_normalizado": {
+    "corpo": {
+      "mediana": 0.0404,
+      "media": 0.0487,
+      "amostras": 295
+    },
+    "face": {
+      "mediana": 0.0354,
+      "media": 0.0569,
+      "amostras": 295
+    },
+    "mao esquerda": {
+      "mediana": 0.0781,
+      "media": 0.1281,
+      "amostras": 295
+    },
+    "mao direita": {
+      "mediana": 0.0898,
+      "media": 0.1704,
+      "amostras": 295
+    }
+  },
+  "resposta_media": {
+    "corpo": 7.1,
+    "face": 9.68,
+    "mao esquerda": 8.15,
+    "mao direita": 8.2
+  },
+  "keypoints_anotados_por_instancia": {
+    "corpo": 14.3,
+    "face": 68.0,
+    "mao esquerda": 20.9,
+    "mao direita": 20.9
+  }
+}

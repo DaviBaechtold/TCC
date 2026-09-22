@@ -41,6 +41,8 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from src.models.detector_config import DETECTOR_CHOICES, DETECTOR_NONE
+
 SEQUENCE_LENGTH = 16
 
 from src.evaluation.pose_alignment import procrustes_align
@@ -95,11 +97,14 @@ def parse_args():
                         '— lente de 567px, ocupante a 0,664m — em vez de usar a '
                         'mediana do H3WB, que amplia a pose em 3,8 vezes neste '
                         'domínio')
-    p.add_argument('--detector', action='store_true',
-                   help='Usa o detector de pessoas em vez do quadro inteiro '
-                        'como caixa. É a condição de operação, e a do conjunto '
-                        'de treino veicular; sem a flag reproduz as medições '
-                        'anteriores desta régua')
+    p.add_argument('--detector', default=DETECTOR_NONE,
+                   choices=DETECTOR_CHOICES,
+                   help='Origem da caixa. O padrão usa o quadro inteiro, que '
+                        'reproduz as medições anteriores desta régua; nomear um '
+                        'detector mede a condição de operação. O conjunto de '
+                        'treino veicular foi extraído com rtmdet-nano, de modo '
+                        'que medir com outro detector mede também o '
+                        'descasamento entre treino e operação')
     p.add_argument('--device', default='cuda:0')
     p.add_argument('--out', type=Path,
                    default=Path('results/lifting_driveact.json'))
@@ -139,12 +144,10 @@ def main():
     # medições anteriores desta régua foram feitas. Com `--detector` a entrada
     # passa a ser a de operação, e é sob ela que o conjunto de treino veicular
     # foi extraído --- comparar treino e medida exige a mesma condição.
-    detector = None
-    if args.detector:
-        from src.models.pose_pipeline import DEFAULT_DETECTOR_SCORE, PersonDetector
-        detector = PersonDetector(panel.DETECTOR_CONFIG,
-                                  panel.DETECTOR_CHECKPOINT, args.device,
-                                  DEFAULT_DETECTOR_SCORE)
+    from src.models.pose_pipeline import (DEFAULT_DETECTOR_SCORE,
+                                          build_person_detector)
+    detector = build_person_detector(args.detector, args.device,
+                                     DEFAULT_DETECTOR_SCORE)
     pose = FullBodyPosePipeline(
         panel._config_without_flip_test(panel.POSE_CONFIG, work_dir),
         args.pose_ckpt or panel.POSE_CHECKPOINT, args.device, detector)
@@ -258,7 +261,7 @@ def main():
         'pose_checkpoint': Path(args.pose_ckpt or panel.POSE_CHECKPOINT).name,
         'lift_checkpoint': Path(args.lift_ckpt or panel.LIFT_CHECKPOINT).name,
         'confidence': args.confidence,
-        'detector': bool(args.detector),
+        'detector': args.detector,
         'normalizacao': args.normalizacao,
         # Com `camera` quem decodifica é a geometria virtual do H3WB, e este
         # fator não é aplicado; fica no relatório só para o modo `largura`.

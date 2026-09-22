@@ -61,7 +61,8 @@ def main():
 
     from src.data.driveact import read_pose_csv
     from src.models.pose_pipeline import (DEFAULT_DETECTOR_SCORE,
-                                          FullBodyPosePipeline, PersonDetector)
+                                          FullBodyPosePipeline, PersonDetector,
+                                          RTMDET_CHECKPOINT, RTMDET_CONFIG)
 
     spec = importlib.util.spec_from_file_location(
         'panel_defaults', Path(__file__).with_name('run_panel.py'))
@@ -76,7 +77,11 @@ def main():
 
     trabalho = Path('work_dirs/driveact_lift')
     trabalho.mkdir(parents=True, exist_ok=True)
-    detector = PersonDetector(painel.DETECTOR_CONFIG, painel.DETECTOR_CHECKPOINT,
+    # Prende o RTMDet-nano de propósito, embora o padrão do sistema já seja o
+    # YOLO26n-pose: o checkpoint veicular foi treinado sobre o 2D que este
+    # detector produziu, e reconstruir o conjunto com outro mudaria a entrada de
+    # treino sem que nada denunciasse.
+    detector = PersonDetector(RTMDET_CONFIG, RTMDET_CHECKPOINT,
                               args.device, DEFAULT_DETECTOR_SCORE)
     # O estimador da montagem de retrovisor, que é quem alimenta o lifting neste
     # domínio --- treinar com a saída de outro modelo mediria outro sistema.

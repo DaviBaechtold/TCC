@@ -75,10 +75,11 @@ def main():
     import cv2
     import torch
 
-    from src.evaluation.normalized_keypoint_error import torso_length
+    from src.evaluation.normalized_keypoint_error import instance_error
     from src.models import torch_compat  # noqa: F401
     from src.models.pose_pipeline import (DEFAULT_DETECTOR_SCORE,
-                                      FullBodyPosePipeline, PersonDetector)
+                                          FullBodyPosePipeline, PersonDetector,
+                                          RTMDET_CHECKPOINT, RTMDET_CONFIG)
     from src.models.yolo_detector import YoloPersonDetector
 
     import importlib.util
@@ -98,9 +99,8 @@ def main():
 
     configurations = {
         'caixa de ground truth': 'gt',
-        'RTMDet-nano': PersonDetector(panel.DETECTOR_CONFIG,
-                                      panel.DETECTOR_CHECKPOINT, args.device,
-                                      DEFAULT_DETECTOR_SCORE),
+        'RTMDet-nano': PersonDetector(RTMDET_CONFIG, RTMDET_CHECKPOINT,
+                                      args.device, DEFAULT_DETECTOR_SCORE),
         'sem detector': None,
     }
     for label, checkpoint in YOLO_CHECKPOINTS.items():
@@ -138,17 +138,13 @@ def main():
             # formato COCO-WholeBody carrega só as 17 juntas corporais; face e
             # mãos vivem em campos separados e aqui estão vazias.
             reference = np.array(annotation['keypoints']).reshape(-1, 3)
-            visible = reference[:, 2] > 0
-            scale = torso_length(reference[:, :2], visible)
-            if scale is None:
-                continue
 
             # Com mais de uma detecção, a primeira é a do ocupante: o Drive&Act
             # tem uma pessoa por quadro.
-            predicted = result.keypoints[0][:len(reference)]
-            distances = np.linalg.norm(
-                predicted[visible] - reference[visible, :2], axis=-1)
-            errors.append(distances.mean() / scale)
+            measured = instance_error(result.keypoints[0], reference)
+            if measured is None:
+                continue
+            errors.append(measured[0])
 
         report[label] = {
             'erro_normalizado': round(float(np.mean(errors)), 4),

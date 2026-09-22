@@ -1,0 +1,43 @@
+{
+  "tag": "caixa_rtmdet-nano",
+  "checkpoint": "best_coco-wholebody_AP_epoch_5_merged.pth",
+  "conjunto": "COCO-WholeBody val, escala de cinza",
+  "origem_da_caixa": "rtmdet-nano",
+  "instancias_sem_correspondencia": 7,
+  "flip_test": false,
+  "instancias": 293,
+  "erro_normalizado": {
+    "corpo": {
+      "mediana": 0.0412,
+      "media": 0.0535,
+      "amostras": 293
+    },
+    "face": {
+      "mediana": 0.036,
+      "media": 0.1186,
+      "amostras": 293
+    },
+    "mao esquerda": {
+      "mediana": 0.0774,
+      "media": 0.1611,
+      "amostras": 293
+    },
+    "mao direita": {
+      "mediana": 0.0904,
+      "media": 0.1991,
+      "amostras": 293
+    }
+  },
+  "resposta_media": {
+    "corpo": 7.06,
+    "face": 9.65,
+    "mao esquerda": 8.09,
+    "mao direita": 8.09
+  },
+  "keypoints_anotados_por_instancia": {
+    "corpo": 14.4,
+    "face": 68.0,
+    "mao esquerda": 21.0,
+    "mao direita": 20.9
+  }
+}

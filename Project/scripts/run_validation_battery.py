@@ -26,6 +26,9 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from src.models.detector_config import (DEFAULT_DETECTOR,
+                                        DETECTOR_CHOICES)
+
 VIDEO = Path('work_dirs/panel/rec_20260921_224039.mp4')
 QUADROS_LATENCIA = 300
 QUADROS_SOAK = 1000
@@ -41,6 +44,10 @@ def parse_args():
         formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument('--video', type=Path, default=VIDEO)
     p.add_argument('--device', default='cuda:0')
+    p.add_argument('--detector', default=DEFAULT_DETECTOR,
+                   choices=DETECTOR_CHOICES,
+                   help='Detector de pessoas do estágio 1; o padrão é '
+                        'o de operação')
     p.add_argument('--out', type=Path, default=Path('results/bateria_validacao.json'))
     return p.parse_args()
 
@@ -89,16 +96,16 @@ def main():
                                                    latencia_por_quadro, ocluir)
     from src.evaluation.normalized_keypoint_error import torso_length
     from src.models.pose_pipeline import (DEFAULT_DETECTOR_SCORE,
-                                          FullBodyPosePipeline, PersonDetector)
+                                          FullBodyPosePipeline,
+                                          build_person_detector)
 
     trabalho = Path('work_dirs/bateria')
     trabalho.mkdir(parents=True, exist_ok=True)
-    detector = PersonDetector(painel.DETECTOR_CONFIG, painel.DETECTOR_CHECKPOINT,
-                              args.device, DEFAULT_DETECTOR_SCORE)
+    detector = build_person_detector(args.detector, args.device,
+                                     DEFAULT_DETECTOR_SCORE)
     pose = FullBodyPosePipeline(
         painel._config_without_flip_test(painel.POSE_CONFIG, trabalho),
         painel.POSE_CHECKPOINT, args.device, detector)
-    argumentos = painel.parse_args.__wrapped__ if hasattr(painel.parse_args, '__wrapped__') else None
 
     testes: dict[str, dict] = {}
 
@@ -303,7 +310,7 @@ def soak(pose, lifter, video, painel, torch):
     relatorio.update({
         'condicao': f'{processados} quadros pelo caminho completo, memória '
                     'amostrada a cada 50',
-        'criterio': f'sem exceções e crescimento de memória < 64 MiB',
+        'criterio': 'sem exceções e crescimento de memória < 64 MiB',
         'quadros': processados,
         'excecoes': excecoes,
         'pico_mib': round(torch.cuda.max_memory_allocated() / 2**20, 1),

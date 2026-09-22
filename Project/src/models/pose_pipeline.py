@@ -19,6 +19,14 @@ from mmengine.registry import DefaultScope
 
 # Precisa vir antes de qualquer import que dispare o loader do mmengine.
 from src.models import torch_compat  # noqa: F401
+from src.models.detector_config import (DEFAULT_DETECTOR,
+                                        DETECTOR_CHOICES,
+                                        DETECTOR_NONE,
+                                        DETECTOR_RTMDET,
+                                        DETECTOR_YOLO,
+                                        RTMDET_CHECKPOINT,
+                                        RTMDET_CONFIG,
+                                        YOLO_CHECKPOINT)
 
 from mmpose.apis import inference_topdown, init_model  # noqa: E402
 
@@ -134,6 +142,33 @@ class PersonDetector:
         if len(boxes) == 0:
             return np.zeros((0, 4), dtype=np.float32)
         return boxes.astype(np.float32)
+
+
+def build_person_detector(kind: str = DEFAULT_DETECTOR,
+                          device: str = 'cuda:0',
+                          score_threshold: float = DEFAULT_DETECTOR_SCORE):
+    """Detector de pessoas do tipo pedido, ou `None` para dispensar o estágio.
+
+    `PersonDetector` e `YoloPersonDetector` têm o mesmo contrato de chamada ---
+    recebem um frame, devolvem caixas ---, então o chamador não precisa saber
+    qual recebeu.
+
+    Raises:
+        ValueError: tipo desconhecido. Falhar aqui é melhor que seguir sem
+            detector por causa de um nome digitado errado, que degrada a pose em
+            82% sem levantar erro.
+    """
+    if kind == DETECTOR_NONE:
+        return None
+    if kind == DETECTOR_RTMDET:
+        return PersonDetector(RTMDET_CONFIG, RTMDET_CHECKPOINT, device,
+                              score_threshold)
+    if kind == DETECTOR_YOLO:
+        from src.models.yolo_detector import YoloPersonDetector
+
+        return YoloPersonDetector(YOLO_CHECKPOINT, device, score_threshold)
+    raise ValueError(
+        f'Detector desconhecido: {kind!r}. Use um de {DETECTOR_CHOICES}.')
 
 
 class FullBodyPosePipeline:

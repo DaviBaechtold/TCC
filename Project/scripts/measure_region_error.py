@@ -7,9 +7,14 @@ adaptação ao domínio veicular, que treina com peso zero em face e mãos por f
 de anotação, degradou essas regiões?
 
 O conjunto é o COCO-WholeBody em escala de cinza, único com anotação de face e
-mãos. Só entram instâncias com face e as duas mãos anotadas, e a caixa é a de
-ground truth --- isola o estimador do erro do detector, como manda o protocolo
-do projeto.
+mãos. Só entram instâncias com face e as duas mãos anotadas.
+
+Por padrão a caixa é a de ground truth, o que isola o estimador do erro do
+detector. Com `--detector` a caixa passa a vir do detector, e a medição responde
+outra pergunta: **trocar o detector degrada face e mãos?** Ela existe porque a
+comparação de detectores da QP1 só mede erro corporal --- o Drive&Act não anota
+face nem mãos --- e adotar um detector por essa evidência repetiria o erro da
+Etapa 3, que melhorou o corpo e desfez a face sem que nada medisse a face.
 
     python scripts/measure_region_error.py --tag etapa2 \\
         --ckpt work_dirs/rtmw_x_gray_lora/best_coco-wholebody_AP_epoch_5_merged.pth
@@ -24,6 +29,8 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from src.models.detector_config import DETECTOR_CHOICES, DETECTOR_NONE
 
 DATA_ROOT = Path('data/processed/grayscale')
 ANN_FILE = 'annotations/coco_wholebody_val_v1.0.json'
@@ -46,6 +53,11 @@ def parse_args():
     parser.add_argument('--max-images', type=int, default=300)
     parser.add_argument('--device', default='cuda:0')
     parser.add_argument('--out', type=Path, default=None)
+    parser.add_argument('--detector', default=DETECTOR_NONE,
+                        choices=DETECTOR_CHOICES,
+                        help='Origem da caixa. O padrão dispensa o detector e '
+                             'usa a de ground truth; nomear um detector mede o '
+                             'efeito dele sobre cada região')
     return parser.parse_args()
 
 
@@ -89,13 +101,36 @@ def usable_annotations(ann_file: Path, limit: int) -> list[tuple[dict, dict]]:
     return escolhidas
 
 
+# Abaixo disto a caixa detectada descreve outra pessoa, ou um recorte tão
+# desalinhado que a pose não é comparável com a anotação. 0,5 é o mesmo limiar
+# que o protocolo do COCO usa para considerar uma detecção correta.
+MIN_IOU_CORRESPONDENCIA = 0.5
+
+
+def indice_da_pessoa_anotada(caixas: np.ndarray, anotada: np.ndarray,
+                             iou) -> int | None:
+    """Índice da caixa detectada que corresponde à pessoa anotada.
+
+    Returns:
+        O índice de maior IoU, ou `None` se nenhuma caixa alcançar
+        `MIN_IOU_CORRESPONDENCIA` --- caso em que a instância é descartada em vez
+        de medida contra a pessoa errada.
+    """
+    pontuacoes = [iou(caixa, anotada) for caixa in caixas]
+    melhor = int(np.argmax(pontuacoes))
+    return melhor if pontuacoes[melhor] >= MIN_IOU_CORRESPONDENCIA else None
+
+
 def main():
     args = parse_args()
 
     import cv2
 
-    from src.evaluation.region_error import REGION_INDICES, normalized_errors, summarize
-    from src.models.pose_pipeline import FullBodyPosePipeline
+    from src.evaluation.region_error import (REGION_INDICES, normalized_errors,
+                                             summarize)
+    from src.models.pose_pipeline import (FullBodyPosePipeline,
+                                          build_person_detector)
+    from src.utils.bbox_utils import bbox_iou
 
     spec = importlib.util.spec_from_file_location(
         'panel_defaults', Path(__file__).with_name('run_panel.py'))
@@ -105,31 +140,46 @@ def main():
     WORK_DIR.mkdir(parents=True, exist_ok=True)
     # Flip test desligado: é a condição de operação do painel, que é onde a
     # suspeita apareceu. Ligado, mediria outra configuração.
+    detector = build_person_detector(args.detector, args.device)
     pipeline = FullBodyPosePipeline(
         panel._config_without_flip_test(args.cfg, WORK_DIR),
-        args.ckpt, args.device, detector=None)
+        args.ckpt, args.device, detector=detector)
 
     instancias = usable_annotations(args.data_root / args.ann_file,
                                     args.max_images)
     print(f'{len(instancias)} instâncias com face e duas mãos anotadas')
 
     amostras, respostas, anotados_por_regiao = [], [], []
+    sem_correspondencia = 0
     for anotacao, imagem in instancias:
         frame = cv2.imread(str(args.data_root / 'val2017' / imagem['file_name']))
         if frame is None:
             continue
         x, y, largura, altura = anotacao['bbox']
-        caixa = np.array([[x, y, x + largura, y + altura]], dtype=np.float32)
-        resultado = pipeline(frame, boxes=caixa)
+        caixa = np.array([x, y, x + largura, y + altura], dtype=np.float32)
+        resultado = (pipeline(frame, boxes=caixa[None]) if detector is None
+                     else pipeline(frame))
         if not resultado.num_people:
             continue
 
+        # O detector devolve todas as pessoas da imagem, e a anotação descreve
+        # uma. Sem casar as duas, a medição compararia a pose de uma pessoa com
+        # o ground truth de outra --- e o erro resultante não teria nada a ver
+        # com a qualidade do detector.
+        pessoa = 0
+        if detector is not None:
+            pessoa = indice_da_pessoa_anotada(resultado.boxes, caixa, bbox_iou)
+            if pessoa is None:
+                sem_correspondencia += 1
+                continue
+
         verdade, anotados = ground_truth(anotacao)
-        erros = normalized_errors(resultado.keypoints[0], verdade, anotados)
+        erros = normalized_errors(resultado.keypoints[pessoa], verdade, anotados)
         if erros:
             amostras.append(erros)
-            respostas.append({regiao: float(resultado.scores[0][indices].mean())
-                              for regiao, indices in REGION_INDICES.items()})
+            respostas.append(
+                {regiao: float(resultado.scores[pessoa][indices].mean())
+                 for regiao, indices in REGION_INDICES.items()})
             anotados_por_regiao.append(
                 {regiao: int(anotados[indices].sum())
                  for regiao, indices in REGION_INDICES.items()})
@@ -137,7 +187,10 @@ def main():
     relatorio = {
         'tag': args.tag,
         'checkpoint': Path(args.ckpt).name,
-        'conjunto': 'COCO-WholeBody val, escala de cinza, caixa de ground truth',
+        'conjunto': 'COCO-WholeBody val, escala de cinza',
+        'origem_da_caixa': ('ground truth' if args.detector == DETECTOR_NONE
+                            else args.detector),
+        'instancias_sem_correspondencia': sem_correspondencia,
         'flip_test': False,
         'instancias': len(amostras),
         'erro_normalizado': summarize(amostras),
