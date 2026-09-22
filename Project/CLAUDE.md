@@ -295,6 +295,23 @@ projeto — 26% dos boots terminam em congelamento. Diagnóstico completo na
 memória `hardware-instabilidade-do-pc`. Logs em `work_dirs/logs/`, que sobrevive
 à troca de sessão, ao contrário do diretório temporário.
 
+### Recuperação automática — três quedas, três respostas
+
+| Queda | Quem recupera |
+|---|---|
+| Kernel trava por completo | Watchdog da placa (`iTCO_wdt` mais `RuntimeWatchdogSec=60s` no systemd), que reinicia por hardware em 60s |
+| GPU sai do barramento com o sistema de pé (21/09/2026) | `scripts/vigia_hardware.sh` detecta e tenta reiniciar; sem uma regra de reinício sem senha em `/etc/sudoers.d`, ela apenas registra no log |
+| A fila morre e a GPU continua sadia | A mesma vigia relança; o treino retoma da última época pelo `--resume` |
+
+Depois de qualquer reinício, o `@reboot` do crontab roda
+`scripts/retomar_apos_reboot.sh`, que lê o marcador `work_dirs/logs/fila_pendente`,
+relança a fila e sobe a vigia junto.
+
+A vigia tem dois modos: sem argumento faz uma verificação (forma de cron), com
+um intervalo em segundos fica em laço até a fila concluir. Ela **não** age sem
+marcador de fila — máquina ociosa não é reiniciada — e tem teto de três
+reinícios, para que defeito permanente não vire laço de boot.
+
 `data/`, `checkpoints/`, `work_dirs/` e `venv/` são ignorados pelo git.
 `results/` **não é** — os JSON de métrica ali sustentam afirmações do documento.
 

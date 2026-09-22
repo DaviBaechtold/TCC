@@ -27,3 +27,8 @@ sleep 90
 
 echo "[$(date '+%F %H:%M:%S')] retomando $FILA após reinício" >> "$LOGS/reinicios.log"
 setsid "./scripts/$FILA" >> "$LOGS/${FILA%.sh}_fila.log" 2>&1 < /dev/null &
+
+# A vigia sobe junto, senão a máquina volta sem quem a proteja da próxima queda
+# --- e a queda que ela cobre, a GPU saindo do barramento com o sistema de pé,
+# não dispara o watchdog de hardware porque o kernel continua vivo.
+setsid ./scripts/vigia_hardware.sh 300 >> "$LOGS/vigia.log" 2>&1 < /dev/null &
