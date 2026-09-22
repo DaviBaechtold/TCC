@@ -60,7 +60,7 @@ carregado, porque o MMPose não converte bfloat16 para NumPy.
 | Módulo 2 — estimação 2D top-down | Funcional (RTMDet-nano + RTMW-x); adaptação de domínio por LoRA em curso |
 | Módulo 1 — aquisição | Parcial: captura e calibração OK (fx 959,4, reprojeção 0,414px). **A distância ao ocupante é o parâmetro mais frágil do sistema** — dela dependem a escala de entrada e a de saída do lifting, e os 0,97m informados na demo são desmentidos pela pose reconstruída (interpupilar 43,3mm; a 1,40m daria 63,7mm). Medir com trena. |
 | Módulo 3 — lifting 3D | DSTFormer 42,4M params sobre H3WB; batch 4 é o teto dos 8 GB. Checkpoint corrente: `work_dirs/lift3d_robusto_v3/best_MPJPE_whole_epoch_12.pth` (treino com corte de quadro) |
-| Módulo 4 — visualização | Painel completo: 2D, 3D de corpo inteiro com previsto distinto de observado, escala métrica fixa, filtro One Euro, métricas por região coerentes com o desenho |
+| Módulo 4 — visualização | Painel completo: 2D, 3D de corpo inteiro com previsto distinto de observado, escala métrica fixa, **filtro por observação** (junta prevista estabilizada: tremor das pernas 70,97 → 10,61mm sem damping do movimento real), métricas por região coerentes com o desenho |
 | Drive&Act | Vídeos e anotações baixados; conversor escrito e validado |
 | H3WB (lifting 3D) | Baixado e convertido: 60k treino / 20k teste, 133 keypoints |
 | Human3.6M (imagens) | Não necessário — a tarefa 2D→3D usa só coordenadas |
