@@ -51,8 +51,12 @@ FILA=$(cat "$PENDENTE")
 # Duas leituras ruins seguidas, e não uma: `nvidia-smi` falha esporadicamente
 # sob carga pesada sem que a GPU tenha caído.
 FALHAS_PARA_REINICIAR=2
-# Teto de reinícios, para que um defeito permanente não vire laço de boot.
+# Teto de reinícios, para que um defeito permanente não vire laço de boot. O
+# teto vale para uma crise, não para a vida da máquina: uma hora de GPU sadia o
+# zera, senão três quedas espaçadas por meses deixariam a vigia desarmada para
+# sempre.
 MAXIMO_DE_REINICIOS=3
+VERIFICACOES_PARA_ZERAR=12
 
 anotar() { echo "[$(date '+%F %H:%M:%S')] $*" >> "$DIARIO"; }
 
@@ -81,9 +85,38 @@ fi
 
 rm -f "$FALHAS"
 
-# GPU sadia. Se a fila sumiu mas o marcador continua lá, ela morreu sem
-# concluir: relançar é seguro porque o treino retoma da última época.
-if ! pgrep -f "scripts/$FILA" > /dev/null 2>&1; then
-    anotar "fila $FILA ausente com marcador presente; relançando"
-    setsid "./scripts/$FILA" >> "$LOGS/${FILA%.sh}_vigia.log" 2>&1 < /dev/null &
+# Sequência de leituras sadias: ao completar a hora, a crise passou e o teto de
+# reinícios volta a valer inteiro.
+if [ -s "$REINICIOS" ]; then
+    sadias=$(( $(cat "$LOGS/vigia_sadias" 2>/dev/null || echo 0) + 1 ))
+    echo "$sadias" > "$LOGS/vigia_sadias"
+    if [ "$sadias" -ge "$VERIFICACOES_PARA_ZERAR" ]; then
+        anotar "GPU sadia há $sadias verificações; zerando o contador de reinícios"
+        rm -f "$REINICIOS" "$LOGS/vigia_sadias"
+    fi
+fi
+
+# GPU sadia. Se ninguém está usando a GPU e o marcador continua lá, a fila
+# morreu sem concluir --- e relançar é seguro porque o treino retoma da última
+# época.
+#
+# A presença da fila é aferida pelos processos de computação da GPU, e não por
+# `pgrep -f`, que casa com **qualquer** linha de comando contendo o nome do
+# script, inclusive a do shell que o lançou. Esse casamento consigo mesmo já
+# travou uma fila por 2h10 neste projeto, e voltou a morder no teste desta
+# vigia. A GPU não mente e não se autorreferencia.
+#
+# Três verificações seguidas sem processo algum, e não uma: entre uma etapa e
+# outra a fila passa minutos montando dataset sem tocar na GPU.
+OCIOSAS_PARA_RELANCAR=3
+if [ -z "$(nvidia-smi --query-compute-apps=pid --format=csv,noheader 2>/dev/null)" ]; then
+    ociosas=$(( $(cat "$LOGS/vigia_ociosas" 2>/dev/null || echo 0) + 1 ))
+    echo "$ociosas" > "$LOGS/vigia_ociosas"
+    if [ "$ociosas" -ge "$OCIOSAS_PARA_RELANCAR" ]; then
+        anotar "GPU ociosa há $ociosas verificações com $FILA pendente; relançando"
+        rm -f "$LOGS/vigia_ociosas"
+        setsid "./scripts/$FILA" >> "$LOGS/${FILA%.sh}_vigia.log" 2>&1 < /dev/null &
+    fi
+else
+    rm -f "$LOGS/vigia_ociosas"
 fi
