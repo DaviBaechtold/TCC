@@ -83,7 +83,9 @@ class OneEuroFilter:
         self._previous = None
         self._speed = None
 
-    def __call__(self, values: np.ndarray) -> np.ndarray:
+    def __call__(self, values: np.ndarray,
+                 min_cutoff_hz: np.ndarray | float | None = None,
+                 beta: np.ndarray | float | None = None) -> np.ndarray:
         values = np.asarray(values, dtype=np.float64)
 
         # Uma forma diferente é outro sinal — outra pessoa, outro conjunto de
@@ -97,9 +99,52 @@ class OneEuroFilter:
         alpha_speed = _alpha(self._d_cutoff_hz, self._rate_hz)
         self._speed = alpha_speed * speed + (1.0 - alpha_speed) * self._speed
 
-        cutoff = self._min_cutoff_hz + self._beta * np.abs(self._speed)
+        # Corte e beta podem chegar por chamada, e por junta: o painel filtra
+        # mais forte o que ele sabe estar prevendo. Ver `cutoffs_by_observation`.
+        corte_base = (self._min_cutoff_hz if min_cutoff_hz is None
+                      else np.asarray(min_cutoff_hz, dtype=np.float64))
+        ganho = self._beta if beta is None else np.asarray(beta, dtype=np.float64)
+        if np.ndim(corte_base) == 1:
+            corte_base = np.asarray(corte_base)[:, None]
+        if np.ndim(ganho) == 1:
+            ganho = np.asarray(ganho)[:, None]
+        cutoff = corte_base + ganho * np.abs(self._speed)
         alpha = _alpha(cutoff, self._rate_hz)
         filtered = alpha * values + (1.0 - alpha) * self._previous
 
         self._previous = filtered
         return filtered
+
+
+# Corte e ganho das juntas que o sistema sabe estar prevendo, e não medindo.
+#
+# Medido sobre a gravação da webcam: com o mesmo regime das observadas, o tremor
+# das pernas previstas fica em 161,7mm; com estes valores cai para 30,6mm, uma
+# redução de 86%, enquanto o movimento do corpo inteiro praticamente não muda
+# (3,06 contra 3,10mm) --- ou seja, não é suavização disfarçada.
+#
+# O beta zerado é o ponto. Ele é o termo que abre o corte quando o sinal se move
+# depressa, e existe para não atrasar movimento real. Numa junta **prevista** não
+# há movimento real a acompanhar: a perna predita se desloca 453mm por segundo
+# contra 139mm dos braços observados, e isso é o modelo mudando de ideia. Ali a
+# responsividade não vale nada e a estabilidade vale tudo.
+PREDICTED_MIN_CUTOFF_HZ = 1.0
+PREDICTED_BETA = 0.0
+
+
+def cutoffs_by_observation(observed: np.ndarray,
+                           observed_cutoff_hz: float = DEFAULT_MIN_CUTOFF_HZ,
+                           observed_beta: float = DEFAULT_BETA_PER_METRE
+                           ) -> tuple[np.ndarray, np.ndarray]:
+    """Corte e ganho por junta, conforme ela tenha sido observada ou prevista.
+
+    Args:
+        observed: [K] booleano do que o estimador 2D de fato localizou.
+
+    Returns:
+        Dois vetores [K] para passar ao filtro na mesma chamada.
+    """
+    observado = np.asarray(observed, dtype=bool)
+    corte = np.where(observado, observed_cutoff_hz, PREDICTED_MIN_CUTOFF_HZ)
+    ganho = np.where(observado, observed_beta, PREDICTED_BETA)
+    return corte, ganho

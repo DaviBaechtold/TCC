@@ -128,7 +128,7 @@ def main():
 
     from src.evaluation.live_quality import report
     from src.models.observability import observed_keypoints
-    from src.models.temporal_filter import OneEuroFilter
+    from src.models.temporal_filter import OneEuroFilter, cutoffs_by_observation
 
     dados = detect_2d(panel, args)
     keypoints, scores = dados['keypoints'], dados['scores']
@@ -144,7 +144,8 @@ def main():
                                        args.montagem)
         pose = lifter(keypoints[indice], scores[indice], frame_size, observado)
         if not args.sem_filtro:
-            pose = smoother(pose)
+            corte, ganho = cutoffs_by_observation(observado)
+            pose = smoother(pose, corte, ganho)
         poses.append(pose)
         observados.append(observado)
 

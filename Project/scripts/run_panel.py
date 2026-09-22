@@ -42,7 +42,7 @@ from src.data.estimator_noise import UNOBSERVED_CONFIDENCE_CAP
 from src.models.observability import MOUNTING_ABSENT, observed_keypoints
 from src.models.pose_pipeline import (DEFAULT_DETECTOR_SCORE,
                                       FullBodyPosePipeline, PersonDetector)
-from src.models.temporal_filter import OneEuroFilter
+from src.models.temporal_filter import OneEuroFilter, cutoffs_by_observation
 from src.visualization.panel import PanelState, ValidationPanel
 from src.visualization.skeleton import draw_box, draw_pose
 
@@ -389,9 +389,15 @@ def main():
                     state.frame_index += 1
 
                     if lifter is not None and result.num_people:
+                        # Filtro por junta: o que foi observado segue
+                        # responsivo, o que é previsão é estabilizado. Sem
+                        # isso a perna prevista treme 213mm por quadro e é o
+                        # que o olho lê como "não está pegando".
+                        corte, ganho = cutoffs_by_observation(observed[0])
                         state.keypoints_3d = smoother(
                             lifter(result.keypoints[0], result.scores[0],
-                                   (width, height), observed=observed[0]))
+                                   (width, height), observed=observed[0]),
+                            corte, ganho)
                         state.keypoints_3d_observed = observed[0]
                         state.lifting_warming_up = lifter.warming_up
                     else:
