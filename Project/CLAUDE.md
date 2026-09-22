@@ -100,6 +100,17 @@ test + duas pessoas (19,1 FPS). Flip test é para avaliação, não para operaç
 
 Lifting 3D, H3WB, sujeito retido S7, 2D de GT, janela de 16 frames, 30 épocas:
 38,96mm full-body, 42,34mm corpo, 9,58mm face, **80,50mm mãos** (dominam o erro).
+
+**O erro das mãos é o erro do punho, e é profundidade.** Decomposto no S7 com
+`scripts/measure_hand_error.py`: absoluto 84,5mm, sem o erro do punho 35mm,
+**só a forma 11mm**. A cadeia cresce do tronco para a ponta (ombro 28, cotovelo
+63, punho 73, mão 84,5) e de 97 a 99% do erro é **profundidade** — no plano da
+imagem tudo erra 4 a 6mm, porque a entrada 2D é ground truth. Três alavancas
+testadas e descartadas antes de gastar GPU: repesar a perda (as mãos já são 67%
+da massa de erro), paralaxe (correlação movimento×erro −0,035), encurtamento
+(−0,037). A quarta rende 8%: corrigir o comprimento de osso da cadeia inteira
+leva o punho de 72,1 para 66,5mm, e a meta de 60mm exigiria 30%. **Meta
+registrada como não atingida, com o motivo medido.**
 A curva ainda descia na época 30 — mais épocas é alavanca disponível aqui, ao
 contrário do LoRA, que saturou.
 

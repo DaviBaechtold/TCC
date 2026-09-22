@@ -1,0 +1,19 @@
+{
+  "tag": "v3",
+  "checkpoint": "best_MPJPE_whole_epoch_12.pth",
+  "janelas": 1200,
+  "entrada_2d": "ground truth do H3WB, sujeito retido S7, entrada íntegra",
+  "quadro": "causal, último da janela de 16",
+  "esquerda_absoluto_mm": 90.46644592285156,
+  "esquerda_no_punho_mm": 36.403385162353516,
+  "esquerda_forma_mm": 10.939374923706055,
+  "esquerda_punho_mm": 77.17707061767578,
+  "esquerda_tamanho_predito_mm": 144.7544403076172,
+  "esquerda_tamanho_verdadeiro_mm": 157.2292938232422,
+  "direita_absoluto_mm": 78.5516128540039,
+  "direita_no_punho_mm": 34.651023864746094,
+  "direita_forma_mm": 11.48582649230957,
+  "direita_punho_mm": 68.9473876953125,
+  "direita_tamanho_predito_mm": 148.64013671875,
+  "direita_tamanho_verdadeiro_mm": 160.0060577392578
+}
