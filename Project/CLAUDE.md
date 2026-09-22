@@ -155,11 +155,26 @@ quadril. Por isso ele anda junto do checkpoint (`--teto-confianca`), não do pai
 
 **A simulação descreve parte do mecanismo, e a transferência é parcial.** Na
 gravação real o v3 corta pela metade a incoerência de forma (0,3625 → 0,1800) e
-traz a largura de quadril para a faixa adulta, mas o tronco previsto continua em
-319,4mm contra 450 a 550mm esperados — contra 464,8mm no corte simulado. O
-estimador real prende o quadril na borda (o que a simulação reproduz) e espalha
-joelhos e tornozelos sobre tronco e braços (o que ela não reproduz). Próximo
-passo medido, não suposto: caracterizar onde ele coloca joelho e tornozelo.
+traz a largura de quadril para a faixa adulta, mas o tronco previsto fica curto —
+contra 464,8mm no corte simulado. O estimador real prende o quadril na borda (o
+que a simulação reproduz) e espalha joelhos e tornozelos sobre tronco e braços
+(o que ela não reproduz). Medido em `results/posicao_ausentes_*.json`: o quadril
+fica junto da borda em 98% dos quadros na mesa, o joelho em 43 a 53%, o
+tornozelo em 31 a 49% e os pés em 6 a 32% — o resto cai **sobre o corpo
+visível**. No retrovisor a corrupção é outra: as pernas descem numa cadeia
+plausível e quase não tocam o corpo. São dois mecanismos, e a simulação descreve
+um.
+
+**O que encolhe a pose é o corte, não a distância declarada.** Segunda gravação
+(21/09), enquadramento mais afastado, mesma distância declarada: a distância
+interpupilar reconstruída sai em 62,3mm (faixa adulta) contra 50,0mm da
+primeira, onde o quadril estava em quadro em 0,4% dos quadros contra 85,8% aqui.
+Com as pernas de fato observadas o lifting reconstrói coxa 411,0 e canela
+455,3mm, ambas na faixa; cortadas, viram 574,6 e 324,6mm. A razão coxa/tronco
+degrada com o que se esconde: 1,24 com quadril visível, 1,39 sem ele, 1,57 no
+corte alto — contra 0,85 da anatomia. **A escala absoluta segue sem verificação
+independente**: nenhuma das duas gravações tem referência de tamanho conhecido
+em quadro.
 
 **A Etapa 3 esqueceu face e mãos, e o checkpoint de operação é o da Etapa 2.**
 Medido no COCO em cinza, onde face e mãos têm anotação, caixa de GT, 300
