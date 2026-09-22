@@ -136,6 +136,38 @@ CUT_JITTER_SHOULDER_WIDTHS = 2.9 / 223.0
 SHOULDER_INDICES = [5, 6]
 KNEE_INDICES = [13, 14]
 
+# Como o estimador coloca uma junta cortada, medido em
+# `scripts/measure_absent_placement.py` sobre 290 quadros da webcam e 300 do
+# Drive&Act (`results/posicao_ausentes_*.json`). A primeira versão do corte
+# prendia **tudo** na linha, e por isso corrigiu o quadril e não as pernas.
+#
+# O que a medição mostra é que a colocação depende da distância da junta à
+# linha, não da anatomia dela. A junta imediatamente abaixo do corte --- o
+# quadril, na webcam de mesa --- é grudada na borda em 98 e 99% dos quadros. As
+# mais profundas escapam: joelho em 43 a 53%, tornozelo em 31 a 59%, pés em 6 a
+# 40%. O que não encosta na borda cai **sobre o corpo visível** em 17 a 44% dos
+# casos --- joelho no peito, tornozelo ao lado da mão levantada --- ou se
+# espalha, chegando acima da linha dos ombros (p10 de -1,3 largura de ombro no
+# dedinho).
+# A probabilidade de encostar na borda **decai com a distância à linha**, e não
+# tem degrau: um limiar rígido classificava o quadril como junta profunda e o
+# prendia em 44% dos casos contra os 98% medidos. A forma gaussiana é escolha de
+# conveniência, ancorada em três pontos da medição --- quadril a ~0,4 largura de
+# ombro abaixo da linha prende 0,98, joelho a ~1,2 prende 0,43 a 0,53, tornozelo
+# e pés a ~2,2 prendem 0,06 a 0,49.
+CUT_PIN_PROB_NEAR = 0.95
+CUT_PIN_PROB_FAR = 0.25
+CUT_PIN_DECAY_SHOULDERS = 0.9
+
+# Do que não encosta na borda, a parcela que gruda num keypoint visível ---
+# joelho no peito, tornozelo ao lado da mão levantada. Medido: 17 a 44%.
+CUT_ON_BODY_PROB = 0.30
+
+# Onde cai o que nem encosta nem gruda, em larguras de ombro a partir da linha.
+# A faixa vem dos percentis 10 e 90 medidos, e inclui posições acima da linha
+# dos ombros --- o dedinho esquerdo chega a -0,9.
+CUT_SCATTER_Y_SHOULDERS = (-1.0, 1.5)
+
 
 @TRANSFORMS.register_module()
 class SimulatedEstimatorNoise(BaseTransform):
@@ -160,12 +192,19 @@ class SimulatedEstimatorNoise(BaseTransform):
 
     def __init__(self, prob: float = 0.6, max_groups: int = 2,
                  frame_cut_prob: float = 0.0,
-                 unobserved_confidence: float | None = None) -> None:
+                 unobserved_confidence: float | None = None,
+                 cut_placement: str = 'linha') -> None:
         super().__init__()
         self.prob = prob
         self.max_groups = max_groups
         self.frame_cut_prob = frame_cut_prob
         self.unobserved_confidence = unobserved_confidence
+        if cut_placement not in ('linha', 'medido'):
+            raise ValueError(f'colocação desconhecida: {cut_placement}')
+        # `linha` prende tudo na linha de corte e é o que treinou o v3; fica
+        # como padrão para que aquele config continue reproduzível. `medido`
+        # usa a mistura de três modos que a medição descreve.
+        self.cut_placement = cut_placement
         self._names = list(KEYPOINT_GROUPS)
         weights = np.array([GROUP_WEIGHTS[n] for n in self._names], float)
         self._probabilities = weights / weights.sum()
@@ -252,11 +291,15 @@ class SimulatedEstimatorNoise(BaseTransform):
             0.0, CUT_JITTER_SHOULDER_WIDTHS * body_scale,
             size=labels.shape[:-1] + (2, ))
         pinned_y = cut_y - CUT_INSET_SHOULDER_WIDTHS * body_scale
+        placed_x = labels[..., 0] + jitter[..., 0]
+        placed_y = pinned_y + jitter[..., 1]
 
-        labels[..., 0] = np.where(below, labels[..., 0] + jitter[..., 0],
-                                  labels[..., 0])
-        labels[..., 1] = np.where(below, pinned_y + jitter[..., 1],
-                                  labels[..., 1])
+        if self.cut_placement == 'medido':
+            placed_x, placed_y = self._place_as_measured(
+                labels, below, cut_y, body_scale, placed_x, placed_y)
+
+        labels[..., 0] = np.where(below, placed_x, labels[..., 0])
+        labels[..., 1] = np.where(below, placed_y, labels[..., 1])
         labels[..., 2] = np.where(below,
                                   self._draw_low_confidence(labels.shape[:-1]),
                                   labels[..., 2])
@@ -269,6 +312,51 @@ class SimulatedEstimatorNoise(BaseTransform):
             results['keypoint_labels_visible'] = visible
 
         return results, below
+
+    def _place_as_measured(self, labels: np.ndarray, below: np.ndarray,
+                           cut_y: float, body_scale: float,
+                           pinned_x: np.ndarray, pinned_y: np.ndarray
+                           ) -> tuple[np.ndarray, np.ndarray]:
+        """Sorteia o modo de colocação de cada junta cortada, como medido.
+
+        Três modos, e a proporção entre eles depende de quão longe da linha a
+        junta de fato estaria: a que está logo abaixo é grudada na borda quase
+        sempre, a profunda escapa em mais da metade dos quadros. O modo é
+        sorteado **uma vez por janela**, porque o enquadramento não muda dentro
+        dela --- sortear por quadro ensinaria uma instabilidade que o estimador
+        real não tem.
+        """
+        profundidade = np.maximum(
+            (labels[..., 1].mean(axis=0) - cut_y) / body_scale, 0.0)
+        probabilidade = CUT_PIN_PROB_FAR + (
+            CUT_PIN_PROB_NEAR - CUT_PIN_PROB_FAR) * np.exp(
+                -(profundidade / CUT_PIN_DECAY_SHOULDERS) ** 2)
+
+        prende = np.random.rand(labels.shape[-2]) < probabilidade
+        # Quem não encosta na borda ou gruda num keypoint visível, ou se
+        # espalha pela faixa medida.
+        no_corpo = ~prende & (np.random.rand(labels.shape[-2])
+                              < CUT_ON_BODY_PROB)
+
+        visiveis = np.flatnonzero(~below.any(axis=0))
+        if visiveis.size:
+            ancora = np.random.choice(visiveis, size=labels.shape[-2])
+            corpo_x = labels[..., ancora, 0]
+            corpo_y = labels[..., ancora, 1]
+        else:                       # janela sem nada visível: nada a copiar
+            no_corpo = np.zeros_like(no_corpo)
+            corpo_x = corpo_y = pinned_x
+
+        espalhado_y = cut_y + body_scale * np.random.uniform(
+            *CUT_SCATTER_Y_SHOULDERS, size=labels.shape[-2])
+        espalhado_x = labels[..., 0].mean(axis=0) + body_scale * np.random.normal(
+            0.0, 0.5, size=labels.shape[-2])
+
+        x = np.where(prende, pinned_x,
+                     np.where(no_corpo, corpo_x, espalhado_x + 0.0 * pinned_x))
+        y = np.where(prende, pinned_y,
+                     np.where(no_corpo, corpo_y, espalhado_y + 0.0 * pinned_y))
+        return x, y
 
     def cut_mask(self, labels: np.ndarray, level: float | None = None
                  ) -> tuple[np.ndarray, float, float] | None:
