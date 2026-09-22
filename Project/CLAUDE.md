@@ -178,9 +178,15 @@ da Etapa 2, mãos 0,080/0,090, whole-body AP 0,6848, **ao custo de 0,42px de err
 corporal** (9,94 contra 9,52 da v2, ainda 34% melhor que os 15,04 de partida). A
 supervisão de incerteza sobrevive: 7,5% das juntas ausentes acima do limiar
 contra 7,4% da v2. Checkpoint em
-`work_dirs/rtmw_x_driveact_ensaio/best_torso_px_mean_epoch_2_merged.pth` —
-**falta confirmar na gravação própria antes de virar padrão do painel**, que
-hoje ainda roda com a Etapa 2.
+`work_dirs/rtmw_x_driveact_ensaio/best_torso_px_mean_epoch_2_merged.pth`.
+
+**Confirmado na webcam**, que é onde a v2 falhava: raio dos landmarks de face
+36,3px contra 35,2 da Etapa 2 — e 164,5px na v2, com distância interpupilar
+reconstruída de 225mm. **O painel passa a escolher o estimador pela montagem**
+(`POSE_CHECKPOINT_BY_MOUNTING`): ensaio no retrovisor (9,94 contra 15,04px de
+erro corporal), Etapa 2 na mesa (treme menos no domínio em que foi treinado —
+face 1,39 contra 3,22mm — embora o ensaio acerte melhor a anatomia). O
+checkpoint sem ensaio não entra em montagem alguma.
 
 Quatro conclusões que orientam todo trabalho futuro:
 

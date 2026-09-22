@@ -54,13 +54,37 @@ FPS_WINDOW = 30
 
 MESSAGE_DURATION_S = 2.5
 
-# Modelo corrente do projeto. Manter aqui, e não no exemplo da docstring, é o
-# que evita que a demonstração rode com um checkpoint antigo porque alguém
-# copiou a linha de comando errada — já apontava para o treino descartado do
-# RTMPose-m, que mede 0,51 de AP contra 0,69 deste.
+# Checkpoint de pose por montagem, porque cada um foi medido melhor no seu
+# domínio e a diferença entre eles é grande demais para um padrão só.
+#
+# Retrovisor: o modelo adaptado ao infravermelho com ensaio, que mede 9,94px de
+# erro corporal no Drive&Act contra 15,04px do modelo de grayscale --- e que,
+# ao contrário da versão sem ensaio, preserva face e mãos (whole-body AP 0,6848
+# contra 0,2330 no COCO em cinza).
+#
+# Mesa: o modelo de grayscale da Etapa 2. Na gravação da própria webcam ele
+# treme menos que o do ensaio (face 1,39 contra 3,22mm, coerência de forma
+# 0,146 contra 0,174), o que faz sentido --- é o domínio em que ele foi
+# treinado, enquanto o outro foi especializado no habitáculo. A anatomia do
+# ensaio é melhor (tronco 348,7 contra 317,3mm), e essa troca se decide pela
+# montagem, não por preferência.
+#
+# **Não usar o checkpoint sem ensaio (`rtmw_x_driveact_ft_v2`) em montagem
+# alguma**: na webcam a face dele explode para 164,5px de raio contra 35,2 dos
+# outros dois, e a distância interpupilar reconstruída sai em 225mm.
 POSE_CONFIG = 'configs/eval/rtmw_x_wholebody_eval.py'
-POSE_CHECKPOINT = ('work_dirs/rtmw_x_gray_lora/'
-                   'best_coco-wholebody_AP_epoch_5_merged.pth')
+POSE_CHECKPOINT_BY_MOUNTING = {
+    'mesa': ('work_dirs/rtmw_x_gray_lora/'
+             'best_coco-wholebody_AP_epoch_5_merged.pth'),
+    'retrovisor': ('work_dirs/rtmw_x_driveact_ensaio/'
+                   'best_torso_px_mean_epoch_2_merged.pth'),
+}
+
+# Checkpoint das medições já publicadas em `results/`, que os scripts de
+# medição importam. Mantê-lo explícito evita que uma troca de padrão do painel
+# mude em silêncio o protocolo de um número que o documento cita.
+POSE_CHECKPOINT = POSE_CHECKPOINT_BY_MOUNTING['mesa']
+
 DETECTOR_CONFIG = 'configs/detectors/rtmdet_nano_person_infer.py'
 DETECTOR_CHECKPOINT = ('checkpoints/rtmdet_nano_8xb32-100e_coco-obj365-person-'
                        '05d8511e.pth')
@@ -140,7 +164,7 @@ def parse_args():
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--cfg', default=POSE_CONFIG,
                         help='Config do estimador de pose')
-    parser.add_argument('--ckpt', default=POSE_CHECKPOINT,
+    parser.add_argument('--ckpt', default=None,
                         help='Checkpoint do estimador')
     parser.add_argument('--det-cfg', default=DETECTOR_CONFIG,
                         help='Config do detector; vazio dispensa o estágio')
@@ -186,6 +210,8 @@ def parse_args():
     parser.add_argument('--out-dir', type=Path, default=Path('work_dirs/panel'))
 
     args = parser.parse_args()
+    if args.ckpt is None:
+        args.ckpt = POSE_CHECKPOINT_BY_MOUNTING[args.montagem]
     if args.distancia is None:
         args.distancia = DEFAULT_SUBJECT_DEPTH_M[args.montagem]
     return args
