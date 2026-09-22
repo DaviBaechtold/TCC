@@ -67,6 +67,9 @@ def corrupt(labels: np.ndarray, condition: str,
             noise: SimulatedEstimatorNoise,
             cut_level: float = MESA_CUT_LEVEL
             ) -> tuple[np.ndarray, np.ndarray]:
+    # A colocação usada no corte é a do `noise` que chega pronto --- medir um
+    # checkpoint sob o mecanismo do outro é o que revela se o ganho é
+    # generalização ou aderência ao próprio treino.
     """Corrompe uma janela e devolve o que a câmera daquela montagem não vê.
 
     Args:

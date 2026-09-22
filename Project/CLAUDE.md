@@ -181,6 +181,16 @@ reconstrói coxa 411,0 e canela 455,3mm, dentro da faixa adulta; cortadas, viram
 574,6 e 324,6mm. A razão coxa/tronco degrada com o que se esconde: 1,24 com
 quadril visível, 1,39 sem ele, 1,57 no corte alto — contra 0,85 da anatomia.
 
+**Simular a colocação medida não transferiu — resultado negativo.** O v4
+(`cut_placement='medido'`) reproduz a distribuição medida de onde cada junta
+cortada cai, e não melhora: no Drive&Act 81,08 contra 81,79mm de PA-MPJPE
+(dentro da incerteza de 30,1mm da referência) e na gravação com distância
+medida as proporções da perna **pioram** — coxa 593,7 contra 527,9, canela
+286,7 contra 340,6. **O painel segue com o v3.** O que a medição cruzada achou,
+e que vale como método: sob o mecanismo alheio o v4 degrada 4% (56,5 contra
+59,0) e o v3 degrada 33% (74,1 contra 55,7) — a mistura de três modos ensina
+tolerância a corrupções que ela não contém. Robustez, não acurácia.
+
 **A Etapa 3 esqueceu face e mãos, e o checkpoint de operação é o da Etapa 2.**
 Medido no COCO em cinza, onde face e mãos têm anotação, caixa de GT, 300
 instâncias: whole-body AP de **0,6931 para 0,2330**; erro da face (normalizado

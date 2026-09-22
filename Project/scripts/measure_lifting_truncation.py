@@ -47,6 +47,11 @@ def parse_args():
                         help='Teto de confiança das juntas ocultas. Precisa '
                              'casar com o que o checkpoint viu no treino: o v3 '
                              'usa 0,3, o base e o v2 não usam teto')
+    parser.add_argument('--colocacao', default='linha',
+                        choices=('linha', 'medido'),
+                        help='Mecanismo de colocação da junta cortada. Medir um '
+                             'checkpoint sob o mecanismo do outro separa '
+                             'generalização de aderência ao próprio treino')
     parser.add_argument('--max-windows', type=int, default=0,
                         help='0 usa todas as janelas do conjunto')
     parser.add_argument('--seed', type=int, default=0)
@@ -106,7 +111,8 @@ def main():
 
     lifter = SequenceLifter(args.lift_cfg, args.lift_ckpt, args.device)
     noise = SimulatedEstimatorNoise(
-        unobserved_confidence=args.unobserved_confidence)
+        unobserved_confidence=args.unobserved_confidence,
+        cut_placement=args.colocacao)
 
     report = {
         'checkpoint': Path(args.lift_ckpt).name,
@@ -117,6 +123,7 @@ def main():
         'quadro': 'causal, último da janela de 16',
         'entrada_2d': 'ground truth do H3WB, sujeito retido S7',
         'teto_de_confianca': args.unobserved_confidence,
+        'colocacao': args.colocacao,
         'nivel_do_corte_mesa': None,
         'condicoes': {},
     }
