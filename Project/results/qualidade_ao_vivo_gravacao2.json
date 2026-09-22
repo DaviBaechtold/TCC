@@ -1,0 +1,88 @@
+{
+  "quadros": 492,
+  "tremor_mm": {
+    "cabeca": 1.46,
+    "face": 1.36,
+    "ombros": 5.59,
+    "cotovelos e pulsos": 9.54,
+    "quadris": 10.91,
+    "pernas e pes": 90.29,
+    "maos": 15.17
+  },
+  "movimento_mm": 2.33,
+  "coerencia_osso_mm": 55.27,
+  "coerencia_forma": 0.1659,
+  "geometria": {
+    "largura de ombros": {
+      "mediana_mm": 261.7,
+      "desvio_mm": 68.5,
+      "faixa_adulto_mm": [
+        330.0,
+        420.0
+      ],
+      "dentro_da_faixa": false
+    },
+    "ombro-quadril": {
+      "mediana_mm": 386.2,
+      "desvio_mm": 24.8,
+      "faixa_adulto_mm": [
+        450.0,
+        550.0
+      ],
+      "dentro_da_faixa": false
+    },
+    "largura de quadril": {
+      "mediana_mm": 215.5,
+      "desvio_mm": 37.2,
+      "faixa_adulto_mm": [
+        180.0,
+        280.0
+      ],
+      "dentro_da_faixa": true
+    },
+    "coxa": {
+      "mediana_mm": 483.7,
+      "desvio_mm": 82.7,
+      "faixa_adulto_mm": [
+        380.0,
+        470.0
+      ],
+      "dentro_da_faixa": false
+    },
+    "canela": {
+      "mediana_mm": 363.2,
+      "desvio_mm": 104.9,
+      "faixa_adulto_mm": [
+        360.0,
+        440.0
+      ],
+      "dentro_da_faixa": true
+    },
+    "interpupilar": {
+      "mediana_mm": 61.8,
+      "desvio_mm": 9.9,
+      "faixa_adulto_mm": [
+        58.0,
+        70.0
+      ],
+      "dentro_da_faixa": true
+    }
+  },
+  "fracao_observada": {
+    "cabeca": 1.0,
+    "face": 1.0,
+    "ombros": 1.0,
+    "cotovelos e pulsos": 0.984,
+    "quadris": 0.858,
+    "pernas e pes": 0.29,
+    "maos": 0.964
+  },
+  "tag": "gravacao2",
+  "video": "rec_20260921_215336.mp4",
+  "lift_checkpoint": "best_MPJPE_whole_epoch_12.pth",
+  "pose_checkpoint": "best_coco-wholebody_AP_epoch_5_merged.pth",
+  "montagem": "mesa",
+  "distancia_m": 1.17,
+  "calibrado": true,
+  "filtro": true
+}
