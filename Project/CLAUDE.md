@@ -165,16 +165,21 @@ visível**. No retrovisor a corrupção é outra: as pernas descem numa cadeia
 plausível e quase não tocam o corpo. São dois mecanismos, e a simulação descreve
 um.
 
-**O que encolhe a pose é o corte, não a distância declarada.** Segunda gravação
-(21/09), enquadramento mais afastado, mesma distância declarada: a distância
-interpupilar reconstruída sai em 62,3mm (faixa adulta) contra 50,0mm da
-primeira, onde o quadril estava em quadro em 0,4% dos quadros contra 85,8% aqui.
-Com as pernas de fato observadas o lifting reconstrói coxa 411,0 e canela
-455,3mm, ambas na faixa; cortadas, viram 574,6 e 324,6mm. A razão coxa/tronco
-degrada com o que se esconde: 1,24 com quadril visível, 1,39 sem ele, 1,57 no
-corte alto — contra 0,85 da anatomia. **A escala absoluta segue sem verificação
-independente**: nenhuma das duas gravações tem referência de tamanho conhecido
-em quadro.
+**A escala métrica está verificada contra referência física: erro de 1,7%.**
+Gravação com o tabuleiro de calibração ao lado do rosto: solvePnP com os
+intrínsecos completos dá 1110mm de distância; os 55,94px entre os centros dos
+olhos dão 64,7mm de interpupilar real por pinhole; o lifting reconstrói 63,6mm.
+**Dado o Z correto, a escala do sistema está certa** — e o Z é a única grandeza
+que a câmera monocular não observa, então é ele que precisa ser medido em cada
+montagem. A gravação de 12/09 reconstruía 50,0mm de interpupilar porque a
+distância declarada (0,97m) não era a real, que os 64,7mm implicam ter sido
+~1,51m. Esconder o quadril **não** altera a face (62,3 contra 64,3mm na mesma
+gravação): o corte quebra o corpo, não a escala.
+
+**O que o corte quebra é a perna.** Com as pernas observadas o lifting
+reconstrói coxa 411,0 e canela 455,3mm, dentro da faixa adulta; cortadas, viram
+574,6 e 324,6mm. A razão coxa/tronco degrada com o que se esconde: 1,24 com
+quadril visível, 1,39 sem ele, 1,57 no corte alto — contra 0,85 da anatomia.
 
 **A Etapa 3 esqueceu face e mãos, e o checkpoint de operação é o da Etapa 2.**
 Medido no COCO em cinza, onde face e mãos têm anotação, caixa de GT, 300
