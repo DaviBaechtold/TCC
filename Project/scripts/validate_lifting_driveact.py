@@ -116,6 +116,7 @@ def main():
 
     args = parse_args()
 
+    from src.evaluation.live_quality import body_geometry
     from src.evaluation.bone_consistency import (MIN_FRAMES, consistency,
                                                  motion)
     from src.models import torch_compat  # noqa: F401
@@ -178,6 +179,7 @@ def main():
     coerencia: list[float] = []
     coerencia_forma: list[float] = []
     movimento: list[float] = []
+    todas_as_predicoes: list[np.ndarray] = []
     for file_id in sorted(by_sequence)[:args.max_sequences]:
         subject, run = file_id.split('/')
         csv_path = args.poses / subject / f'{run}.openpose.3d.csv'
@@ -238,6 +240,7 @@ def main():
         if matched:
             por_sequencia[file_id] = round(
                 float(np.mean(errors[-matched:])), 2)
+        todas_as_predicoes.extend(predicoes)
         if len(predicoes) >= MIN_FRAMES:
             desvios = consistency(np.stack(predicoes))
             if 'mediana' in desvios:
@@ -285,6 +288,12 @@ def main():
         # movimento, um ganho de coerência pode ser suavização disfarçada.
         'movimento_mm': (round(float(np.median(movimento)), 2)
                          if movimento else None),
+        # Geometria dos 133 pontos preditos, e não só dos 12 que a referência
+        # cobre. A régua acima é cega a face, mãos e pernas; esta medida existe
+        # porque o primeiro lifting veicular colapsava justamente esses pontos
+        # --- perda que ignorava o peso do alvo --- e a régua não o viu.
+        'geometria_predita': (body_geometry(np.stack(todas_as_predicoes))
+                              if todas_as_predicoes else None),
     }
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(report, indent=2, ensure_ascii=False))

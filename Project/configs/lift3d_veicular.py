@@ -74,4 +74,7 @@ train_cfg = dict(by_epoch=True, max_epochs=max_epochs, val_interval=1)
 model = dict(
     head=dict(loss=dict(type='MPJPEVelocityJointLoss', use_target_weight=True)))
 
-work_dir = 'work_dirs/lift3d_veicular'
+# Diretório próprio do treino com a perda corrigida. O checkpoint do primeiro
+# treino, com o defeito, fica em work_dirs/lift3d_veicular para a comparação,
+# que é a própria verificação da correção.
+work_dir = 'work_dirs/lift3d_veicular_peso'
