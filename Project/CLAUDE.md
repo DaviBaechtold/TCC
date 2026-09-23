@@ -213,9 +213,17 @@ verdade (marca `corrupcao_real`).
 
 **Duas ressalvas.** O modelo é treinado contra a mesma referência que o avalia,
 então os 41,49 medem concordância com a triangulação do OpenPose, não acurácia;
-a coerência de osso, que não usa referência, é a evidência limpa. E ele
-**quebra fora da montagem**: por isso o lifting também passa a seguir a
-montagem (`LIFT_CHECKPOINT_BY_MOUNTING`), como o estimador de pose já fazia.
+a coerência de osso, que não usa referência, é a evidência limpa. E **o treino
+tinha um defeito de perda** (achado em 23/09): a `MPJPEVelocityJointLoss` só aplica
+o `lifting_target_weight` com `use_target_weight=True`, e o padrão é `False`. Os
+121 pontos sem referência de cada janela do Drive&Act têm alvo idêntico (dispersão
+0,00mm) e foram supervisionados contra ele — a rede colapsa face, mãos e pernas.
+A canela de 18,9mm na webcam, lida antes como "quebra fora da montagem", é esse
+defeito. Config corrigido; `tests/test_partial_supervision_loss.py` reprova todo
+config com alvo parcial que ignore o peso (e reprova o antigo). **Retreino
+pendente**; até lá o checkpoint veicular vale só para os 12 pontos corporais. O
+lifting continua escolhido pela montagem (`LIFT_CHECKPOINT_BY_MOUNTING`), decisão a
+reavaliar com o modelo retreinado.
 
 **Armadilha de leitura que me custou quatro medições:** a linha de validação do
 MMEngine traz `MPJPE` e `P-MPJPE` juntas. Uma regex gulosa captura a segunda, e
