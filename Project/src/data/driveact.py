@@ -305,3 +305,24 @@ def to_coco_keypoints(points_2d: np.ndarray,
         start += size
 
     return fields, num_visible
+
+
+def annotated_pairs(coco: dict, limit: int) -> list[tuple[dict, dict]]:
+    """Pares (imagem, anotação) de um JSON COCO do Drive&Act, espaçados.
+
+    O espaçamento não é detalhe. Os JSONs gerados por `convert_driveact.py`
+    guardam as imagens em ordem de sequência, e na partição de validação os
+    primeiros 1.500 quadros são todos de vp14_run1 --- um participante numa
+    sessão. Cortar pela cabeça mede uma pessoa e uma gravação, e isso já
+    aconteceu: a comparação de detectores da QP1 foi feita assim.
+
+    O Drive&Act tem um ocupante por quadro, então há no máximo uma anotação por
+    imagem.
+    """
+    por_imagem = {anotacao['image_id']: anotacao
+                  for anotacao in coco['annotations']
+                  if not anotacao.get('iscrowd')}
+    pares = [(imagem, por_imagem[imagem['id']]) for imagem in coco['images']
+             if imagem['id'] in por_imagem]
+    passo = max(1, len(pares) // limit)
+    return pares[::passo][:limit]

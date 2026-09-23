@@ -70,32 +70,12 @@ def load_panel():
     return panel
 
 
-def annotated_images(annotations: Path, limit: int) -> list[tuple[dict, dict]]:
-    """Pares (imagem, anotação) do Drive&Act, um por imagem.
-
-    O Drive&Act tem um ocupante por quadro, então uma anotação por imagem é a
-    totalidade do dado --- não é amostragem.
-    """
-    dados = json.loads(annotations.read_text())
-    por_imagem = {a['image_id']: a for a in dados['annotations']
-                  if not a.get('iscrowd')}
-
-    pares = []
-    for imagem in dados['images']:
-        anotacao = por_imagem.get(imagem['id'])
-        if anotacao is None:
-            continue
-        pares.append((imagem, anotacao))
-        if len(pares) >= limit:
-            break
-    return pares
-
-
 def main():
     args = parse_args()
 
     import cv2
 
+    from src.data.driveact import annotated_pairs
     from src.evaluation.normalized_keypoint_error import instance_error
     from src.evaluation.stratified_error import (Observation, degradation,
                                                  frame_brightness, summarize)
@@ -111,7 +91,8 @@ def main():
         panel._config_without_flip_test(args.cfg or panel.POSE_CONFIG, WORK_DIR),
         checkpoint, args.device, detector)
 
-    pares = annotated_images(args.annotations, args.max_images)
+    pares = annotated_pairs(json.loads(args.annotations.read_text()),
+                            args.max_images)
     print(f'{len(pares)} quadros anotados, caixa: {args.detector}')
 
     observacoes, sem_deteccao, sem_tronco = [], 0, 0

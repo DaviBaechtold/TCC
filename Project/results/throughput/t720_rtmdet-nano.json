@@ -1,0 +1,31 @@
+{
+  "label": "t720_rtmdet-nano",
+  "conditions": {
+    "device": "NVIDIA GeForce RTX 5060",
+    "torch": "2.8.0+cu128",
+    "cuda": "12.8",
+    "config": "configs/eval/rtmw_x_wholebody_eval.py",
+    "checkpoint": "best_coco-wholebody_AP_epoch_5_merged.pth",
+    "input_size": [
+      288,
+      384
+    ],
+    "frame": "1280x720",
+    "people_in_frame": 1,
+    "flip_test": false,
+    "detector": "rtmdet-nano",
+    "batch_size": 1,
+    "precision": "fp32",
+    "channels_last": false,
+    "compiled": false,
+    "warmup": 20
+  },
+  "median_ms": 23.135,
+  "p95_ms": 25.465,
+  "fps": 43.22,
+  "iterations": 100,
+  "stages_median_ms": {
+    "detect": 7.668,
+    "pose": 15.112
+  }
+}

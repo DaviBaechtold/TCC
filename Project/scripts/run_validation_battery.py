@@ -37,6 +37,10 @@ DRIVEACT_ANOTACOES = Path('data/processed/driveact/'
                           'driveact_midlevel.chunks_90.split_0.val.json')
 QUADROS_OCLUSAO = 150
 
+# Rótulos com que `compare_detectors.py` grava cada detector na QP1.
+QP1_LABEL = {'yolo26n-pose': 'YOLOv26n-pose',
+             'rtmdet-nano': 'RTMDet-nano'}
+
 
 def parse_args():
     p = argparse.ArgumentParser(
@@ -94,7 +98,8 @@ def main():
     from src.evaluation.validation_battery import (coordenadas_no_quadro,
                                                    fusao_temporal,
                                                    latencia_por_quadro, ocluir)
-    from src.evaluation.normalized_keypoint_error import torso_length
+    from src.evaluation.normalized_keypoint_error import (instance_error,
+                                                          torso_length)
     from src.models.pose_pipeline import (DEFAULT_DETECTOR_SCORE,
                                           FullBodyPosePipeline,
                                           build_person_detector)
@@ -120,10 +125,13 @@ def main():
         'ap': ap, 'ar': ar, 'criterio': 'AP > 0,70 e AR > 0,75',
         'aprovado': bool(ap and ap > 0.70 and ar and ar > 0.75),
     }
-    torso = le_resultado('results/baselines/rtmwx_etapa3v2_driveact.json',
-                         'metrics', 'torso/normalized_mean')
+    # O checkpoint de operação no retrovisor, o do ensaio. Esta linha citava a
+    # Etapa 3 v2, que mede 0,0282 mas esquece face e mãos e saiu de operação:
+    # o critério passava por um modelo que o sistema não usa.
+    fonte_1b = 'results/baselines/rtmwx_ensaio_driveact.json'
+    torso = le_resultado(fonte_1b, 'metrics', 'torso/normalized_mean')
     testes['1b_erro_corporal_veicular'] = {
-        'fonte': 'results/baselines/rtmwx_etapa3v2_driveact.json',
+        'fonte': fonte_1b,
         'condicao': 'Drive&Act val, 12 keypoints observáveis, erro normalizado por tronco',
         'erro_normalizado': torso, 'criterio': '< 0,040',
         'aprovado': bool(torso and torso < 0.040),
@@ -134,7 +142,11 @@ def main():
         'condicao': 'seis configurações sobre 1.500 quadros do Drive&Act',
         'erro_por_configuracao': {k: v['erro_normalizado'] for k, v in qp1.items()} if qp1 else None,
         'criterio': 'limiar calibrado por medição e detector melhor que quadro inteiro',
-        'aprovado': bool(qp1 and qp1['RTMDet-nano']['erro_normalizado']
+        'detector_de_operacao': args.detector,
+        # Julga o detector que o sistema de fato usa. O critério citava o
+        # RTMDet fixo, e continuaria passando depois de ele sair de operação.
+        'aprovado': bool(qp1 and args.detector in QP1_LABEL
+                         and qp1[QP1_LABEL[args.detector]]['erro_normalizado']
                          < qp1['sem detector']['erro_normalizado']),
     }
 
@@ -159,7 +171,7 @@ def main():
         painel._config_without_flip_test(painel.POSE_CONFIG, trabalho),
         painel.POSE_CHECKPOINT_BY_MOUNTING['retrovisor'], args.device, detector)
     testes['3_oclusao'] = oclusao_driveact(pose_veicular, cv2, ocluir,
-                                           torso_length)
+                                           torso_length, instance_error)
     testes['3_oclusao']['pose_checkpoint'] = Path(
         painel.POSE_CHECKPOINT_BY_MOUNTING['retrovisor']).name
 
@@ -197,6 +209,7 @@ def main():
     relatorio = {
         'pose_checkpoint': Path(painel.POSE_CHECKPOINT).name,
         'lift_checkpoint': Path(painel.LIFT_CHECKPOINT).name,
+        'detector': args.detector,
         'testes': testes,
         'aprovados': sum(1 for t in testes.values() if t.get('aprovado')),
         'total': len(testes),
@@ -221,7 +234,7 @@ def argumentos_padrao(painel):
         teto_confianca=painel.LIFT_UNOBSERVED_CONFIDENCE)
 
 
-def oclusao_driveact(pose, cv2, ocluir, torso_length):
+def oclusao_driveact(pose, cv2, ocluir, torso_length, instance_error):
     """Teste 3: degradação do erro corporal sob oclusão simulada das mãos."""
     if not DRIVEACT_ANOTACOES.exists():
         return {'condicao': 'anotações do Drive&Act ausentes', 'aprovado': None}
@@ -244,12 +257,15 @@ def oclusao_driveact(pose, cv2, ocluir, torso_length):
             continue
 
         def erro(entrada):
+            # A primeira caixa, porque é a que o painel usa: o teste mede o
+            # sistema como ele opera. Com o RTMDet isso custava caro --- ele
+            # devolve caixas espúrias em 58% destes quadros ---, e é parte do
+            # que a troca de detector corrigiu.
             r = pose(entrada)
             if not r.num_people:
                 return None
-            d = np.linalg.norm(r.keypoints[0][:17][visivel[:17]]
-                               - verdade[:17][visivel[:17], :2], axis=-1)
-            return float(d.mean() / escala)
+            medido = instance_error(r.keypoints[0], verdade)
+            return None if medido is None else medido[0]
 
         # Oclusão sobre os punhos anotados, que é onde o volante cobre a mão.
         alvo = quadro

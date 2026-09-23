@@ -60,6 +60,7 @@ def main():
     import importlib.util
 
     from src.data.driveact import read_pose_csv
+    from src.evaluation.normalized_keypoint_error import occupant_index
     from src.models.pose_pipeline import (DEFAULT_DETECTOR_SCORE,
                                           FullBodyPosePipeline, PersonDetector,
                                           RTMDET_CHECKPOINT, RTMDET_CONFIG)
@@ -74,13 +75,19 @@ def main():
     por_sequencia: dict[str, list[dict]] = {}
     for imagem in anotacoes['images']:
         por_sequencia.setdefault(imagem['file_id'], []).append(imagem)
+    # A anotação 2D serve só para associar: dizer qual das caixas detectadas é
+    # o ocupante. O alvo do treino continua sendo a referência 3D.
+    anotacao_2d = {a['image_id']: np.asarray(a['keypoints'], np.float32)
+                   .reshape(-1, 3) for a in anotacoes['annotations']}
 
     trabalho = Path('work_dirs/driveact_lift')
     trabalho.mkdir(parents=True, exist_ok=True)
     # Prende o RTMDet-nano de propósito, embora o padrão do sistema já seja o
     # YOLO26n-pose: o checkpoint veicular foi treinado sobre o 2D que este
     # detector produziu, e reconstruir o conjunto com outro mudaria a entrada de
-    # treino sem que nada denunciasse.
+    # treino sem que nada denunciasse. Uma diferença já existe e é deliberada:
+    # o checkpoint atual foi treinado pela primeira caixa, com ~1% dos quadros
+    # pareados a uma caixa espúria, e este script agora escolhe a do ocupante.
     detector = PersonDetector(RTMDET_CONFIG, RTMDET_CHECKPOINT,
                               args.device, DEFAULT_DETECTOR_SCORE)
     # O estimador da montagem de retrovisor, que é quem alimenta o lifting neste
@@ -94,6 +101,7 @@ def main():
         sequencias = sequencias[:args.max_sequencias]
 
     guardado = {}
+    sem_ocupante = 0
     for indice, file_id in enumerate(sequencias, 1):
         sujeito, run = file_id.split('/')
         csv = args.poses / sujeito / f'{run}.openpose.3d.csv'
@@ -111,7 +119,12 @@ def main():
             if quadro is None:
                 continue
             resultado = pose(quadro)
-            if not resultado.num_people:
+            if not resultado.num_people or imagem['id'] not in anotacao_2d:
+                continue
+            ocupante = occupant_index(resultado.keypoints,
+                                      anotacao_2d[imagem['id']])
+            if ocupante is None:
+                sem_ocupante += 1
                 continue
             verdade = referencia[imagem['frame_id']]
             if int((verdade.confidence > 0).sum()) < MIN_JUNTAS_REFERENCIA:
@@ -123,8 +136,8 @@ def main():
             alvo[:anotados] = verdade.points_3d
             visivel[:anotados] = (verdade.confidence > 0).astype(np.float32)
 
-            keypoints.append(resultado.keypoints[0])
-            scores.append(resultado.scores[0])
+            keypoints.append(resultado.keypoints[ocupante])
+            scores.append(resultado.scores[ocupante])
             alvos.append(alvo)
             visiveis.append(visivel)
             quadros.append(imagem['frame_id'])
@@ -142,7 +155,8 @@ def main():
     out = args.out or args.data_root / f'lift_{args.split}.npz'
     np.savez_compressed(out, **guardado)
     total = sum(v.shape[0] for k, v in guardado.items() if k.endswith('/frames'))
-    print(f'{total} quadros de {len(guardado)//5} sequências gravados em {out}')
+    print(f'{total} quadros de {len(guardado)//5} sequências gravados em {out}; '
+          f'{sem_ocupante} descartados por nenhuma caixa corresponder ao ocupante')
 
 
 if __name__ == '__main__':

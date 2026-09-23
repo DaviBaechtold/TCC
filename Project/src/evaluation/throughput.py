@@ -36,6 +36,10 @@ class ThroughputReport:
     label: str
     conditions: dict
     latencies_ms: list[float] = field(repr=False)
+    # Custo de cada estágio, quando o que se mede os reporta. Sem ele o total
+    # esconde onde está o tempo: a QP1 atribuiu 12ms ao detector quando eram,
+    # na maior parte, passadas extras da pose sobre caixas espúrias.
+    stages_ms: dict[str, list[float]] = field(default_factory=dict, repr=False)
 
     @property
     def median_ms(self) -> float:
@@ -63,6 +67,9 @@ class ThroughputReport:
             'p95_ms': round(self.p95_ms, 3),
             'fps': round(self.fps, 2),
             'iterations': len(self.latencies_ms),
+            'stages_median_ms': {
+                stage: round(statistics.median(values), 3)
+                for stage, values in self.stages_ms.items()},
         }
 
 
@@ -78,16 +85,21 @@ def measure(run: Callable[[], object], label: str, conditions: dict,
         run()
     synchronize()
 
-    latencies = []
+    latencies, stages = [], {}
     for _ in range(iterations):
         started = time.perf_counter()
-        run()
+        result = run()
         synchronize()
         latencies.append((time.perf_counter() - started) * 1e3)
+        # Os estágios do pipeline terminam em cópia para a CPU, que já
+        # sincroniza a GPU; por isso o tempo de cada um é o de computar, e não
+        # o de enfileirar.
+        for stage, value in getattr(result, 'latency_ms', {}).items():
+            stages.setdefault(stage, []).append(value)
 
     return ThroughputReport(label=label,
                             conditions={**conditions, 'warmup': warmup},
-                            latencies_ms=latencies)
+                            latencies_ms=latencies, stages_ms=stages)
 
 
 def describe_device() -> dict:

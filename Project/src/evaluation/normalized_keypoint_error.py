@@ -151,3 +151,37 @@ def instance_error(predicted: np.ndarray,
     distances = np.linalg.norm(
         predicted[:len(reference)][visible] - reference[visible, :2], axis=-1)
     return float(distances.mean() / scale), int(visible.sum())
+
+
+# Acima disto a pose não descreve a pessoa anotada: 0,2 comprimento de tronco é
+# o limiar do PCK@0.2, e o erro típico do estimador adaptado no Drive&Act é de
+# 0,022. Medido no conjunto de treino veicular extraído pela primeira caixa,
+# 1,03% dos quadros passavam deste limiar --- e 0,91% passavam de 1,0, isto é,
+# a caixa estava em outro lugar do quadro.
+MAX_ASSOCIATION_ERROR = 0.2
+
+
+def occupant_index(keypoints: np.ndarray, reference: np.ndarray) -> int | None:
+    """Qual das pessoas detectadas é a pessoa da anotação.
+
+    Args:
+        keypoints: [N, K, 2] poses preditas, uma por caixa detectada.
+        reference: [K, 3] anotação no formato COCO.
+
+    Returns:
+        O índice da pose mais próxima da anotação, ou `None` quando nenhuma fica
+        abaixo de `MAX_ASSOCIATION_ERROR`.
+
+    Existe porque "a primeira caixa é a do ocupante" é falso no infravermelho:
+    o RTMDet-nano devolve mais de uma caixa em 58% dos quadros do Drive&Act,
+    que tem uma pessoa só, e a primeira nem sempre é a dela. Parear o 2D de uma
+    caixa espúria com o 3D do ocupante ensina a rede uma correspondência que
+    não existe.
+    """
+    erros = [instance_error(pose, reference) for pose in keypoints]
+    candidatos = [(medido[0], indice) for indice, medido in enumerate(erros)
+                  if medido is not None]
+    if not candidatos:
+        return None
+    erro, indice = min(candidatos)
+    return indice if erro <= MAX_ASSOCIATION_ERROR else None

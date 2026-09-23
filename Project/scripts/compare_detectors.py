@@ -63,7 +63,7 @@ def parse_args():
                                 'driveact_midlevel.chunks_90.split_0.val.json'))
     p.add_argument('--pose-ckpt', default=None,
                    help='Estimador 2D; o padrão é o modelo corrente do painel')
-    p.add_argument('--max-frames', type=int, default=600)
+    p.add_argument('--max-frames', type=int, default=1500)
     p.add_argument('--device', default='cuda:0')
     p.add_argument('--out', type=Path, default=Path('results/qp1_detectores.json'))
     return p.parse_args()
@@ -75,6 +75,7 @@ def main():
     import cv2
     import torch
 
+    from src.data.driveact import annotated_pairs
     from src.evaluation.normalized_keypoint_error import instance_error
     from src.models import torch_compat  # noqa: F401
     from src.models.pose_pipeline import (DEFAULT_DETECTOR_SCORE,
@@ -88,14 +89,17 @@ def main():
     panel = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(panel)
 
-    annotations = json.loads(args.annotations.read_text())
-    truth = {a['image_id']: a for a in annotations['annotations']}
-    images = annotations['images'][:args.max_frames]
+    pairs = annotated_pairs(json.loads(args.annotations.read_text()),
+                            args.max_frames)
 
     work_dir = Path('work_dirs/qp1')
     work_dir.mkdir(parents=True, exist_ok=True)
     pose_config = panel._config_without_flip_test(panel.POSE_CONFIG, work_dir)
-    pose_checkpoint = args.pose_ckpt or panel.POSE_CHECKPOINT
+    # O estimador da montagem de retrovisor, que é a montagem do Drive&Act. O
+    # padrão anterior era o da mesa, e medir o domínio veicular com o modelo do
+    # outro domínio mede a troca de modelo junto com o detector.
+    pose_checkpoint = (args.pose_ckpt
+                       or panel.POSE_CHECKPOINT_BY_MOUNTING['retrovisor'])
 
     configurations = {
         'caixa de ground truth': 'gt',
@@ -114,11 +118,10 @@ def main():
             pose_config, pose_checkpoint, args.device,
             detector=None if detector == 'gt' else detector)
 
-        errors, latencies, missed = [], [], 0
-        for image in images:
+        errors, latencies, missed, extra_boxes = [], [], 0, 0
+        for image, annotation in pairs:
             frame = cv2.imread(str(args.frames / image['file_name']))
-            annotation = truth.get(image['id'])
-            if frame is None or annotation is None:
+            if frame is None:
                 continue
 
             started = time.perf_counter()
@@ -133,6 +136,11 @@ def main():
             if result.num_people == 0:
                 missed += 1
                 continue
+            # O Drive&Act tem um ocupante por quadro, então toda caixa além da
+            # primeira é espúria. Ela custa duas vezes: uma passada inteira da
+            # pose, e o risco de a primeira caixa não ser a do ocupante.
+            if result.num_people > 1:
+                extra_boxes += 1
 
             # O Drive&Act anota apenas corpo e pés, e o campo `keypoints` do
             # formato COCO-WholeBody carrega só as 17 juntas corporais; face e
@@ -151,12 +159,13 @@ def main():
             'latencia_mediana_ms': round(float(np.median(latencies)), 2),
             'fps': round(1000.0 / float(np.median(latencies)), 1),
             'quadros_sem_deteccao': missed,
+            'quadros_com_caixas_extras': extra_boxes,
             'quadros_medidos': len(errors),
         }
         print(f'  {label:24s} erro {report[label]["erro_normalizado"]:.4f}  '
               f'{report[label]["latencia_mediana_ms"]:6.2f} ms  '
               f'({report[label]["fps"]:5.1f} FPS)  '
-              f'sem detecção: {missed}')
+              f'sem detecção: {missed}  caixas extras: {extra_boxes}')
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(report, indent=2, ensure_ascii=False))

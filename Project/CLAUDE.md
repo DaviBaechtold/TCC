@@ -57,7 +57,7 @@ carregado, porque o MMPose não converte bfloat16 para NumPy.
 | Componente | Estado |
 |---|---|
 | Dataset COCO-WholeBody grayscale | Pronto: 118.287 treino / 5.000 val |
-| Módulo 2 — estimação 2D top-down | Funcional (RTMDet-nano + RTMW-x); adaptação de domínio por LoRA em curso |
+| Módulo 2 — estimação 2D top-down | Funcional (YOLO26n-pose + RTMW-x). Estimador por montagem: Etapa 2 na mesa, Etapa 3 com ensaio no retrovisor (0,0295 no Drive&Act) |
 | Módulo 1 — aquisição | Parcial: captura e calibração OK (fx 959,4, reprojeção 0,414px). **A distância ao ocupante é o parâmetro mais frágil do sistema** — dela dependem a escala de entrada e a de saída do lifting, e os 0,97m informados na demo são desmentidos pela pose reconstruída (interpupilar 43,3mm; a 1,40m daria 63,7mm). Medir com trena. |
 | Módulo 3 — lifting 3D | DSTFormer 42,4M params sobre H3WB; batch 4 é o teto dos 8 GB. Checkpoint corrente: `work_dirs/lift3d_robusto_v3/best_MPJPE_whole_epoch_12.pth` (treino com corte de quadro) |
 | Módulo 4 — visualização | Painel completo: 2D, 3D de corpo inteiro com previsto distinto de observado, escala métrica fixa, **filtro por observação** (junta prevista estabilizada: tremor das pernas 70,97 → 10,61mm sem damping do movimento real), métricas por região coerentes com o desenho |
@@ -88,14 +88,17 @@ o checkpoint bruto tem nomes de camada adaptados e não carrega num config comum
 Throughput na 5060, lote 1, fp32, mediana de 100 iterações após 20 de
 aquecimento, com `torch.cuda.synchronize()` a cada iteração:
 
-| Estágio | Custo |
+| Estágio | Custo (um ocupante, 23/09/2026) |
 |---|---|
-| Detector RTMDet-nano | 7,35 ms, fixo |
-| Pose RTMW-x 384×288 | 12,44 ms por pessoa |
-| Flip test | dobra o custo da pose |
+| Detector YOLO26n-pose | 4,5–4,8 ms (RTMDet-nano, anterior: 7,3–7,7 ms) |
+| Pose RTMW-x 384×288 | ~15 ms **por caixa** |
+| Flip test | +12 ms por pessoa |
+| Caminho completo com lifting (bateria) | 47,4 ms, 21,1 FPS |
 
-Cumpre 20 FPS em três das quatro configurações; falha só com detector + flip
-test + duas pessoas (19,1 FPS). Flip test é para avaliação, não para operação.
+O custo do detector quase não depende do tamanho do quadro (ambos redimensionam
+por dentro). `benchmark_throughput.py` agora grava `stages_median_ms`, e é daí
+que saem os números por estágio. Flip test é para avaliação: no caminho completo
+levaria a ~59 ms, 17 FPS.
 **O "24,0 FPS" citado antes não tinha condição declarada e foi descartado.**
 
 Lifting 3D, H3WB, sujeito retido S7, 2D de GT, janela de 16 frames, 30 épocas:
@@ -269,12 +272,51 @@ Quatro conclusões que orientam todo trabalho futuro:
    em 10 epochs a 5e-4, por catastrophic forgetting. A adaptação de domínio
    tem que ser por LoRA ou LR muito baixo, nunca por fine-tuning agressivo.
 
+**O detector de operação é o YOLO26n-pose, e a QP1 foi refeita (23/09/2026).**
+A QP1 original usava os primeiros 1.500 quadros do val do Drive&Act — **todos de
+vp14_run1**, porque o JSON guarda as imagens em ordem de sequência — e o
+estimador da mesa. Refeita com `annotated_pairs` (espaçada, `src/data/driveact.py`)
+e o estimador do retrovisor, sobre 1.480 quadros das quatro sequências:
+
+| Configuração | Erro | Latência | Caixas espúrias |
+|---|---|---|---|
+| Caixa de GT | 0,0301 | 15,16 ms | 0 |
+| **YOLO26n-pose** | **0,0310** | 20,82 ms | 39 (3%) |
+| RTMDet-nano | 0,0395 | 32,41 ms | **846 (57%)** |
+| Sem detector | 0,0408 | 15,16 ms | — |
+
+**O RTMDet devolve caixa espúria em 57% dos quadros NIR** (um ocupante só). Cada
+uma custa uma passada de pose (era isso os "12 ms", não o detector) e a primeira
+caixa nem sempre é o ocupante. Atribuído por medição: mesmo estimador, RTMDet
+0,0276 nos primeiros 600 quadros contra 0,0476 espaçados — a amostra escondia
+a falha. Sem detector custa 32%, não 82% (o 82% era do estimador de cinza).
+
+A troca **não prejudica face nem mãos** (pergunta de Davi, medida):
+`measure_region_error.py --detector` casa a caixa com a anotação por IoU. No
+COCO em cinza as medianas empatam e a média da face cai de 0,1186 (RTMDet) para
+0,0569 (YOLO) — o RTMDet tem cauda de caixas ruins.
+
+Consequências no código: `src/models/detector_config.py` é o catálogo (sem
+dependências: importar `pose_pipeline` para ler três strings custava 3,2 s);
+`build_person_detector` em `pose_pipeline`; `instance_error` e `occupant_index`
+em `normalized_keypoint_error`. **`build_driveact_lift_dataset.py` prende o
+RTMDet** (o modelo veicular foi treinado sobre o 2D dele) e agora escolhe a caixa
+do ocupante: o conjunto atual, extraído pela primeira caixa, tem ~1% dos quadros
+pareados a caixa espúria (erro > 0,2 tronco), medido sem GPU contra a anotação 2D.
+
+**Estratificação (Fase 2, `measure_stratified_error.py`):** iluminação não é
+fator (terço escuro 0,0301 contra claro 0,0318); oclusão é (+32% com 8–10 juntas
+visíveis contra 12–14). O Drive&Act não tem luz solar nem túnel.
+
 **Bateria de validação: 7 de 8 passam** (`results/bateria_validacao.json`,
-22/09/2026). A falha é o AP de 0,6931 contra a meta de 0,70. Os números novos
-que ela produziu: tempo real com folga de 1% (20,2 FPS medianos, latência p90
-59,3ms, caminho completo em 1280x720); degradação de 7,0% sob oclusão do punho
-(teto 15%); **a janela temporal reduz o tremor em 21,7%** contra a mesma rede
-sem contexto; mil quadros sem exceção e sem crescimento de memória.
+23/09/2026, com YOLO26n-pose). A falha é o critério de precisão full-body: AP
+0,6931 contra 0,70 e AR 0,7479 contra 0,75. Tempo real com folga de 5% (21,1
+FPS, 47,4 ms medianos, caminho completo em 1280x720; com o RTMDet eram 20,2);
+degradação de 8,2% sob oclusão do punho (teto 15%); **a janela temporal reduz o
+tremor em 29,1%** contra a mesma rede sem contexto (21,7% com o RTMDet); mil
+quadros sem exceção e sem crescimento de memória. O critério 1b cita agora o
+checkpoint de operação (ensaio, 0,0295) — antes citava a Etapa 3 v2 (0,0282),
+aposentada por esquecer face e mãos.
 
 A primeira execução reprovou dois testes por defeito do arnês, não do sistema:
 o teste veicular usava o checkpoint da montagem de mesa (68% de degradação, que
@@ -341,7 +383,8 @@ python scripts/check_document_numbers.py
 
 # Taxa de processamento, com as condições registradas junto do resultado
 python scripts/benchmark_throughput.py --cfg configs/eval/rtmw_x_wholebody_eval.py \
-  --ckpt <checkpoint> --tag <nome> --image <imagem com pessoas> [--flip-test] [--detector]
+  --ckpt <checkpoint> --tag <nome> --image <imagem com pessoas> [--flip-test] \
+  [--detector yolo26n-pose|rtmdet-nano|nenhum]
 ```
 
 **Não rode o painel com um treino em andamento**: a disputa pela GPU derruba a

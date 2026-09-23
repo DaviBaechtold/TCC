@@ -1,0 +1,74 @@
+{
+  "iluminacao": {
+    "baixo": {
+      "faixa": [
+        18.3,
+        24.5
+      ],
+      "instancias": 493,
+      "erro_mediano": 0.0274,
+      "erro_medio": 0.0301
+    },
+    "médio": {
+      "faixa": [
+        24.5,
+        34.2
+      ],
+      "instancias": 493,
+      "erro_mediano": 0.0281,
+      "erro_medio": 0.0312
+    },
+    "alto": {
+      "faixa": [
+        34.2,
+        68.1
+      ],
+      "instancias": 494,
+      "erro_mediano": 0.0281,
+      "erro_medio": 0.0318
+    }
+  },
+  "oclusao": {
+    "baixo": {
+      "faixa": [
+        8.0,
+        10.0
+      ],
+      "instancias": 233,
+      "erro_mediano": 0.0319,
+      "erro_medio": 0.0383
+    },
+    "médio": {
+      "faixa": [
+        11.0,
+        11.0
+      ],
+      "instancias": 295,
+      "erro_mediano": 0.0279,
+      "erro_medio": 0.0319
+    },
+    "alto": {
+      "faixa": [
+        12.0,
+        14.0
+      ],
+      "instancias": 952,
+      "erro_mediano": 0.0274,
+      "erro_medio": 0.029
+    }
+  },
+  "agregado": {
+    "instancias": 1480,
+    "erro_mediano": 0.0279,
+    "erro_medio": 0.031
+  },
+  "tag": "retrovisor",
+  "checkpoint": "best_torso_px_mean_epoch_2_merged.pth",
+  "conjunto": "Drive&Act val, partição split_0, participantes vp14 e vp15",
+  "origem_da_caixa": "yolo26n-pose",
+  "metrica": "erro de keypoint corporal normalizado por comprimento de tronco",
+  "quadros_sem_deteccao": 0,
+  "quadros_sem_tronco": 20,
+  "degradacao_escuro_vs_claro_pct": -5.3,
+  "degradacao_ocluido_vs_visivel_pct": 32.1
+}

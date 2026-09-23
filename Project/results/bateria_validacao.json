@@ -1,6 +1,7 @@
 {
   "pose_checkpoint": "best_coco-wholebody_AP_epoch_5_merged.pth",
   "lift_checkpoint": "best_MPJPE_whole_epoch_12.pth",
+  "detector": "yolo26n-pose",
   "testes": {
     "1_precisao_full_body": {
       "fonte": "results/baselines/rtmwx_lora_gray.json",
@@ -11,9 +12,9 @@
       "aprovado": false
     },
     "1b_erro_corporal_veicular": {
-      "fonte": "results/baselines/rtmwx_etapa3v2_driveact.json",
+      "fonte": "results/baselines/rtmwx_ensaio_driveact.json",
       "condicao": "Drive&Act val, 12 keypoints observáveis, erro normalizado por tronco",
-      "erro_normalizado": 0.02818189465089716,
+      "erro_normalizado": 0.029524408887637264,
       "criterio": "< 0,040",
       "aprovado": true
     },
@@ -21,32 +22,33 @@
       "fonte": "results/qp1_detectores.json",
       "condicao": "seis configurações sobre 1.500 quadros do Drive&Act",
       "erro_por_configuracao": {
-        "caixa de ground truth": 0.0288,
-        "RTMDet-nano": 0.03,
-        "sem detector": 0.0526,
-        "YOLOv11n-pose": 0.0295,
-        "YOLOv12n": 0.029,
-        "YOLOv26n-pose": 0.0292
+        "caixa de ground truth": 0.0301,
+        "RTMDet-nano": 0.0395,
+        "sem detector": 0.0408,
+        "YOLOv11n-pose": 0.031,
+        "YOLOv12n": 0.0309,
+        "YOLOv26n-pose": 0.031
       },
       "criterio": "limiar calibrado por medição e detector melhor que quadro inteiro",
+      "detector_de_operacao": "yolo26n-pose",
       "aprovado": true
     },
     "2_tempo_real": {
       "condicao": "300 quadros consecutivos de rec_20260921_224039.mp4, caminho completo com detector, pose e lifting, com sincronização da GPU",
       "criterio": "FPS >= 20 e latência p90 < 100ms",
       "quadros": 300,
-      "latencia_mediana_ms": 49.38,
-      "latencia_p90_ms": 58.73,
-      "latencia_p99_ms": 65.71,
-      "fps_mediano": 20.3,
+      "latencia_mediana_ms": 47.42,
+      "latencia_p90_ms": 49.26,
+      "latencia_p99_ms": 66.51,
+      "fps_mediano": 21.1,
       "aprovado": true
     },
     "3_oclusao": {
       "condicao": "149 quadros do Drive&Act, oclusão quadrada de 0,35 comprimento de tronco sobre cada punho anotado, da ordem de uma mão",
       "criterio": "degradação do erro corporal < 15%",
-      "erro_sem_oclusao": 0.0549,
-      "erro_com_oclusao": 0.0588,
-      "degradacao": 0.0703,
+      "erro_sem_oclusao": 0.0316,
+      "erro_com_oclusao": 0.0342,
+      "degradacao": 0.0817,
       "aprovado": true,
       "pose_checkpoint": "best_torso_px_mean_epoch_2_merged.pth"
     },
@@ -55,13 +57,13 @@
       "criterio": "keypoints no sistema do quadro e confiança decomposta por região",
       "observados": 102,
       "fracao_no_quadro": 0.9902,
-      "distancia_mediana_ao_centro_da_caixa": 0.193,
+      "distancia_mediana_ao_centro_da_caixa": 0.188,
       "aprovado": true,
       "regioes": {
-        "body": 7.59,
+        "body": 7.73,
         "feet": 0.0,
-        "face": 9.77,
-        "left_hand": 9.2,
+        "face": 9.81,
+        "left_hand": 9.17,
         "right_hand": 0.0
       },
       "regioes_completas": true
@@ -70,36 +72,36 @@
       "condicao": "120 quadros, mesma pose 2D nos dois regimes; quadro único emulado preenchendo a janela com cópias",
       "criterio": "a janela temporal reduz o tremor do corpo",
       "tremor_com_janela": {
-        "cabeca": 1.94,
-        "face": 2.03,
-        "ombros": 7.21,
-        "cotovelos e pulsos": 13.05,
-        "quadris": 16.47,
-        "pernas e pes": 94.95,
-        "maos": 23.74
+        "cabeca": 1.77,
+        "face": 1.85,
+        "ombros": 5.34,
+        "cotovelos e pulsos": 10.82,
+        "quadris": 10.47,
+        "pernas e pes": 40.94,
+        "maos": 18.33
       },
       "tremor_quadro_unico": {
-        "cabeca": 2.16,
-        "face": 2.34,
-        "ombros": 9.8,
-        "cotovelos e pulsos": 16.08,
-        "quadris": 26.7,
-        "pernas e pes": 92.86,
-        "maos": 28.63
+        "cabeca": 2.19,
+        "face": 2.31,
+        "ombros": 7.71,
+        "cotovelos e pulsos": 15.07,
+        "quadris": 15.56,
+        "pernas e pes": 48.64,
+        "maos": 23.67
       },
-      "reducao": 0.2172,
+      "reducao": 0.2906,
       "aprovado": true
     },
     "7_pipeline": {
-      "memoria_inicial_mib": 894.5,
-      "memoria_final_mib": 894.5,
+      "memoria_inicial_mib": 938.1,
+      "memoria_final_mib": 938.1,
       "crescimento_mib": 0.0,
       "aprovado": true,
       "condicao": "1000 quadros pelo caminho completo, memória amostrada a cada 50",
       "criterio": "sem exceções e crescimento de memória < 64 MiB",
       "quadros": 1000,
       "excecoes": 0,
-      "pico_mib": 956.1
+      "pico_mib": 1000.3
     }
   },
   "aprovados": 7,
