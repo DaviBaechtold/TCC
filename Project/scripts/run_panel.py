@@ -117,8 +117,11 @@ LIFT_CONFIG_BY_MOUNTING = {
 }
 LIFT_CHECKPOINT_BY_MOUNTING = {
     'mesa': 'work_dirs/lift3d_robusto_v3/best_MPJPE_whole_epoch_12.pth',
-    'retrovisor': ('work_dirs/lift3d_veicular/'
-                   'best_MPJPE_whole_epoch_4.pth'),
+    # O retreinado com a perda que respeita o peso do alvo. O primeiro treino
+    # veicular (work_dirs/lift3d_veicular) colapsava face, mãos e pernas ---
+    # interpupilar reconstruída de 3mm no próprio Drive&Act, contra 71mm deste.
+    'retrovisor': ('work_dirs/lift3d_veicular_peso/'
+                   'best_MPJPE_whole_epoch_5.pth'),
 }
 
 # Config e checkpoint das medições já publicadas, que os scripts de medição
@@ -150,6 +153,17 @@ CAMERA_CALIBRATION = 'configs/camera/webcam.calibration.json'
 # torno de 20%. A medição que decide é uma gravação nova à distância medida.
 # Retrovisor: 0,66m, mediana medida na referência 3D do Drive&Act.
 DEFAULT_SUBJECT_DEPTH_M = {'mesa': 1.17, 'retrovisor': 0.664}
+
+# Precisão da inferência do lifting, o estágio que domina o caminho completo.
+# Medido (scripts/benchmark_lifting.py, v3, 300 janelas do S7): float32 27,91ms
+# e 39,31mm; float16 10,72ms e 39,35mm; bfloat16 11,72ms e 39,38mm. float16 corta
+# a latência 2,6 vezes por 0,04mm.
+LIFT_PRECISIONS = ('float32', 'float16', 'bfloat16')
+DEFAULT_LIFT_PRECISION = 'float16'
+
+# De quantos em quantos quadros a janela do lifting é montada. 1 até que a
+# comparação com 3 (scripts/run_passo_temporal.sh) decida.
+DEFAULT_TEMPORAL_STRIDE = 1
 
 # Taxa nominal do painel, que o One Euro assume constante. Um desvio de alguns
 # hertz desloca o corte efetivo na mesma proporção, sem quebrar o filtro.
@@ -204,7 +218,11 @@ def parse_args():
     parser.add_argument('--calibracao', default=CAMERA_CALIBRATION,
                         help='Calibração da câmera. Sem ela a escala da pose 3D '
                              'é herdada e apenas aproximada')
-    parser.add_argument('--passo-temporal', type=int, default=1,
+    parser.add_argument('--precisao', default=DEFAULT_LIFT_PRECISION,
+                        choices=LIFT_PRECISIONS,
+                        help='Precisão da inferência do lifting')
+    parser.add_argument('--passo-temporal', type=int,
+                        default=DEFAULT_TEMPORAL_STRIDE,
                         help='De quantos em quantos quadros a janela do lifting '
                              'é montada. O H3WB tem 100ms medianos entre quadros '
                              'da janela; a 30 FPS, passo 3 reproduz isso')
@@ -294,6 +312,12 @@ def _config_without_flip_test(config_path: str, out_dir: Path) -> str:
     return str(patched)
 
 
+def lift_dtype(precision: str):
+    """O tipo do PyTorch para a precisão pedida; `None` mantém float32."""
+    import torch
+    return None if precision == 'float32' else getattr(torch, precision)
+
+
 def build_lifter(args):
     """Monta o lifting 3D com a geometria da câmera, se ela for conhecida.
 
@@ -323,7 +347,8 @@ def build_lifter(args):
     lifter = SequenceLifter(args.lift_cfg, args.lift_ckpt, args.device,
                             camera=camera,
                             unobserved_confidence=args.teto_confianca,
-                            frame_stride=args.passo_temporal)
+                            frame_stride=args.passo_temporal,
+                            inference_dtype=lift_dtype(args.precisao))
     return lifter, camera is not None
 
 

@@ -1,0 +1,57 @@
+{
+  "condicoes": {
+    "device": "NVIDIA GeForce RTX 5060",
+    "torch": "2.8.0+cu128",
+    "cuda": "12.8",
+    "config": "configs/lift3d_dstformer_h3wb_robusto_v3.py",
+    "checkpoint": "best_MPJPE_whole_epoch_12.pth",
+    "janela": "16 quadros x 133 pontos, lote 1",
+    "iteracoes": 100,
+    "aquecimento": 20,
+    "acuracia": "300 janelas do S7, 2D de referência, quadro causal, sem espelhamento"
+  },
+  "por_profundidade": {
+    "1": {
+      "mediana_ms": 5.63,
+      "p95_ms": 5.65,
+      "parametros_M": 8.8
+    },
+    "2": {
+      "mediana_ms": 11.05,
+      "p95_ms": 11.79,
+      "parametros_M": 17.2
+    },
+    "3": {
+      "mediana_ms": 16.48,
+      "p95_ms": 17.36,
+      "parametros_M": 25.6
+    },
+    "4": {
+      "mediana_ms": 22.01,
+      "p95_ms": 23.1,
+      "parametros_M": 34.0
+    },
+    "5": {
+      "mediana_ms": 27.53,
+      "p95_ms": 28.45,
+      "parametros_M": 42.4
+    }
+  },
+  "por_precisao": {
+    "float32": {
+      "mediana_ms": 27.91,
+      "p95_ms": 28.83,
+      "mpjpe_mm": 39.31
+    },
+    "bfloat16": {
+      "mediana_ms": 11.72,
+      "p95_ms": 12.4,
+      "mpjpe_mm": 39.38
+    },
+    "float16": {
+      "mediana_ms": 10.72,
+      "p95_ms": 11.33,
+      "mpjpe_mm": 39.35
+    }
+  }
+}

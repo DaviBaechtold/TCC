@@ -231,7 +231,9 @@ def argumentos_padrao(painel):
         lift_cfg=painel.LIFT_CONFIG, lift_ckpt=painel.LIFT_CHECKPOINT,
         calibracao=painel.CAMERA_CALIBRATION, device='cuda:0',
         distancia=painel.DEFAULT_SUBJECT_DEPTH_M['mesa'],
-        teto_confianca=painel.LIFT_UNOBSERVED_CONFIDENCE)
+        teto_confianca=painel.LIFT_UNOBSERVED_CONFIDENCE,
+        passo_temporal=painel.DEFAULT_TEMPORAL_STRIDE,
+        precisao=painel.DEFAULT_LIFT_PRECISION)
 
 
 def oclusao_driveact(pose, cv2, ocluir, torso_length, instance_error):
