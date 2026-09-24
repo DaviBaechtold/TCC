@@ -117,14 +117,18 @@ def _versao_anterior_ao_corte() -> types.ModuleType:
     versão que treinou o v2, que é a que precisa seguir reprodutível.
     """
     raiz = Path(__file__).resolve().parents[1]
-    revisoes = subprocess.check_output(
-        ['git', '-C', str(raiz), 'log', '--format=%H', '--',
-         CAMINHO_NO_REPOSITORIO], text=True).split()
+    # `--follow` e o caminho de cada revisão: em 24/09/2026 a raiz do repositório
+    # passou de TCC/ para TCC/Project/, e as revisões antigas guardam o arquivo
+    # sob `Project/`. Sem isso o histórico anterior à mudança some da busca.
+    saida = subprocess.check_output(
+        ['git', '-C', str(raiz), 'log', '--follow', '--format=%H',
+         '--name-only', '--', CAMINHO_NO_REPOSITORIO], text=True).split()
+    revisoes = list(zip(saida[0::2], saida[1::2]))
 
-    for revisao in revisoes:
+    for revisao, caminho in revisoes:
         fonte = subprocess.check_output(
-            ['git', '-C', str(raiz), 'show',
-             f'{revisao}:./{CAMINHO_NO_REPOSITORIO}'], text=True)
+            ['git', '-C', str(raiz), 'show', f'{revisao}:{caminho}'],
+            text=True)
         if 'frame_cut_prob' not in fonte:
             return _executar_como_modulo(fonte, revisao)
 
