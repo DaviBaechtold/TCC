@@ -239,9 +239,10 @@ S7); a latência do DSTFormer é linear, ~5,5ms por bloco. **Escala temporal:** 
 janelas do H3WB têm 100ms medianos entre quadros e 3,7s de duração; ao vivo, 33ms
 e 0,5s. `--passo-temporal 3` reproduz o intervalo do treino
 (`scripts/run_passo_temporal.sh`) — **piorou** o tremor em todas as regiões, e o
-padrão fica 1. **QP4 preliminar:** quadro único (`configs/lift3d_dstformer_h3wb_1frm.py`,
-lote 64) mede 34,75mm contra 38,96mm da janela; controle com lote 4 em
-`configs/lift3d_dstformer_h3wb_1frm_lote4.py`. A QP2 no H3WB mede movimento
+padrão fica 1. **QP4:** quadro único mede 34,75mm com lote 64
+(`configs/lift3d_dstformer_h3wb_1frm.py`) e **35,03mm com o mesmo lote 4 do base**
+(`configs/lift3d_dstformer_h3wb_1frm_lote4.py`), contra 38,96mm da janela. A
+janela não ganha acurácia no H3WB; fica pela estabilidade (26,9% menos tremor). A QP2 no H3WB mede movimento
 perdido, não recuperação de oclusão curta (`scripts/measure_temporary_occlusion.py`).
 Os padrões do lifting (precisão, passo) moram no painel; a bateria e o medidor
 ao vivo os leem de lá — a bateria montava os argumentos à mão e quebraria. O
