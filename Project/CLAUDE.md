@@ -219,9 +219,16 @@ o `lifting_target_weight` com `use_target_weight=True`, e o padrão é `False`. 
 121 pontos sem referência de cada janela do Drive&Act têm alvo idêntico (dispersão
 0,00mm) e foram supervisionados contra ele — a rede colapsa face, mãos e pernas.
 A canela de 18,9mm na webcam, lida antes como "quebra fora da montagem", é esse
-defeito. Config corrigido; `tests/test_partial_supervision_loss.py` reprova todo
-config com alvo parcial que ignore o peso (e reprova o antigo). **Retreino
-pendente**; até lá o checkpoint veicular vale só para os 12 pontos corporais. O
+defeito — e no próprio Drive&Act o modelo reconstrói interpupilar de **3,3mm**
+(`results/lifting_driveact_veicular_defeito.json`, com a geometria dos 133
+pontos que o validador passou a medir). **Ligar `use_target_weight` não basta**:
+nesse caminho a perda do MMPose multiplica as 15 velocidades pelos 16 pesos e
+quebra. A perda agora é `WeightedMPJPEVelocityLoss` (`src/models/lifting_loss.py`),
+com `tests/test_lifting_loss.py` (coincide com a original a peso 1; peso zero não
+muda perda nem gradiente) e `tests/test_partial_supervision_loss.py` (exige essa
+perda em todo treino com alvo parcial). Retreino em
+`work_dirs/lift3d_veicular_peso` por `scripts/run_lifting_veicular_peso.sh`; até
+ele fechar, o checkpoint veicular vale só para os 12 pontos corporais. O
 lifting continua escolhido pela montagem (`LIFT_CHECKPOINT_BY_MOUNTING`), decisão a
 reavaliar com o modelo retreinado.
 
