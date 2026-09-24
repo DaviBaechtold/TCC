@@ -1,0 +1,65 @@
+{
+  "conjunto": "Drive&Act val, split_0, vp14 e vp15, amostra espaçada",
+  "estimador": "best_torso_px_mean_epoch_2_merged.pth",
+  "detector": "yolo26n-pose",
+  "metrica": "erro de keypoint corporal normalizado por tronco",
+  "resolucao": "1280x1024, 30 FPS",
+  "codificador": "h264_nvenc, taxa constante, GOP de 60 quadros, sem quadros B",
+  "ressalva": "os vídeos originais já estão comprimidos; a medição só fala de taxas abaixo da original",
+  "por_taxa": {
+    "original": {
+      "erro_medio": 0.031,
+      "erro_mediano": 0.0279,
+      "erro_p90": 0.045,
+      "quadros_medidos": 1480,
+      "quadros_sem_deteccao": 0,
+      "taxa_real_kbps": 510.4,
+      "degradacao_pct": 0.0
+    },
+    "2000kbps": {
+      "erro_medio": 0.0339,
+      "erro_mediano": 0.028,
+      "erro_p90": 0.0489,
+      "quadros_medidos": 1480,
+      "quadros_sem_deteccao": 0,
+      "taxa_real_kbps": 2001.1,
+      "degradacao_pct": 9.4
+    },
+    "1000kbps": {
+      "erro_medio": 0.0404,
+      "erro_mediano": 0.0286,
+      "erro_p90": 0.0785,
+      "quadros_medidos": 1480,
+      "quadros_sem_deteccao": 0,
+      "taxa_real_kbps": 1001.0,
+      "degradacao_pct": 30.3
+    },
+    "500kbps": {
+      "erro_medio": 0.0486,
+      "erro_mediano": 0.0312,
+      "erro_p90": 0.1184,
+      "quadros_medidos": 1478,
+      "quadros_sem_deteccao": 3,
+      "taxa_real_kbps": 501.0,
+      "degradacao_pct": 56.8
+    },
+    "250kbps": {
+      "erro_medio": 0.054,
+      "erro_mediano": 0.0338,
+      "erro_p90": 0.1262,
+      "quadros_medidos": 1454,
+      "quadros_sem_deteccao": 30,
+      "taxa_real_kbps": 251.0,
+      "degradacao_pct": 74.2
+    },
+    "125kbps": {
+      "erro_medio": 0.056,
+      "erro_mediano": 0.0348,
+      "erro_p90": 0.127,
+      "quadros_medidos": 1315,
+      "quadros_sem_deteccao": 175,
+      "taxa_real_kbps": 126.0,
+      "degradacao_pct": 80.6
+    }
+  }
+}
