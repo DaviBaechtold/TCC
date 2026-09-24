@@ -44,24 +44,6 @@ WINDOWS_IN_BATCH = 4
 IMAGE_SIZE = 1000
 
 
-def load_windows(count):
-    """Janelas do conjunto de validação, com o fator de câmera de cada uma."""
-    from mmengine.config import Config
-    from mmengine.registry import init_default_scope
-
-    init_default_scope('mmpose')
-    import src.data.h3wb_dataset  # noqa: F401  registra o dataset
-    from mmpose.registry import DATASETS
-
-    cfg = Config.fromfile(CONFIG)
-    dataset_cfg = cfg.val_dataloader.dataset.copy()
-    dataset_cfg['pipeline'] = cfg.val_pipeline
-    dataset = DATASETS.build(dataset_cfg)
-
-    step = max(1, len(dataset) // count)
-    return [dataset[index] for index in range(0, len(dataset), step)]
-
-
 def replay(lifter, normalized, factor):
     """Alimenta o lifter quadro a quadro, como o painel faz, e devolve a última.
 
@@ -77,23 +59,15 @@ def replay(lifter, normalized, factor):
     return predicted
 
 
-def target_of(sample):
-    """Ground truth 3D do último quadro da janela, ancorado na raiz."""
-    target = np.squeeze(
-        np.asarray(sample['data_samples'].gt_instances.lifting_target))
-    target = target[-1] if target.ndim == 3 else target
-    return target - target[:1]
-
-
-def factor_of(sample):
-    return float(
-        np.asarray(sample['data_samples'].metainfo['factor']).ravel()[-1])
-
-
 def main():
     from src.models import torch_compat  # noqa: F401
 
-    samples = load_windows(WINDOWS_TO_CHECK)
+    import src.data.h3wb_dataset  # noqa: F401  registra o dataset
+    from src.data.h3wb_dataset import (last_frame_target,
+                                       load_validation_windows,
+                                       window_factor)
+
+    samples = load_validation_windows(CONFIG, WINDOWS_TO_CHECK)
 
     from src.models.sequence_lifter import SequenceLifter
 
@@ -104,10 +78,10 @@ def main():
     errors = []
     predictions = []
     for sample in samples:
-        predicted = replay(lifter, sample['inputs'].numpy(), factor_of(sample))
+        predicted = replay(lifter, sample['inputs'].numpy(), window_factor(sample))
         predictions.append(predicted)
         errors.append(
-            np.linalg.norm(predicted - target_of(sample), axis=-1).mean() * 1000)
+            np.linalg.norm(predicted - last_frame_target(sample), axis=-1).mean() * 1000)
 
     mean_error = float(np.mean(errors))
     print(f'  MPJPE do caminho ao vivo: {mean_error:.1f} mm '
@@ -120,7 +94,7 @@ def main():
     in_batch = lifter.predict_windows(
         np.stack([sample['inputs'].numpy() for sample in batch]),
         (IMAGE_SIZE, IMAGE_SIZE),
-        np.array([factor_of(sample) for sample in batch], dtype=np.float32))
+        np.array([window_factor(sample) for sample in batch], dtype=np.float32))
     gap = np.abs(in_batch - np.stack(predictions[:WINDOWS_IN_BATCH])).max()
     print(f'  maior diferença entre lote e quadro a quadro: {gap * 1000:.4f} mm')
     assert gap < MAX_BATCH_GAP_M, (

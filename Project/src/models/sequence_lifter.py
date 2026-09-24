@@ -38,6 +38,7 @@ porque o contexto temporal é artificial, e `warming_up` permite sinalizá-lo.
 
 from __future__ import annotations
 
+import contextlib
 from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
@@ -210,7 +211,9 @@ class SequenceLifter:
                  factor: float = DEFAULT_FACTOR,
                  sequence_length: int = SEQUENCE_LENGTH,
                  response_scale: float = OBSERVED_RESPONSE,
-                 unobserved_confidence: float | None = None):
+                 unobserved_confidence: float | None = None,
+                 inference_dtype: 'torch.dtype | None' = None,
+                 frame_stride: int = 1):
         """
         Args:
             camera: calibração da câmera. Com ela, o 2D é levado à geometria de
@@ -220,6 +223,16 @@ class SequenceLifter:
                 com `factor`, uma escala aproximada que o painel declara como tal.
             unobserved_confidence: teto da confiança dos keypoints que o sistema
                 sabe não ter observado. `None` desliga o teto.
+            inference_dtype: precisão reduzida da inferência (`torch.bfloat16`
+                ou `torch.float16`), por autocast. `None` mantém float32. Existe
+                para a QP5 medir o que a precisão custa em acurácia e rende em
+                latência no estágio que domina o caminho completo.
+            frame_stride: de quantos em quantos quadros a janela é montada no
+                caminho ao vivo. O lifting aprendeu contexto temporal no H3WB,
+                cujas janelas têm intervalo mediano de 100ms entre quadros e
+                duração mediana de 3,7s; a 30 FPS, com passo 1, a janela ao vivo
+                dura 0,5s. Passo 3 dá 100ms entre quadros. A saída continua a
+                cada quadro e causal: o quadro mais recente é sempre o último.
         """
         from mmengine.config import Config
         from mmengine.registry import init_default_scope
@@ -235,11 +248,22 @@ class SequenceLifter:
 
         self._device = device
         self._sequence_length = sequence_length
-        self._window: deque[np.ndarray] = deque(maxlen=sequence_length)
+        if frame_stride < 1:
+            raise ValueError('frame_stride precisa ser ao menos 1')
+        self._frame_stride = frame_stride
+        # O buffer guarda todos os quadros do intervalo que a janela espaçada
+        # cobre; a janela é amostrada dele de trás para a frente.
+        self._window: deque[np.ndarray] = deque(
+            maxlen=(sequence_length - 1) * frame_stride + 1)
         self._camera = camera
         self._factor = factor
         self._response_scale = response_scale
         self._unobserved_confidence = unobserved_confidence
+        self._inference_dtype = inference_dtype
+        if inference_dtype is not None:
+            # As cabeças do MMPose convertem a saída para NumPy, que não tem
+            # bfloat16; sem a correção a primeira predição levanta TypeError.
+            from src.models import bf16_compat  # noqa: F401
 
         # O flip test duplica o custo e exige índices de espelhamento que só o
         # dataset conhece. Ao vivo a métrica é latência, então fica desligado --
@@ -250,7 +274,7 @@ class SequenceLifter:
     @property
     def warming_up(self) -> bool:
         """Verdadeiro enquanto a janela ainda não viu quadros suficientes."""
-        return len(self._window) < self._sequence_length
+        return len(self._window) < self._window.maxlen
 
     def reset(self) -> None:
         """Descarta o contexto temporal. Necessário ao trocar de fonte."""
@@ -331,7 +355,12 @@ class SequenceLifter:
             sample.gt_instances = InstanceData()
             samples.append(sample)
 
-        with torch.no_grad():
+        # A saída volta a float32 no decodificador, que converte para NumPy;
+        # o autocast só muda o tipo das operações dentro da rede.
+        precisao = (torch.autocast('cuda', dtype=self._inference_dtype)
+                    if self._inference_dtype is not None
+                    else contextlib.nullcontext())
+        with torch.no_grad(), precisao:
             predicted = self._model.predict(batch, samples)
 
         poses = np.stack([
@@ -357,7 +386,9 @@ class SequenceLifter:
         self._window.append(
             self._encode(keypoints, scores, frame_size, observed))
 
-        window = list(self._window)
+        # A partir do mais recente, de `frame_stride` em `frame_stride`: o
+        # quadro atual é sempre o último da janela, e a leitura segue causal.
+        window = list(self._window)[::-1][::self._frame_stride][::-1]
         while len(window) < self._sequence_length:
             window.insert(0, window[0])  # repete o mais antigo
 

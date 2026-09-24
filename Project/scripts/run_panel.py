@@ -204,6 +204,10 @@ def parse_args():
     parser.add_argument('--calibracao', default=CAMERA_CALIBRATION,
                         help='Calibração da câmera. Sem ela a escala da pose 3D '
                              'é herdada e apenas aproximada')
+    parser.add_argument('--passo-temporal', type=int, default=1,
+                        help='De quantos em quantos quadros a janela do lifting '
+                             'é montada. O H3WB tem 100ms medianos entre quadros '
+                             'da janela; a 30 FPS, passo 3 reproduz isso')
     parser.add_argument('--distancia', type=float, default=None,
                         help='Distância da câmera ao ocupante, em metros. '
                              'Medir uma vez: é o que a câmera não observa. '
@@ -318,7 +322,8 @@ def build_lifter(args):
 
     lifter = SequenceLifter(args.lift_cfg, args.lift_ckpt, args.device,
                             camera=camera,
-                            unobserved_confidence=args.teto_confianca)
+                            unobserved_confidence=args.teto_confianca,
+                            frame_stride=args.passo_temporal)
     return lifter, camera is not None
 
 

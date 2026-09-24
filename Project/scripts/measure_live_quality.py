@@ -55,6 +55,8 @@ def parse_args(panel):
         formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--video', type=Path, default=DEFAULT_VIDEO)
     parser.add_argument('--tag', required=True)
+    parser.add_argument('--passo-temporal', type=int, default=1,
+                        help='Passo da janela do lifting, como no painel')
     parser.add_argument('--cfg', default=panel.POSE_CONFIG)
     parser.add_argument('--ckpt', default=panel.POSE_CHECKPOINT)
     parser.add_argument('--lift-cfg', default=panel.LIFT_CONFIG)
@@ -167,6 +169,7 @@ def main():
     relatorio = report(poses, observados)
     relatorio.update({
         'tag': args.tag,
+        'passo_temporal': args.passo_temporal,
         'video': args.video.name,
         'lift_checkpoint': Path(args.lift_ckpt).name,
         'pose_checkpoint': Path(args.ckpt).name,

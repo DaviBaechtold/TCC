@@ -1,0 +1,39 @@
+{
+  "checkpoint": "best_MPJPE_whole_epoch_12.pth",
+  "tag": "v3",
+  "janelas": 1200,
+  "entrada_2d": "ground truth do H3WB, sujeito retido S7",
+  "quadro": "causal, último da janela de 16",
+  "grupo_oculto": "punho e mão direitos (22 pontos)",
+  "oclusao": "congelado na última posição vista, confiança no teto de ausência do treino",
+  "por_duracao_da_oclusao": {
+    "0": {
+      "mao_com_janela_mm": 78.12,
+      "mao_sem_contexto_mm": 89.07
+    },
+    "1": {
+      "mao_com_janela_mm": 142.22,
+      "mao_sem_contexto_mm": 168.04
+    },
+    "2": {
+      "mao_com_janela_mm": 199.85,
+      "mao_sem_contexto_mm": 209.31
+    },
+    "4": {
+      "mao_com_janela_mm": 290.29,
+      "mao_sem_contexto_mm": 275.8
+    },
+    "8": {
+      "mao_com_janela_mm": 381.96,
+      "mao_sem_contexto_mm": 351.71
+    },
+    "12": {
+      "mao_com_janela_mm": 415.8,
+      "mao_sem_contexto_mm": 392.07
+    },
+    "16": {
+      "mao_com_janela_mm": 401.82,
+      "mao_sem_contexto_mm": 404.34
+    }
+  }
+}

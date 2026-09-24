@@ -297,3 +297,43 @@ class H3WBSeq2SeqDataset(H36MWholeBodyDataset):
             instance['camera_param'] = camera_param
 
         return instance_list, image_list
+
+
+def load_validation_windows(config: str, limit: int = 0) -> list[dict]:
+    """Janelas de validação (sujeito retido S7) do config dado, já processadas.
+
+    Com `limit`, espaça a amostra sobre o conjunto em vez de tomar a cabeça: o
+    arquivo guarda as janelas em ordem de ação, e as primeiras seriam todas da
+    mesma. Vivia copiada em dois controllers e num teste.
+    """
+    from mmengine.config import Config
+    from mmengine.registry import init_default_scope
+    from mmpose.registry import DATASETS
+
+    init_default_scope('mmpose')
+    cfg = Config.fromfile(config)
+    dataset_cfg = cfg.val_dataloader.dataset.copy()
+    dataset_cfg['pipeline'] = cfg.val_pipeline
+    dataset = DATASETS.build(dataset_cfg)
+
+    indices = range(len(dataset))
+    if limit:
+        indices = range(0, len(dataset), max(1, len(dataset) // limit))
+    return [dataset[index] for index in indices]
+
+
+def last_frame_target(sample: dict) -> np.ndarray:
+    """Ground truth 3D do último quadro da janela, ancorado na raiz.
+
+    O último, e não o central, porque é o quadro que o sistema emite: a leitura
+    causal da janela.
+    """
+    target = np.squeeze(
+        np.asarray(sample['data_samples'].gt_instances.lifting_target))
+    target = target[-1] if target.ndim == 3 else target
+    return target - target[:1]
+
+
+def window_factor(sample: dict) -> float:
+    """Fator de decodificação da câmera da janela, do último quadro."""
+    return float(np.asarray(sample['data_samples'].metainfo['factor']).ravel()[-1])

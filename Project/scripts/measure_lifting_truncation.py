@@ -60,33 +60,6 @@ def parse_args():
     return parser.parse_args()
 
 
-def load_windows(config: str, limit: int) -> list[dict]:
-    from mmengine.config import Config
-    from mmengine.registry import init_default_scope
-
-    init_default_scope('mmpose')
-    import src.data.h3wb_dataset  # noqa: F401  registra o dataset
-    from mmpose.registry import DATASETS
-
-    cfg = Config.fromfile(config)
-    dataset_cfg = cfg.val_dataloader.dataset.copy()
-    dataset_cfg['pipeline'] = cfg.val_pipeline
-    dataset = DATASETS.build(dataset_cfg)
-
-    indices = range(len(dataset))
-    if limit:
-        indices = range(0, len(dataset), max(1, len(dataset) // limit))
-    return [dataset[index] for index in indices]
-
-
-def target_of(sample: dict) -> np.ndarray:
-    """Ground truth do último quadro da janela, ancorado na raiz."""
-    target = np.squeeze(
-        np.asarray(sample['data_samples'].gt_instances.lifting_target))
-    target = target[-1] if target.ndim == 3 else target
-    return target - target[:1]
-
-
 def is_seated(sample: dict) -> bool:
     path = str(sample['data_samples'].metainfo['target_img_path'])
     return any(action in path for action in SEATED_ACTIONS)
@@ -99,12 +72,15 @@ def main():
     from src.data.estimator_noise import SimulatedEstimatorNoise
     from src.evaluation.truncation_protocol import (CONDITIONS, bone_geometry,
                                                     corrupt, decompose_error)
+    import src.data.h3wb_dataset  # noqa: F401  registra o dataset
+    from src.data.h3wb_dataset import (last_frame_target,
+                                       load_validation_windows,
+                                       window_factor)
     from src.models.sequence_lifter import SequenceLifter
 
-    samples = load_windows(args.lift_cfg, args.max_windows)
-    targets = np.stack([target_of(s) for s in samples])
-    factors = np.array([float(np.asarray(
-        s['data_samples'].metainfo['factor']).ravel()[-1]) for s in samples])
+    samples = load_validation_windows(args.lift_cfg, args.max_windows)
+    targets = np.stack([last_frame_target(s) for s in samples])
+    factors = np.array([window_factor(s) for s in samples])
     seated = np.array([is_seated(s) for s in samples])
     inputs = np.stack([s['inputs'].numpy() for s in samples])
     print(f'{len(samples)} janelas do S7, {int(seated.sum())} sentadas')

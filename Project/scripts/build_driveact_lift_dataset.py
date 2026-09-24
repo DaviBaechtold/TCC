@@ -20,9 +20,14 @@ entram com peso zero --- o que exige ensaio com o H3WB no treino, sob pena de
 repetir o esquecimento medido na Etapa 3.
 
 **Os quadros extraídos são de cinco em cinco.** Uma janela de dezesseis cobre
-2,7 segundos, contra 0,3 no H3WB. A avaliação do Drive&Act sempre rodou nesse
-mesmo ritmo, de modo que treino e medida são consistentes entre si, mas o painel
-ao vivo roda a 30 quadros por segundo.
+2,5 segundos. No H3WB, onde o lifting aprendeu o contexto temporal, as janelas são
+feitas das imagens anotadas, esparsas e irregulares: intervalo mediano de 100ms
+entre quadros vizinhos e janela mediana de 3,7 segundos (p90 10,2s), medidos
+sobre as 1.200 janelas de validação. O painel ao vivo, a 30 FPS, monta janelas
+de 0,5 segundo. Treino, Drive&Act e operação estão, portanto, em três escalas
+temporais diferentes --- a versão anterior deste texto dizia 0,3 segundo para o
+H3WB, e estava errada. A avaliação do Drive&Act roda no mesmo passo de cinco
+quadros, de modo que o treino veicular e a medida dele são consistentes entre si.
 """
 
 import argparse
