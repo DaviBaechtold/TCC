@@ -27,6 +27,7 @@ custom_imports = dict(
         'src.data.driveact_lift_dataset',
         'src.data.estimator_noise',
         'src.evaluation.wholebody_mpjpe',
+        'src.models.lifting_loss',
     ],
     allow_failed_imports=True)
 
@@ -64,15 +65,14 @@ resume = False
 max_epochs = 5
 train_cfg = dict(by_epoch=True, max_epochs=max_epochs, val_interval=1)
 
-# A perda precisa respeitar o peso do alvo. A `MPJPEVelocityJointLoss` só lê o
-# `lifting_target_weight` que a cabeça lhe passa quando `use_target_weight` está
-# ligado, e o padrão é desligado. No H3WB isso é inócuo --- todo ponto tem
-# referência e peso 1 ---, mas numa janela do Drive&Act 121 dos 133 pontos não
-# têm referência, e o alvo de todos eles cai no mesmo ponto (dispersão medida:
-# 0,00mm). Com o peso ignorado, a primeira versão deste treino ensinou a rede a
-# colapsar face, mãos, pés e pernas num ponto em cerca de 40% das amostras.
-model = dict(
-    head=dict(loss=dict(type='MPJPEVelocityJointLoss', use_target_weight=True)))
+# A perda precisa respeitar o peso do alvo. Numa janela do Drive&Act 121 dos 133
+# pontos não têm referência, e o alvo de todos cai no mesmo ponto (dispersão
+# medida: 0,00mm). A `MPJPEVelocityJointLoss` do MMPose descarta o peso por
+# padrão --- e a primeira versão deste treino ensinou a rede a colapsar face,
+# mãos e pernas ---, e com o peso ligado ela quebra em sequências (15
+# velocidades contra 16 pesos). `WeightedMPJPEVelocityLoss` corrige as duas
+# coisas e coincide com a original onde todo ponto tem referência.
+model = dict(head=dict(loss=dict(_delete_=True, type='WeightedMPJPEVelocityLoss')))
 
 # Diretório próprio do treino com a perda corrigida. O checkpoint do primeiro
 # treino, com o defeito, fica em work_dirs/lift3d_veicular para a comparação,

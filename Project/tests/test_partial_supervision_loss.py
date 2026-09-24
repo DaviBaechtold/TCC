@@ -22,6 +22,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 # Conjuntos cuja referência cobre só parte dos 133 pontos.
 PARTIAL_TARGET_DATASETS = ('DriveActLiftDataset',)
 
+# Perdas que de fato aplicam o peso em janelas temporais. A
+# `MPJPEVelocityJointLoss` do MMPose não entra nem com `use_target_weight`
+# ligado: nesse caminho ela multiplica 15 velocidades por 16 pesos e quebra.
+WEIGHT_RESPECTING_LOSSES = ('WeightedMPJPEVelocityLoss',)
+
 
 def dataset_types(dataset_cfg) -> list[str]:
     tipos = [dataset_cfg.get('type')]
@@ -40,10 +45,10 @@ def main():
         if not any(t in PARTIAL_TARGET_DATASETS for t in tipos):
             continue
         perda = cfg.model.head.loss
-        assert perda.get('use_target_weight', False), (
+        assert perda['type'] in WEIGHT_RESPECTING_LOSSES, (
             f'{caminho.name} treina com alvo parcial ({tipos}) e a perda '
-            f'{perda["type"]} ignora o peso do alvo: os pontos sem referência '
-            'seriam supervisionados contra um alvo vazio')
+            f'{perda["type"]} não aplica o peso do alvo em janelas: os pontos '
+            'sem referência seriam supervisionados contra um alvo vazio')
         verificados += 1
         print(f'  {caminho.name}: alvo parcial com peso respeitado')
 
