@@ -59,8 +59,35 @@ def replay(lifter, normalized, factor):
     return predicted
 
 
+def missing_requirements() -> list[str]:
+    """O que falta para esta verificação rodar, que depende de dados e de GPU.
+
+    É o único teste que precisa do H3WB, do checkpoint do treino base e da GPU,
+    e nenhum dos três vem numa instalação para testar o painel. Faltando algum,
+    ele avisa e sai sem falhar, em vez de acusar defeito de uma instalação sã.
+    """
+    import torch
+    from mmengine.config import Config
+
+    faltas = []
+    dataset = Config.fromfile(CONFIG).val_dataloader.dataset
+    anotacoes = Path(dataset.get('data_root', '')) / dataset.ann_file
+    if not anotacoes.exists():
+        faltas.append(f'anotações do H3WB ({anotacoes})')
+    if not Path(CHECKPOINT).exists():
+        faltas.append(f'checkpoint do treino base ({CHECKPOINT})')
+    if not torch.cuda.is_available():
+        faltas.append('GPU com CUDA')
+    return faltas
+
+
 def main():
     from src.models import torch_compat  # noqa: F401
+
+    faltas = missing_requirements()
+    if faltas:
+        print('PULADO: exige ' + ', '.join(faltas))
+        return
 
     import src.data.h3wb_dataset  # noqa: F401  registra o dataset
     from src.data.h3wb_dataset import (last_frame_target,
