@@ -36,17 +36,23 @@ em cinza, 67% dos tornozelos não anotados passam de 3,0 (mediana 3,74, contra
 **Os dois tornozelos no mesmo lugar.** Quando um pé some — dobrado sob a cadeira,
 atrás da outra perna —, o estimador põe os dois tornozelos no pé visível, com
 resposta alta nos dois: é a dupla contagem, vista na webcam de mesa com uma perna
-estendida. Se os tornozelos distam menos de `COINCIDENT_ANKLES_FRACTION` do
-tamanho do corpo, o de menor resposta, e o pé que depende dele, deixam de ser
-observados. Medido no COCO-WholeBody em cinza, 1.850 instâncias com caixa de GT
-e a Etapa 2, sobre os tornozelos que a regra retira:
+estendida. Se os tornozelos, **ou os centros dos dois pés**, distam menos de
+`COINCIDENT_FEET_FRACTION` do tamanho do corpo, o tornozelo de menor resposta e o
+pé que depende dele deixam de ser observados. Medido no COCO-WholeBody em cinza,
+1.850 instâncias com caixa de GT e a Etapa 2, sobre os tornozelos retirados:
 
-    distância   retirados   ocultos  errados  certos   observações certas perdidas
-      0,03          47         21       15      11        0,59%
-      0,05          68         29       23      16        0,86%
-      0,08         102         38       36      28        1,50%
+    gatilho            distância  retirados  ocultos  errados  certos  certas perdidas
+    tornozelo            0,05          68       29       23      16      0,86%
+    pé                   0,05          72       28       24      20      1,07%
+    tornozelo ou pé      0,03          72       35       20      17      0,91%
+    tornozelo ou pé      0,05         104       45       34      25      1,34%
+    tornozelo ou pé      0,08         155       58       51      46      2,46%
 
-Em 0,05, três de cada quatro retirados eram ponto oculto ou mal localizado. Nos
+O gatilho do pé existe porque o pé duplica mais apertado que o tornozelo: na
+segunda gravação de mesa, os 18 quadros que ainda saíam com os dois tornozelos
+observados tinham os tornozelos a 5--7% um do outro, sobre o mesmo pé, e os
+centros dos pés a menos de 4%. Somar o pé mantém o acerto em 76% e retira 79
+pontos falsos em vez de 52. Nos
 joelhos a mesma regra acerta 52%, cara ou coroa, e fica de fora; nos punhos
 acerta 67% no COCO, mas no carro as duas mãos juntas no volante são postura
 comum e isso não foi medido no domínio, então também fica de fora.
@@ -115,11 +121,12 @@ LEFT_FOOT = (17, 18, 19)
 RIGHT_FOOT = (20, 21, 22)
 BODY_AND_FEET = slice(0, 23)
 
-# Distância entre os tornozelos, em fração do tamanho do corpo, abaixo da qual
-# um deles é tratado como duplicata do outro. O tamanho é a raiz da área do
-# retângulo que contém os 23 pontos de corpo e pé, e não a caixa do detector,
-# para que a regra dependa só da saída do estimador. Ver a tabela no topo.
-COINCIDENT_ANKLES_FRACTION = 0.05
+# Distância entre os tornozelos, ou entre os centros dos pés, em fração do
+# tamanho do corpo, abaixo da qual um lado é tratado como duplicata do outro. O
+# tamanho é a raiz da área do retângulo que contém os 23 pontos de corpo e pé, e
+# não a caixa do detector, para que a regra dependa só da saída do estimador.
+# Ver a tabela no topo.
+COINCIDENT_FEET_FRACTION = 0.05
 
 # O critério vale para as quatro bordas, e não só a inferior. O estimador encosta
 # na borda que a junta atravessa, qualquer uma delas; nesta gravação o ocupante
@@ -188,11 +195,15 @@ def _double_counted_ankle(keypoints: np.ndarray,
     body = keypoints[..., BODY_AND_FEET, :]
     extent = body.max(axis=-2) - body.min(axis=-2)
     body_size = np.sqrt(extent[..., 0] * extent[..., 1])
-    gap = np.linalg.norm(keypoints[..., LEFT_ANKLE, :]
-                         - keypoints[..., RIGHT_ANKLE, :], axis=-1)
+    ankle_gap = np.linalg.norm(keypoints[..., LEFT_ANKLE, :]
+                               - keypoints[..., RIGHT_ANKLE, :], axis=-1)
+    foot_gap = np.linalg.norm(
+        keypoints[..., list(LEFT_FOOT), :].mean(axis=-2)
+        - keypoints[..., list(RIGHT_FOOT), :].mean(axis=-2), axis=-1)
     # Com NaN, ou com o corpo de tamanho zero, a comparação é falsa e nada é
     # retirado: não há duas posições para chamar de coincidentes.
-    coincident = gap < COINCIDENT_ANKLES_FRACTION * body_size
+    limit = COINCIDENT_FEET_FRACTION * body_size
+    coincident = (ankle_gap < limit) | (foot_gap < limit)
     left_is_copy = scores[..., LEFT_ANKLE] < scores[..., RIGHT_ANKLE]
 
     duplicate = np.zeros(scores.shape, dtype=bool)

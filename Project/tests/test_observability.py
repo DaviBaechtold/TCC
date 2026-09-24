@@ -16,7 +16,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src.models.observability import (COINCIDENT_ANKLES_FRACTION,
+from src.models.observability import (COINCIDENT_FEET_FRACTION,
                                       EDGE_MARGIN_PX, LEFT_FOOT,
                                       MIRROR_VIEW_ABSENT,
                                       NUM_WHOLEBODY_KEYPOINTS, RIGHT_FOOT,
@@ -111,10 +111,19 @@ def test_montagem():
 
 def _standing(left_ankle: tuple[float, float],
               right_ankle: tuple[float, float], left_score: float,
-              right_score: float):
-    """Um corpo de 300x400 px com os tornozelos onde o teste pede."""
+              right_score: float, feet_apart: float = 200.0):
+    """Um corpo de 300x400 px com os tornozelos onde o teste pede.
+
+    Cada pé fica logo abaixo do seu tornozelo, deslocado de `feet_apart` para
+    fora, de modo que só o tornozelo decide, a menos que o teste diga o contrário.
+    """
+    lx, ly = left_ankle
+    rx, ry = right_ankle
+    half = feet_apart / 2
+    feet = {index: (lx - half, ly + 20.0) for index in LEFT_FOOT}
+    feet.update({index: (rx + half, ry + 20.0) for index in RIGHT_FOOT})
     keypoints, scores = _pose({0: (500.0, 100.0), 11: (800.0, 500.0),
-                               15: left_ankle, 16: right_ankle})
+                               15: left_ankle, 16: right_ankle, **feet})
     scores[[15, *LEFT_FOOT]] = left_score
     scores[[16, *RIGHT_FOOT]] = right_score
     return keypoints, scores
@@ -142,12 +151,26 @@ def test_tornozelos_coincidentes():
 def test_tornozelos_separados():
     """Logo acima da distância, os dois continuam observados."""
     body_size = np.sqrt(300.0 * 400.0)
-    apart = COINCIDENT_ANKLES_FRACTION * body_size + 1.0
+    apart = COINCIDENT_FEET_FRACTION * body_size + 1.0
     keypoints, scores = _standing((620.0, 300.0), (620.0 + apart, 300.0),
                                   5.0, 7.0)
     observed = observed_keypoints(keypoints, scores, FRAME_SIZE, MIN_SCORE)
     assert observed[15] and observed[16], 'tornozelos separados foram retirados'
     print(f'  tornozelos a {apart:.0f}px: os dois observados  OK')
+
+
+def test_pes_coincidentes():
+    """O caso que sobrou na segunda gravação: tornozelos um pouco afastados sobre
+    o mesmo pé, e os dois pés quase sobrepostos."""
+    body_size = np.sqrt(300.0 * 400.0)
+    apart = COINCIDENT_FEET_FRACTION * body_size + 1.0
+    keypoints, scores = _standing((620.0, 300.0), (620.0 + apart, 300.0),
+                                  5.0, 7.0, feet_apart=-apart)
+    observed = observed_keypoints(keypoints, scores, FRAME_SIZE, MIN_SCORE)
+    assert not observed[15] and not observed[list(LEFT_FOOT)].any(), \
+        'os pés sobrepostos passaram como dois'
+    assert observed[16]
+    print('  pés coincidentes: dispara pelo pé com os tornozelos afastados  OK')
 
 
 def test_lote():
@@ -170,6 +193,7 @@ def main():
     test_montagem()
     test_tornozelos_coincidentes()
     test_tornozelos_separados()
+    test_pes_coincidentes()
     test_lote()
     print('\nas quatro condições decidem, e nenhuma sozinha')
 
