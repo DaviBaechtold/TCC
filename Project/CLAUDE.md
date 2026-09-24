@@ -29,6 +29,16 @@ cluster é exceção, não caminho padrão.
 (nenhuma op custom é usada), mas gera dezenas de `RuntimeWarning` no stdout —
 filtre a saída ao ler logs, não tente "consertar".
 
+**Instalação do zero: `scripts/instalar_ambiente.sh` + `scripts/baixar_pesos.py`**,
+verificada em 24/09/2026 num `git clone` limpo: testes passam e o painel sai
+idêntico, pixel a pixel, nas duas montagens. O MMCV entra como `mmcv-lite`, e o
+MMPose só carrega com um `mmcv/_ext.py` substituto — que até essa data existia
+**só no site-packages desta máquina, criado à mão em 2025**, e nenhuma instalação
+nova reproduzia. Hoje vive em `src/models/mmcv_ext_stub.py` e o instalador o
+copia. Pesos treinados: release `pesos-v1` do GitHub (ou `--origem <pasta>`),
+conferidos por SHA-256; `--empacotar` prepara a publicação. Um novo checkpoint
+em operação exige atualizar o SHA-256 no manifesto de `baixar_pesos.py`.
+
 Checkpoints do OpenMMLab (2023) contêm objetos numpy e o PyTorch ≥ 2.6 usa
 `weights_only=True` por padrão, rejeitando-os. Todo entrypoint que carrega
 checkpoint precisa do patch de `torch.load` — veja `scripts/eval_checkpoint.py`.
