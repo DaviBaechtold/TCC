@@ -1,6 +1,6 @@
 """Quais keypoints o sistema de fato observa num quadro.
 
-Camada Model. Três condições independentes decidem, e nenhuma delas basta
+Camada Model. Quatro condições independentes decidem, e nenhuma delas basta
 sozinha.
 
 **A montagem da câmera.** É propriedade da montagem, não do modelo: com a câmera
@@ -29,7 +29,27 @@ de 3,0. Confiança alta em posição inventada é exatamente o caso que o limiar
 pega.
 
 **O limiar de resposta.** Continua necessário para a junta que está em quadro mas
-foi mal localizada — o que a borda não vê.
+foi mal localizada — o que a borda não vê. É fraco para a junta oculta: no COCO
+em cinza, 67% dos tornozelos não anotados passam de 3,0 (mediana 3,74, contra
+7,06 dos visíveis).
+
+**Os dois tornozelos no mesmo lugar.** Quando um pé some — dobrado sob a cadeira,
+atrás da outra perna —, o estimador põe os dois tornozelos no pé visível, com
+resposta alta nos dois: é a dupla contagem, vista na webcam de mesa com uma perna
+estendida. Se os tornozelos distam menos de `COINCIDENT_ANKLES_FRACTION` do
+tamanho do corpo, o de menor resposta, e o pé que depende dele, deixam de ser
+observados. Medido no COCO-WholeBody em cinza, 1.850 instâncias com caixa de GT
+e a Etapa 2, sobre os tornozelos que a regra retira:
+
+    distância   retirados   ocultos  errados  certos   observações certas perdidas
+      0,03          47         21       15      11        0,59%
+      0,05          68         29       23      16        0,86%
+      0,08         102         38       36      28        1,50%
+
+Em 0,05, três de cada quatro retirados eram ponto oculto ou mal localizado. Nos
+joelhos a mesma regra acerta 52%, cara ou coroa, e fica de fora; nos punhos
+acerta 67% no COCO, mas no carro as duas mãos juntas no volante são postura
+comum e isso não foi medido no domínio, então também fica de fora.
 
 **Por que a montagem entra como conhecimento explícito, e não como limiar.** O
 estimador 2D adaptado ao Drive&Act ficou *mais* confiante sobre o que não vê: a
@@ -87,6 +107,20 @@ EDGE_MARGIN_PX = 28
 # mesma fração da pessoa cai fora do quadro.
 REFERENCE_FRAME_HEIGHT_PX = 720
 
+# Tornozelos esquerdo e direito, e os três pontos de pé de cada lado (dedão,
+# dedinho, calcanhar), na ordem do COCO-WholeBody. O pé segue o tornozelo: se o
+# tornozelo é o duplicado, o pé dele também é.
+LEFT_ANKLE, RIGHT_ANKLE = 15, 16
+LEFT_FOOT = (17, 18, 19)
+RIGHT_FOOT = (20, 21, 22)
+BODY_AND_FEET = slice(0, 23)
+
+# Distância entre os tornozelos, em fração do tamanho do corpo, abaixo da qual
+# um deles é tratado como duplicata do outro. O tamanho é a raiz da área do
+# retângulo que contém os 23 pontos de corpo e pé, e não a caixa do detector,
+# para que a regra dependa só da saída do estimador. Ver a tabela no topo.
+COINCIDENT_ANKLES_FRACTION = 0.05
+
 # O critério vale para as quatro bordas, e não só a inferior. O estimador encosta
 # na borda que a junta atravessa, qualquer uma delas; nesta gravação o ocupante
 # está centrado e as duas variantes quase coincidem (mãos 7,3% contra 6,2% em
@@ -139,5 +173,30 @@ def observed_keypoints(keypoints: np.ndarray,
     inside = ((x > margin) & (x < width - margin)
               & (y > margin) & (y < height - margin))
 
-    return (scores >= min_score) & inside & _mounting_mask(mounting,
-                                                           scores.shape[-1])
+    return ((scores >= min_score) & inside
+            & _mounting_mask(mounting, scores.shape[-1])
+            & ~_double_counted_ankle(keypoints, scores))
+
+
+def _double_counted_ankle(keypoints: np.ndarray,
+                          scores: np.ndarray) -> np.ndarray:
+    """Marca o tornozelo duplicado, e o pé dele, quando os dois coincidem.
+
+    Returns:
+        [..., K] booleano, verdadeiro onde o ponto é a cópia de menor resposta.
+    """
+    body = keypoints[..., BODY_AND_FEET, :]
+    extent = body.max(axis=-2) - body.min(axis=-2)
+    body_size = np.sqrt(extent[..., 0] * extent[..., 1])
+    gap = np.linalg.norm(keypoints[..., LEFT_ANKLE, :]
+                         - keypoints[..., RIGHT_ANKLE, :], axis=-1)
+    # Com NaN, ou com o corpo de tamanho zero, a comparação é falsa e nada é
+    # retirado: não há duas posições para chamar de coincidentes.
+    coincident = gap < COINCIDENT_ANKLES_FRACTION * body_size
+    left_is_copy = scores[..., LEFT_ANKLE] < scores[..., RIGHT_ANKLE]
+
+    duplicate = np.zeros(scores.shape, dtype=bool)
+    for side, is_copy in (((LEFT_ANKLE,) + LEFT_FOOT, left_is_copy),
+                          ((RIGHT_ANKLE,) + RIGHT_FOOT, ~left_is_copy)):
+        duplicate[..., list(side)] = (coincident & is_copy)[..., None]
+    return duplicate

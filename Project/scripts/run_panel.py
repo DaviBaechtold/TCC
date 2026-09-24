@@ -26,6 +26,7 @@ Teclas: espaço pausa, r grava, s salva frame, k alterna esqueleto, q sai.
 """
 
 import argparse
+import subprocess
 import sys
 import time
 from collections import deque
@@ -56,6 +57,11 @@ WINDOW = 'Validador de Pose 3D Full-Body'
 FPS_WINDOW = 30
 
 MESSAGE_DURATION_S = 2.5
+
+# Taxa pedida à webcam. Sem pedido explícito a C922 negocia 10 FPS em 1280x720,
+# e o painel exibia 42 FPS enquanto processava 10 --- medido em 24/09/2026, 439
+# quadros gravados em 44 segundos.
+CAMERA_FPS = 30
 
 # Checkpoint de pose por montagem, porque cada um foi medido melhor no seu
 # domínio e a diferença entre eles é grande demais para um padrão só.
@@ -268,7 +274,9 @@ def open_source(source: str, width: int, height: int) -> tuple[cv2.VideoCapture,
         # MJPG evita o teto de ~5 FPS que o formato YUYV impõe em 1280x720
         # nas webcams USB, que estrangularia a medição de FPS do sistema.
         capture.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+        capture.set(cv2.CAP_PROP_FPS, CAMERA_FPS)
         capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        _fix_camera_framerate(int(source))
         label = f'Camera {source}'
     else:
         capture = cv2.VideoCapture(source)
@@ -277,6 +285,23 @@ def open_source(source: str, width: int, height: int) -> tuple[cv2.VideoCapture,
     if not capture.isOpened():
         raise SystemExit(f'Nao foi possivel abrir a fonte: {source}')
     return capture, label
+
+
+def _fix_camera_framerate(index: int) -> None:
+    """Impede a webcam de baixar a taxa de quadros para alongar a exposição.
+
+    Com a exposição automática, o controle `exposure_dynamic_framerate` deixa a
+    câmera trocar quadros por luz: num quarto iluminado por janela ela entrega
+    15 FPS mesmo com 30 pedidos, e 30 com o controle desligado, sem imagem
+    escura (brilho médio 110). O OpenCV não expõe esse controle; o v4l2-ctl sim.
+    """
+    try:
+        subprocess.run(['v4l2-ctl', '-d', f'/dev/video{index}',
+                        '-c', 'exposure_dynamic_framerate=0'],
+                       check=True, capture_output=True)
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        print('  aviso: taxa dinamica da camera nao desligada (v4l2-ctl); '
+              'com pouca luz a camera pode entregar menos de 30 FPS')
 
 
 def to_model_domain(frame: np.ndarray, keep_color: bool) -> np.ndarray:
@@ -393,6 +418,7 @@ def main():
     frame_times: deque[float] = deque(maxlen=FPS_WINDOW)
     show_skeleton = True
     writer = None
+    last_frame_at = None
     message_until = 0.0
     last_render = None
 
@@ -404,8 +430,12 @@ def main():
                     state.message = 'Fim do video'
                     state.paused = True
                 else:
-                    started = time.perf_counter()
                     frame = to_model_domain(raw, args.color)
+                    # A gravação serve de entrada para as medições ao vivo, que
+                    # rodam o pipeline de novo sobre ela; com o esqueleto
+                    # desenhado por cima, o estimador leria as próprias linhas.
+                    if writer is not None:
+                        writer.write(frame)
                     result = pipeline(frame)
 
                     height, width = frame.shape[:2]
@@ -426,15 +456,13 @@ def main():
                                                result.scores[index], 0.0),
                                       args.score_thr)
 
-                    frame_times.append(time.perf_counter() - started)
                     state.frame = frame
                     state.num_people = result.num_people
-                    state.latency_ms = result.latency_ms
+                    state.latency_ms = dict(result.latency_ms)
                     state.region_confidence = result.region_confidence(
                         args.score_thr, observed)
                     state.region_counts = result.region_counts(
                         args.score_thr, observed)
-                    state.fps = len(frame_times) / sum(frame_times) if frame_times else 0.0
                     state.frame_index += 1
 
                     if lifter is not None and result.num_people:
@@ -443,10 +471,12 @@ def main():
                         # isso a perna prevista treme 213mm por quadro e é o
                         # que o olho lê como "não está pegando".
                         corte, ganho = cutoffs_by_observation(observed[0])
-                        state.keypoints_3d = smoother(
-                            lifter(result.keypoints[0], result.scores[0],
-                                   (width, height), observed=observed[0]),
-                            corte, ganho)
+                        lift_started = time.perf_counter()
+                        pose_3d = lifter(result.keypoints[0], result.scores[0],
+                                         (width, height), observed=observed[0])
+                        state.latency_ms['lift'] = \
+                            (time.perf_counter() - lift_started) * 1e3
+                        state.keypoints_3d = smoother(pose_3d, corte, ganho)
                         state.keypoints_3d_observed = observed[0]
                         state.lifting_warming_up = lifter.warming_up
                     else:
@@ -462,8 +492,14 @@ def main():
                     state.azimuth = SWAY_AMPLITUDE_RADIANS * np.sin(
                         2 * np.pi * state.frame_index / SWAY_PERIOD_FRAMES)
 
-                    if writer is not None:
-                        writer.write(frame)
+                    # FPS de relógio, de um quadro ao seguinte: inclui câmera,
+                    # lifting e desenho. Medir só detector e pose exibia 42 FPS
+                    # num painel que rodava a 10.
+                    now = time.perf_counter()
+                    if last_frame_at is not None:
+                        frame_times.append(now - last_frame_at)
+                    last_frame_at = now
+                    state.fps = len(frame_times) / sum(frame_times) if frame_times else 0.0
 
             if time.time() > message_until:
                 state.message = '' if not state.paused else state.message
@@ -485,6 +521,7 @@ def main():
                 break
             if action == 'space':
                 state.paused = not state.paused
+                last_frame_at = None
             elif action == 'k':
                 show_skeleton = not show_skeleton
                 next(b for b in panel.buttons if b.key == 'k').active = show_skeleton
@@ -499,7 +536,7 @@ def main():
                     height, width = state.frame.shape[:2]
                     writer = cv2.VideoWriter(
                         str(path), cv2.VideoWriter_fourcc(*'mp4v'),
-                        max(1.0, state.fps), (width, height))
+                        CAMERA_FPS, (width, height))
                     state.message = f'Gravando: {path.name}'
                 else:
                     writer.release()

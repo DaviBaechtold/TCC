@@ -289,7 +289,8 @@ class ValidationPanel:
                             'Desempenho')
         detect_ms = state.latency_ms.get('detect', 0.0)
         pose_ms = state.latency_ms.get('pose', 0.0)
-        total_ms = detect_ms + pose_ms
+        lift_ms = state.latency_ms.get('lift', 0.0)
+        total_ms = detect_ms + pose_ms + lift_ms
 
         fps_color = GOOD if state.fps >= 20 else (ACCENT if state.fps >= 15 else WARNING)
         _put(canvas, f'{state.fps:5.1f}', (x + 6, y + 34), 1.05, fps_color, 2)
@@ -300,6 +301,7 @@ class ValidationPanel:
             ('Latencia total', f'{total_ms:.1f} ms'),
             ('  detector', f'{detect_ms:.1f} ms'),
             ('  pose', f'{pose_ms:.1f} ms'),
+            ('  lifting 3D', f'{lift_ms:.1f} ms'),
             ('Pessoas detectadas', str(state.num_people)),
         ]
         row_y = y + 62
