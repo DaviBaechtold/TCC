@@ -379,6 +379,18 @@ NVENC como uma câmera os codificaria. Erro corporal: 0,0310 original, 0,0339 a
 45–47 dB) e os pontos da cabeça ainda saltam. Resultado em
 `results/compressao_video.json`.
 
+**Fixar o comprimento da perna prevista: testado e descartado (24/09).** Coxa
+prevista varia 90mm de desvio na webcam, e a hipótese era que isso fosse o ruído.
+No H3WB S7 (corte de quadro): âncora no braço piora em toda condição (mesa
+117,5→126,6mm), mesmo com o braço verdadeiro e razões do próprio H3WB (1,526 e
+1,498; Drillis e Contini dão 1,317/1,323, segmento anatômico ≠ keypoint);
+autoconsistência (mediana do próprio modelo) é neutra com perna oculta
+(117,5→117,3). Ao vivo, porém, **aumentou o tremor** (10,62→18,44mm; 8,01→11,38).
+Diagnóstico: a oscilação do comprimento é lenta (0,2–0,7mm/quadro, deriva de
+segundos) e o tremor é **angular**; fixar o comprimento empurra o joelho mais
+longe na direção ruidosa. `src/models/leg_lengths.py` fica só para reproduzir.
+O ruído da perna prevista se trata no treino, não por geometria na saída.
+
 ## Manter o documento vivo — regra obrigatória
 
 Este repositório implementa o que o Projeto Físico especifica, e os dois andam

@@ -71,6 +71,9 @@ def parse_args(panel):
     parser.add_argument('--sem-filtro', action='store_true',
                         help='Desliga o filtro temporal, para medir o que ele '
                              'contribui')
+    parser.add_argument('--comprimento-perna', action='store_true',
+                        help='Fixa o comprimento da perna não observada na '
+                             'mediana recente do modelo (src/models/leg_lengths.py)')
     parser.add_argument('--device', default='cuda:0')
     parser.add_argument('--detector', default=DEFAULT_DETECTOR,
                         choices=DETECTOR_CHOICES,
@@ -130,6 +133,7 @@ def main():
 
     from src.evaluation.live_quality import report
     from src.models.observability import observed_keypoints
+    from src.models.leg_lengths import LegLengthStabilizer
     from src.models.temporal_filter import OneEuroFilter, cutoffs_by_observation
 
     dados = detect_2d(panel, args)
@@ -138,6 +142,7 @@ def main():
 
     lifter, calibrado = panel.build_lifter(args)
     smoother = OneEuroFilter(panel.FILTER_RATE_HZ)
+    pernas = LegLengthStabilizer()
 
     poses, observados = [], []
     for indice in range(len(keypoints)):
@@ -148,6 +153,8 @@ def main():
         if not args.sem_filtro:
             corte, ganho = cutoffs_by_observation(observado)
             pose = smoother(pose, corte, ganho)
+        if args.comprimento_perna:
+            pose = pernas(pose, observado)
         poses.append(pose)
         observados.append(observado)
 
@@ -172,6 +179,7 @@ def main():
         'distancia_m': args.distancia,
         'calibrado': bool(calibrado),
         'filtro': not args.sem_filtro,
+        'comprimento_perna': args.comprimento_perna,
     })
 
     out = args.out or Path(f'results/qualidade_ao_vivo_{args.tag}.json')

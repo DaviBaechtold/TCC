@@ -1,0 +1,447 @@
+{
+  "checkpoint": "best_MPJPE_whole_epoch_12.pth",
+  "janelas": 1200,
+  "entrada_2d": "ground truth do H3WB, sujeito retido S7, com o protocolo de corte de quadro",
+  "quadro": "causal, último da janela de 16",
+  "proporcoes": "razão perna/braço do ground truth do H3WB, sujeitos S1, S5 e S6",
+  "condicoes": {
+    "completa": {
+      "bruto": {
+        "mpjpe_pernas_mm": 66.44,
+        "mpjpe_pes_mm": 73.47,
+        "ossos": {
+          "ombro-quadril esquerdo": {
+            "predito_mm": 456.4,
+            "verdadeiro_mm": 453.8,
+            "erro_mm": 2.6
+          },
+          "ombro-quadril direito": {
+            "predito_mm": 454.9,
+            "verdadeiro_mm": 451.6,
+            "erro_mm": 3.3
+          },
+          "coxa esquerda": {
+            "predito_mm": 397.2,
+            "verdadeiro_mm": 400.9,
+            "erro_mm": -3.6
+          },
+          "coxa direita": {
+            "predito_mm": 391.7,
+            "verdadeiro_mm": 397.7,
+            "erro_mm": -6.1
+          },
+          "canela esquerda": {
+            "predito_mm": 372.7,
+            "verdadeiro_mm": 368.6,
+            "erro_mm": 4.2
+          },
+          "canela direita": {
+            "predito_mm": 372.6,
+            "verdadeiro_mm": 371.6,
+            "erro_mm": 1.0
+          }
+        }
+      },
+      "braco_previsto": {
+        "mpjpe_pernas_mm": 88.19,
+        "mpjpe_pes_mm": 101.73,
+        "ossos": {
+          "ombro-quadril esquerdo": {
+            "predito_mm": 456.4,
+            "verdadeiro_mm": 453.8,
+            "erro_mm": 2.6
+          },
+          "ombro-quadril direito": {
+            "predito_mm": 454.9,
+            "verdadeiro_mm": 451.6,
+            "erro_mm": 3.3
+          },
+          "coxa esquerda": {
+            "predito_mm": 395.2,
+            "verdadeiro_mm": 400.9,
+            "erro_mm": -5.7
+          },
+          "coxa direita": {
+            "predito_mm": 395.2,
+            "verdadeiro_mm": 397.7,
+            "erro_mm": -2.6
+          },
+          "canela esquerda": {
+            "predito_mm": 387.9,
+            "verdadeiro_mm": 368.6,
+            "erro_mm": 19.4
+          },
+          "canela direita": {
+            "predito_mm": 387.9,
+            "verdadeiro_mm": 371.6,
+            "erro_mm": 16.3
+          }
+        }
+      },
+      "braco_verdadeiro": {
+        "mpjpe_pernas_mm": 82.02,
+        "mpjpe_pes_mm": 93.71,
+        "ossos": {
+          "ombro-quadril esquerdo": {
+            "predito_mm": 456.4,
+            "verdadeiro_mm": 453.8,
+            "erro_mm": 2.6
+          },
+          "ombro-quadril direito": {
+            "predito_mm": 454.9,
+            "verdadeiro_mm": 451.6,
+            "erro_mm": 3.3
+          },
+          "coxa esquerda": {
+            "predito_mm": 400.2,
+            "verdadeiro_mm": 400.9,
+            "erro_mm": -0.7
+          },
+          "coxa direita": {
+            "predito_mm": 400.2,
+            "verdadeiro_mm": 397.7,
+            "erro_mm": 2.5
+          },
+          "canela esquerda": {
+            "predito_mm": 392.9,
+            "verdadeiro_mm": 368.6,
+            "erro_mm": 24.3
+          },
+          "canela direita": {
+            "predito_mm": 392.9,
+            "verdadeiro_mm": 371.6,
+            "erro_mm": 21.2
+          }
+        }
+      },
+      "autoconsistente": {
+        "mpjpe_pernas_mm": 76.07,
+        "mpjpe_pes_mm": 84.51,
+        "ossos": {
+          "ombro-quadril esquerdo": {
+            "predito_mm": 456.4,
+            "verdadeiro_mm": 453.8,
+            "erro_mm": 2.6
+          },
+          "ombro-quadril direito": {
+            "predito_mm": 454.9,
+            "verdadeiro_mm": 451.6,
+            "erro_mm": 3.3
+          },
+          "coxa esquerda": {
+            "predito_mm": 393.5,
+            "verdadeiro_mm": 400.9,
+            "erro_mm": -7.4
+          },
+          "coxa direita": {
+            "predito_mm": 393.5,
+            "verdadeiro_mm": 397.7,
+            "erro_mm": -4.3
+          },
+          "canela esquerda": {
+            "predito_mm": 372.5,
+            "verdadeiro_mm": 368.6,
+            "erro_mm": 3.9
+          },
+          "canela direita": {
+            "predito_mm": 372.5,
+            "verdadeiro_mm": 371.6,
+            "erro_mm": 0.8
+          }
+        }
+      }
+    },
+    "retrovisor": {
+      "bruto": {
+        "mpjpe_pernas_mm": 181.44,
+        "mpjpe_pes_mm": 221.8,
+        "ossos": {
+          "ombro-quadril esquerdo": {
+            "predito_mm": 455.3,
+            "verdadeiro_mm": 453.8,
+            "erro_mm": 1.4
+          },
+          "ombro-quadril direito": {
+            "predito_mm": 456.8,
+            "verdadeiro_mm": 451.6,
+            "erro_mm": 5.2
+          },
+          "coxa esquerda": {
+            "predito_mm": 374.9,
+            "verdadeiro_mm": 400.9,
+            "erro_mm": -26.0
+          },
+          "coxa direita": {
+            "predito_mm": 370.0,
+            "verdadeiro_mm": 397.7,
+            "erro_mm": -27.7
+          },
+          "canela esquerda": {
+            "predito_mm": 373.7,
+            "verdadeiro_mm": 368.6,
+            "erro_mm": 5.1
+          },
+          "canela direita": {
+            "predito_mm": 374.1,
+            "verdadeiro_mm": 371.6,
+            "erro_mm": 2.5
+          }
+        }
+      },
+      "braco_previsto": {
+        "mpjpe_pernas_mm": 188.32,
+        "mpjpe_pes_mm": 233.24,
+        "ossos": {
+          "ombro-quadril esquerdo": {
+            "predito_mm": 455.3,
+            "verdadeiro_mm": 453.8,
+            "erro_mm": 1.4
+          },
+          "ombro-quadril direito": {
+            "predito_mm": 456.8,
+            "verdadeiro_mm": 451.6,
+            "erro_mm": 5.2
+          },
+          "coxa esquerda": {
+            "predito_mm": 396.8,
+            "verdadeiro_mm": 400.9,
+            "erro_mm": -4.1
+          },
+          "coxa direita": {
+            "predito_mm": 396.8,
+            "verdadeiro_mm": 397.7,
+            "erro_mm": -0.9
+          },
+          "canela esquerda": {
+            "predito_mm": 389.5,
+            "verdadeiro_mm": 368.6,
+            "erro_mm": 21.0
+          },
+          "canela direita": {
+            "predito_mm": 389.5,
+            "verdadeiro_mm": 371.6,
+            "erro_mm": 17.9
+          }
+        }
+      },
+      "braco_verdadeiro": {
+        "mpjpe_pernas_mm": 185.11,
+        "mpjpe_pes_mm": 228.69,
+        "ossos": {
+          "ombro-quadril esquerdo": {
+            "predito_mm": 455.3,
+            "verdadeiro_mm": 453.8,
+            "erro_mm": 1.4
+          },
+          "ombro-quadril direito": {
+            "predito_mm": 456.8,
+            "verdadeiro_mm": 451.6,
+            "erro_mm": 5.2
+          },
+          "coxa esquerda": {
+            "predito_mm": 400.2,
+            "verdadeiro_mm": 400.9,
+            "erro_mm": -0.7
+          },
+          "coxa direita": {
+            "predito_mm": 400.2,
+            "verdadeiro_mm": 397.7,
+            "erro_mm": 2.5
+          },
+          "canela esquerda": {
+            "predito_mm": 392.9,
+            "verdadeiro_mm": 368.6,
+            "erro_mm": 24.3
+          },
+          "canela direita": {
+            "predito_mm": 392.9,
+            "verdadeiro_mm": 371.6,
+            "erro_mm": 21.2
+          }
+        }
+      },
+      "autoconsistente": {
+        "mpjpe_pernas_mm": 180.51,
+        "mpjpe_pes_mm": 224.45,
+        "ossos": {
+          "ombro-quadril esquerdo": {
+            "predito_mm": 455.3,
+            "verdadeiro_mm": 453.8,
+            "erro_mm": 1.4
+          },
+          "ombro-quadril direito": {
+            "predito_mm": 456.8,
+            "verdadeiro_mm": 451.6,
+            "erro_mm": 5.2
+          },
+          "coxa esquerda": {
+            "predito_mm": 370.9,
+            "verdadeiro_mm": 400.9,
+            "erro_mm": -30.0
+          },
+          "coxa direita": {
+            "predito_mm": 370.9,
+            "verdadeiro_mm": 397.7,
+            "erro_mm": -26.9
+          },
+          "canela esquerda": {
+            "predito_mm": 375.6,
+            "verdadeiro_mm": 368.6,
+            "erro_mm": 7.0
+          },
+          "canela direita": {
+            "predito_mm": 375.6,
+            "verdadeiro_mm": 371.6,
+            "erro_mm": 4.0
+          }
+        }
+      }
+    },
+    "mesa": {
+      "bruto": {
+        "mpjpe_pernas_mm": 117.48,
+        "mpjpe_pes_mm": 140.2,
+        "ossos": {
+          "ombro-quadril esquerdo": {
+            "predito_mm": 464.8,
+            "verdadeiro_mm": 453.8,
+            "erro_mm": 11.0
+          },
+          "ombro-quadril direito": {
+            "predito_mm": 461.4,
+            "verdadeiro_mm": 451.6,
+            "erro_mm": 9.8
+          },
+          "coxa esquerda": {
+            "predito_mm": 372.8,
+            "verdadeiro_mm": 400.9,
+            "erro_mm": -28.1
+          },
+          "coxa direita": {
+            "predito_mm": 369.2,
+            "verdadeiro_mm": 397.7,
+            "erro_mm": -28.6
+          },
+          "canela esquerda": {
+            "predito_mm": 378.8,
+            "verdadeiro_mm": 368.6,
+            "erro_mm": 10.3
+          },
+          "canela direita": {
+            "predito_mm": 379.3,
+            "verdadeiro_mm": 371.6,
+            "erro_mm": 7.7
+          }
+        }
+      },
+      "braco_previsto": {
+        "mpjpe_pernas_mm": 126.57,
+        "mpjpe_pes_mm": 152.48,
+        "ossos": {
+          "ombro-quadril esquerdo": {
+            "predito_mm": 464.8,
+            "verdadeiro_mm": 453.8,
+            "erro_mm": 11.0
+          },
+          "ombro-quadril direito": {
+            "predito_mm": 461.4,
+            "verdadeiro_mm": 451.6,
+            "erro_mm": 9.8
+          },
+          "coxa esquerda": {
+            "predito_mm": 390.9,
+            "verdadeiro_mm": 400.9,
+            "erro_mm": -10.0
+          },
+          "coxa direita": {
+            "predito_mm": 390.9,
+            "verdadeiro_mm": 397.7,
+            "erro_mm": -6.8
+          },
+          "canela esquerda": {
+            "predito_mm": 383.7,
+            "verdadeiro_mm": 368.6,
+            "erro_mm": 15.2
+          },
+          "canela direita": {
+            "predito_mm": 383.7,
+            "verdadeiro_mm": 371.6,
+            "erro_mm": 12.1
+          }
+        }
+      },
+      "braco_verdadeiro": {
+        "mpjpe_pernas_mm": 122.56,
+        "mpjpe_pes_mm": 145.75,
+        "ossos": {
+          "ombro-quadril esquerdo": {
+            "predito_mm": 464.8,
+            "verdadeiro_mm": 453.8,
+            "erro_mm": 11.0
+          },
+          "ombro-quadril direito": {
+            "predito_mm": 461.4,
+            "verdadeiro_mm": 451.6,
+            "erro_mm": 9.8
+          },
+          "coxa esquerda": {
+            "predito_mm": 400.2,
+            "verdadeiro_mm": 400.9,
+            "erro_mm": -0.7
+          },
+          "coxa direita": {
+            "predito_mm": 400.2,
+            "verdadeiro_mm": 397.7,
+            "erro_mm": 2.5
+          },
+          "canela esquerda": {
+            "predito_mm": 392.9,
+            "verdadeiro_mm": 368.6,
+            "erro_mm": 24.3
+          },
+          "canela direita": {
+            "predito_mm": 392.9,
+            "verdadeiro_mm": 371.6,
+            "erro_mm": 21.2
+          }
+        }
+      },
+      "autoconsistente": {
+        "mpjpe_pernas_mm": 117.33,
+        "mpjpe_pes_mm": 139.58,
+        "ossos": {
+          "ombro-quadril esquerdo": {
+            "predito_mm": 464.8,
+            "verdadeiro_mm": 453.8,
+            "erro_mm": 11.0
+          },
+          "ombro-quadril direito": {
+            "predito_mm": 461.4,
+            "verdadeiro_mm": 451.6,
+            "erro_mm": 9.8
+          },
+          "coxa esquerda": {
+            "predito_mm": 372.2,
+            "verdadeiro_mm": 400.9,
+            "erro_mm": -28.7
+          },
+          "coxa direita": {
+            "predito_mm": 372.2,
+            "verdadeiro_mm": 397.7,
+            "erro_mm": -25.5
+          },
+          "canela esquerda": {
+            "predito_mm": 380.4,
+            "verdadeiro_mm": 368.6,
+            "erro_mm": 11.8
+          },
+          "canela direita": {
+            "predito_mm": 380.4,
+            "verdadeiro_mm": 371.6,
+            "erro_mm": 8.8
+          }
+        }
+      }
+    }
+  }
+}
