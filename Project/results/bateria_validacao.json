@@ -37,10 +37,10 @@
       "condicao": "300 quadros consecutivos de rec_20260921_224039.mp4, caminho completo com detector, pose e lifting, com sincronização da GPU",
       "criterio": "FPS >= 20 e latência p90 < 100ms",
       "quadros": 300,
-      "latencia_mediana_ms": 47.42,
-      "latencia_p90_ms": 49.26,
-      "latencia_p99_ms": 66.51,
-      "fps_mediano": 21.1,
+      "latencia_mediana_ms": 30.37,
+      "latencia_p90_ms": 30.72,
+      "latencia_p99_ms": 32.09,
+      "fps_mediano": 32.9,
       "aprovado": true
     },
     "3_oclusao": {
@@ -72,24 +72,24 @@
       "condicao": "120 quadros, mesma pose 2D nos dois regimes; quadro único emulado preenchendo a janela com cópias",
       "criterio": "a janela temporal reduz o tremor do corpo",
       "tremor_com_janela": {
-        "cabeca": 1.77,
-        "face": 1.85,
-        "ombros": 5.34,
-        "cotovelos e pulsos": 10.82,
-        "quadris": 10.47,
-        "pernas e pes": 40.94,
-        "maos": 18.33
+        "cabeca": 2.13,
+        "face": 2.22,
+        "ombros": 6.27,
+        "cotovelos e pulsos": 10.87,
+        "quadris": 10.77,
+        "pernas e pes": 41.06,
+        "maos": 18.44
       },
       "tremor_quadro_unico": {
-        "cabeca": 2.19,
-        "face": 2.31,
-        "ombros": 7.71,
-        "cotovelos e pulsos": 15.07,
-        "quadris": 15.56,
-        "pernas e pes": 48.64,
-        "maos": 23.67
+        "cabeca": 2.46,
+        "face": 2.84,
+        "ombros": 8.29,
+        "cotovelos e pulsos": 15.16,
+        "quadris": 15.5,
+        "pernas e pes": 48.94,
+        "maos": 23.73
       },
-      "reducao": 0.2906,
+      "reducao": 0.2691,
       "aprovado": true
     },
     "7_pipeline": {
@@ -101,7 +101,7 @@
       "criterio": "sem exceções e crescimento de memória < 64 MiB",
       "quadros": 1000,
       "excecoes": 0,
-      "pico_mib": 1000.3
+      "pico_mib": 1063.2
     }
   },
   "aprovados": 7,

@@ -93,12 +93,12 @@ aquecimento, com `torch.cuda.synchronize()` a cada iteração:
 | Detector YOLO26n-pose | 4,5–4,8 ms (RTMDet-nano, anterior: 7,3–7,7 ms) |
 | Pose RTMW-x 384×288 | ~15 ms **por caixa** |
 | Flip test | +12 ms por pessoa |
-| Caminho completo com lifting (bateria) | 47,4 ms, 21,1 FPS |
+| Caminho completo com lifting em float16 (bateria) | 30,4 ms, 32,9 FPS (float32: 47,4 ms) |
 
 O custo do detector quase não depende do tamanho do quadro (ambos redimensionam
 por dentro). `benchmark_throughput.py` agora grava `stages_median_ms`, e é daí
 que saem os números por estágio. Flip test é para avaliação: no caminho completo
-levaria a ~59 ms, 17 FPS.
+acrescentaria ~12 ms.
 **O "24,0 FPS" citado antes não tinha condição declarada e foi descartado.**
 
 Lifting 3D, H3WB, sujeito retido S7, 2D de GT, janela de 16 frames, 30 épocas:
@@ -238,7 +238,10 @@ reivindicada.
 S7); a latência do DSTFormer é linear, ~5,5ms por bloco. **Escala temporal:** as
 janelas do H3WB têm 100ms medianos entre quadros e 3,7s de duração; ao vivo, 33ms
 e 0,5s. `--passo-temporal 3` reproduz o intervalo do treino
-(`scripts/run_passo_temporal.sh` compara). A QP2 no H3WB mede movimento
+(`scripts/run_passo_temporal.sh`) — **piorou** o tremor em todas as regiões, e o
+padrão fica 1. **QP4 preliminar:** quadro único (`configs/lift3d_dstformer_h3wb_1frm.py`,
+lote 64) mede 34,75mm contra 38,96mm da janela; controle com lote 4 em
+`configs/lift3d_dstformer_h3wb_1frm_lote4.py`. A QP2 no H3WB mede movimento
 perdido, não recuperação de oclusão curta (`scripts/measure_temporary_occlusion.py`).
 Os padrões do lifting (precisão, passo) moram no painel; a bateria e o medidor
 ao vivo os leem de lá — a bateria montava os argumentos à mão e quebraria. O
@@ -338,10 +341,11 @@ visíveis contra 12–14). O Drive&Act não tem luz solar nem túnel.
 
 **Bateria de validação: 7 de 8 passam** (`results/bateria_validacao.json`,
 23/09/2026, com YOLO26n-pose). A falha é o critério de precisão full-body: AP
-0,6931 contra 0,70 e AR 0,7479 contra 0,75. Tempo real com folga de 5% (21,1
-FPS, 47,4 ms medianos, caminho completo em 1280x720; com o RTMDet eram 20,2);
+0,6931 contra 0,70 e AR 0,7479 contra 0,75. Tempo real com folga de 65% (32,9
+FPS, 30,4 ms medianos, lifting em float16, caminho completo em 1280x720; em
+float32 eram 21,1);
 degradação de 8,2% sob oclusão do punho (teto 15%); **a janela temporal reduz o
-tremor em 29,1%** contra a mesma rede sem contexto (21,7% com o RTMDet); mil
+tremor em 26,9%** contra a mesma rede sem contexto (21,7% com o RTMDet); mil
 quadros sem exceção e sem crescimento de memória. O critério 1b cita agora o
 checkpoint de operação (ensaio, 0,0295) — antes citava a Etapa 3 v2 (0,0282),
 aposentada por esquecer face e mãos.
