@@ -226,9 +226,22 @@ nesse caminho a perda do MMPose multiplica as 15 velocidades pelos 16 pesos e
 quebra. A perda agora é `WeightedMPJPEVelocityLoss` (`src/models/lifting_loss.py`),
 com `tests/test_lifting_loss.py` (coincide com a original a peso 1; peso zero não
 muda perda nem gradiente) e `tests/test_partial_supervision_loss.py` (exige essa
-perda em todo treino com alvo parcial). Retreino em
-`work_dirs/lift3d_veicular_peso` por `scripts/run_lifting_veicular_peso.sh`; até
-ele fechar, o checkpoint veicular vale só para os 12 pontos corporais. O
+perda em todo treino com alvo parcial). Retreinado por
+`scripts/run_lifting_veicular_peso.sh` e **em operação** no retrovisor
+(`work_dirs/lift3d_veicular_peso/best_MPJPE_whole_epoch_5.pth`): interpupilar no
+Drive&Act de 3,3 para 71,1mm, canela de 25,1 para 302,2mm; PA-MPJPE dos 12
+pontos 41,49→38,34. Coerência melhora mas com metade do movimento — não
+reivindicada.
+
+**Lifting em float16** (`--precisao`, padrão `DEFAULT_LIFT_PRECISION` no painel):
+`scripts/benchmark_lifting.py` mede 27,91→10,72ms por 0,04mm (39,31→39,35 no
+S7); a latência do DSTFormer é linear, ~5,5ms por bloco. **Escala temporal:** as
+janelas do H3WB têm 100ms medianos entre quadros e 3,7s de duração; ao vivo, 33ms
+e 0,5s. `--passo-temporal 3` reproduz o intervalo do treino
+(`scripts/run_passo_temporal.sh` compara). A QP2 no H3WB mede movimento
+perdido, não recuperação de oclusão curta (`scripts/measure_temporary_occlusion.py`).
+Os padrões do lifting (precisão, passo) moram no painel; a bateria e o medidor
+ao vivo os leem de lá — a bateria montava os argumentos à mão e quebraria. O
 lifting continua escolhido pela montagem (`LIFT_CHECKPOINT_BY_MOUNTING`), decisão a
 reavaliar com o modelo retreinado.
 
