@@ -1,11 +1,10 @@
 #!/usr/bin/env python
-"""Mede quanto a compressão de um stream de vídeo degrada o estimador 2D.
+"""Mede quanto a compressão do vídeo degrada o estimador 2D.
 
-Controller. Testar o sistema fora de casa --- a câmera no carro, o PC em casa ---
-exige transmitir o vídeo por Wi-Fi ou 4G, e a banda do canal decide a
-compressão. O infravermelho é escuro e ruidoso, o tipo de imagem que o H.264
-borra primeiro, e a pergunta é a partir de que taxa o sistema deixa de medir o
-mesmo que mede no conjunto.
+Controller. Toda câmera entrega o vídeo comprimido em H.264, inclusive a
+infravermelha própria pendente para a validação. O infravermelho é escuro e
+ruidoso, o tipo de imagem que o H.264 borra primeiro, e a pergunta é a partir de
+que taxa o sistema deixa de medir o mesmo que mede no conjunto.
 
 Os vídeos do Drive&Act já chegam comprimidos, entre 0,49 e 0,54 Mbps em
 1280x1024, e são o teto de qualidade desta medição: ela não diz nada sobre taxas
@@ -13,7 +12,7 @@ maiores que a do original, só sobre o que se perde abaixo dele. A condição de
 2 Mbps é o controle --- recodificar sem apertar a taxa não deveria mudar o erro.
 
 Os quatro vídeos da partição de validação são recodificados por inteiro, para
-que o controle de taxa do codificador opere como num stream longo, e os mesmos
+que o controle de taxa do codificador opere como numa gravação longa, e os mesmos
 quadros anotados são extraídos e medidos com o estimador de operação.
 
     python scripts/measure_compression.py
@@ -39,7 +38,7 @@ VIDEOS = Path.home() / 'Downloads/extracted/inner_mirror'
 WORK_DIR = Path('work_dirs/compressao')
 ORIGINAL = 'original'
 
-# Do controle até o que um 4G fraco sustenta com folga.
+# Do controle até quatro vezes abaixo da taxa do original.
 DEFAULT_BITRATES_KBPS = (2000, 1000, 500, 250, 125)
 
 
@@ -60,7 +59,7 @@ def parse_args():
     p.add_argument('--annotations', type=Path, default=ANNOTATIONS)
     p.add_argument('--device', default='cuda:0')
     p.add_argument('--out', type=Path,
-                   default=Path('results/compressao_stream.json'))
+                   default=Path('results/compressao_video.json'))
     return p.parse_args()
 
 
@@ -79,7 +78,7 @@ def main():
     import cv2
 
     from src.data.driveact import annotated_pairs, extract_frames
-    from src.data.video_transcoding import transcode_for_stream
+    from src.data.video_transcoding import transcode_like_camera
     from src.evaluation.normalized_keypoint_error import instance_error
     from src.models import operating_config
     from src.models.pose_pipeline import (FullBodyPosePipeline,
@@ -133,8 +132,8 @@ def main():
         pasta = WORK_DIR / f'{taxa}kbps'
         taxas_reais = []
         for video, quadros in quadros_por_video.items():
-            recodificado = transcode_for_stream(fontes[video],
-                                                pasta / f'{video}.mp4', taxa)
+            recodificado = transcode_like_camera(fontes[video],
+                                                 pasta / f'{video}.mp4', taxa)
             taxas_reais.append(measured_bitrate_kbps(recodificado))
             extract_frames(recodificado, quadros, pasta,
                            filename_prefix=video.replace('/', '_'))

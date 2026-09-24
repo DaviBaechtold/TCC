@@ -372,13 +372,12 @@ keypoints fora do quadro. **Testar o instrumento antes de acreditar nele.**
 Sempre declare se um AP usa bbox de ground truth ou de detector. A diferença é
 de ~2 pontos e comparar as duas condições silenciosamente invalida o resultado.
 
-**Compressão de stream (24/09/2026)**, para o teste com câmera no carro
-transmitindo ao PC: `scripts/measure_compression.py` recodifica os vídeos de
-validação do Drive&Act (originais a ~510 kbps) em H.264 NVENC. Erro corporal:
-0,0310 original, 0,0339 a 2 Mbps, 0,0404 a 1 Mbps, 0,0560 a 125 kbps. A 2 Mbps
-a imagem é idêntica (PSNR 45–47 dB) e os pontos da cabeça ainda saltam. Mínimo
-de 2 Mbps; o `run_panel.py --source rtsp://…` já abre stream (OpenCV com FFmpeg),
-mas acumula buffer — falta ler sempre o quadro mais recente.
+**Robustez à compressão do vídeo (24/09/2026):** `scripts/measure_compression.py`
+recodifica os vídeos de validação do Drive&Act (originais a ~510 kbps) em H.264
+NVENC como uma câmera os codificaria. Erro corporal: 0,0310 original, 0,0339 a
+2 Mbps, 0,0404 a 1 Mbps, 0,0560 a 125 kbps. A 2 Mbps a imagem é idêntica (PSNR
+45–47 dB) e os pontos da cabeça ainda saltam. Resultado em
+`results/compressao_video.json`.
 
 ## Manter o documento vivo — regra obrigatória
 
