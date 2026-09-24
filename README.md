@@ -42,10 +42,10 @@ O CUDA Toolkit **não** é necessário: o PyTorch traz o próprio runtime CUDA.
 
 ```bash
 git clone https://github.com/DaviBaechtold/TCC.git
-cd TCC/Project
+cd TCC
 ```
 
-Todos os comandos a partir daqui rodam dentro de `TCC/Project`.
+Todos os comandos a partir daqui rodam dentro de `TCC`, a pasta do clone.
 
 ### 3. Criar o ambiente
 

@@ -12,6 +12,8 @@ vive em outro repositório: `~/Documents/Projeto-Fisico` (Projeto Físico + mono
 
 ```bash
 cd ~/Documents/TCC/Project && source venv/bin/activate
+# Esta pasta é a raiz do repositório git (desde 24/09/2026): no GitHub o conteúdo
+# aparece na raiz, e um clone se chama só TCC/.
 ```
 
 PyTorch 2.8+cu128 · MMPose 1.3.2 · MMCV 2.1.0 · MMEngine 0.10.7 · MMDet 3.2.0
