@@ -67,29 +67,31 @@ três motivos, registrados no próprio script:
 A última linha deve dizer `CUDA disponível: True`. Se disser `False`, o driver
 está abaixo de 570 ou o PyTorch veio do índice errado.
 
-### 4. Baixar os pesos
+### 4. Obter os pesos
 
-Os pesos não estão no git: somam 1,1 GB.
+Os pesos não estão no git: somam 1,1 GB. Os quatro treinados neste projeto
+**não são públicos**, porque dois deles derivam do Drive&Act e do H3WB, cujas
+licenças são de uso acadêmico. Ficam numa pasta do Google Drive que o autor
+compartilha com quem vai testar.
 
-```bash
-python scripts/baixar_pesos.py
-```
-
-O script baixa cinco arquivos e confere cada um pelo SHA-256:
-
-| Arquivo | Origem | Tamanho |
-|---|---|---|
-| Detector de pessoas YOLO26n-pose | release oficial da Ultralytics | 7 MB |
-| Estimador 2D da montagem de mesa (RTMW-x adaptado ao cinza) | release `pesos-v1` deste repositório | 353 MB |
-| Estimador 2D da montagem de retrovisor (RTMW-x adaptado ao infravermelho) | release `pesos-v1` | 353 MB |
-| Lifting 3D da mesa (DSTFormer, corte de quadro) | release `pesos-v1` | 166 MB |
-| Lifting 3D do retrovisor (DSTFormer, adaptação veicular) | release `pesos-v1` | 165 MB |
-
-Se os pesos chegaram por outro meio (Drive, pendrive), aponte a pasta:
+1. Abra o link da pasta que o autor enviou e baixe-a inteira (botão direito >
+   Fazer download). Extraia o `.zip` numa pasta, por exemplo `~/Downloads/pesos`.
+2. Rode:
 
 ```bash
 python scripts/baixar_pesos.py --origem ~/Downloads/pesos
 ```
+
+O script copia os quatro pesos treinados para os caminhos que o sistema espera,
+baixa o detector da internet e confere tudo pelo SHA-256:
+
+| Arquivo | Origem | Tamanho |
+|---|---|---|
+| Detector de pessoas YOLO26n-pose | release oficial da Ultralytics, baixado pelo script | 7 MB |
+| Estimador 2D da montagem de mesa (RTMW-x adaptado ao cinza) | pasta do Drive | 353 MB |
+| Estimador 2D da montagem de retrovisor (RTMW-x adaptado ao infravermelho) | pasta do Drive | 353 MB |
+| Lifting 3D da mesa (DSTFormer, corte de quadro) | pasta do Drive | 166 MB |
+| Lifting 3D do retrovisor (DSTFormer, adaptação veicular) | pasta do Drive | 165 MB |
 
 ### 5. Conferir a instalação
 
@@ -203,7 +205,7 @@ python scripts/convert_h3wb.py --source data/raw/h3wb/reformatado \
 Com os dados no lugar:
 
 ```bash
-python scripts/baixar_pesos.py --todos      # inclui o RTMW-x original, base dos treinos
+python scripts/baixar_pesos.py --origem ~/Downloads/pesos --todos   # + RTMW-x original e RTMDet
 python scripts/run_validation_battery.py    # os oito critérios do Projeto Físico
 
 # O mesmo painel sobre um vídeo do Drive&Act, na montagem de retrovisor

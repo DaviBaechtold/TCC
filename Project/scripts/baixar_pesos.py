@@ -8,16 +8,16 @@ Há dois tipos:
   YOLO26n-pose e, só para treinar ou usar o detector antigo, o RTMW-x original e
   o RTMDet-nano.
 - **Pesos treinados neste projeto**: os dois estimadores 2D (mesa e retrovisor)
-  e os dois liftings 3D. Vêm da release `pesos-v1` do repositório no GitHub, ou
-  de uma pasta local com `--origem`, para quando eles chegarem por outro meio.
+  e os dois liftings 3D. Não são públicos: dois deles derivam do Drive&Act e do
+  H3WB, de licença acadêmica. Ficam numa pasta do Google Drive compartilhada
+  pelo autor, e entram por `--origem` com a pasta baixada.
 
 Cada arquivo vai para o caminho que `src/models/operating_config.py` e
 `src/models/detector_config.py` esperam; nada precisa ser configurado depois.
 
-    python scripts/baixar_pesos.py                  # o necessário para operar
-    python scripts/baixar_pesos.py --todos          # inclui os de treino
-    python scripts/baixar_pesos.py --origem ~/pesos # copia de uma pasta local
-    python scripts/baixar_pesos.py --empacotar ~/publicar   # para o autor
+    python scripts/baixar_pesos.py --origem ~/Downloads/pesos   # para operar
+    python scripts/baixar_pesos.py --origem ~/Downloads/pesos --todos
+    python scripts/baixar_pesos.py --empacotar ~/TCC_pesos-v1   # para o autor
 """
 
 import argparse
@@ -34,8 +34,6 @@ from src.models.detector_config import RTMDET_CHECKPOINT, YOLO_CHECKPOINT
 from src.models.operating_config import (LIFT_CHECKPOINT_BY_MOUNTING,
                                          POSE_CHECKPOINT_BY_MOUNTING)
 
-PROJECT_RELEASE = ('https://github.com/DaviBaechtold/TCC/releases/download/'
-                   'pesos-v1')
 RTMW_X_OFFICIAL = ('checkpoints/rtmw-x_simcc-cocktail14_pt-ucoco_270e-384x288-'
                    'f840f204_20231122.pth')
 
@@ -46,12 +44,9 @@ class Weight:
 
     destination: str
     sha256: str
-    url: str | None = None        # None: treinado neste projeto, vem da release
+    url: str | None = None        # None: treinado neste projeto, vem de --origem
     published_name: str | None = None
     training_only: bool = False
-
-    def source_url(self) -> str:
-        return self.url or f'{PROJECT_RELEASE}/{self.published_name}'
 
 
 WEIGHTS = (
@@ -102,7 +97,7 @@ def parse_args():
     p.add_argument('--todos', action='store_true',
                    help='Inclui os pesos só de treino: RTMW-x original e RTMDet')
     p.add_argument('--origem', type=Path, default=None,
-                   help='Pasta com os pesos treinados, em vez da release')
+                   help='Pasta com os pesos treinados, baixada do Drive do autor')
     p.add_argument('--empacotar', type=Path, default=None,
                    help='Copia os pesos treinados desta máquina para a pasta, '
                         'com os nomes de publicação')
@@ -121,8 +116,8 @@ def package(destination_dir: Path) -> None:
                              f'o checkpoint mudou desde a publicação')
         shutil.copy2(source, destination_dir / weight.published_name)
         print(f'  {weight.published_name}')
-    print(f'pronto em {destination_dir}: suba estes arquivos na release '
-          f'pesos-v1 do repositório')
+    print(f'pronto em {destination_dir}: suba estes arquivos na pasta do '
+          f'Drive compartilhada com quem vai testar')
 
 
 def fetch(weight: Weight, local_dir: Path | None) -> None:
@@ -133,12 +128,18 @@ def fetch(weight: Weight, local_dir: Path | None) -> None:
         return
     destination.parent.mkdir(parents=True, exist_ok=True)
     partial = destination.with_suffix(destination.suffix + '.parcial')
-    if local_dir is not None and weight.published_name is not None:
+    if weight.url is None:
+        source = (local_dir / weight.published_name) if local_dir else None
+        if source is None or not source.exists():
+            raise SystemExit(
+                f'{weight.published_name} não encontrado. Os pesos treinados vêm '
+                f'da pasta do Drive do autor: baixe-a e rode de novo com '
+                f'--origem <pasta>')
         print(f'  copiando {weight.published_name}')
-        shutil.copy2(local_dir / weight.published_name, partial)
+        shutil.copy2(source, partial)
     else:
-        print(f'  baixando {weight.source_url()}')
-        urllib.request.urlretrieve(weight.source_url(), partial)
+        print(f'  baixando {weight.url}')
+        urllib.request.urlretrieve(weight.url, partial)
     # Conferir antes de pôr no lugar: um download interrompido que ficasse no
     # caminho final seria carregado como modelo, e o erro apareceria longe daqui.
     if sha256_of(partial) != weight.sha256:

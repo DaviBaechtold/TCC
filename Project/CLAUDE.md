@@ -35,7 +35,8 @@ idêntico, pixel a pixel, nas duas montagens. O MMCV entra como `mmcv-lite`, e o
 MMPose só carrega com um `mmcv/_ext.py` substituto — que até essa data existia
 **só no site-packages desta máquina, criado à mão em 2025**, e nenhuma instalação
 nova reproduzia. Hoje vive em `src/models/mmcv_ext_stub.py` e o instalador o
-copia. Pesos treinados: release `pesos-v1` do GitHub (ou `--origem <pasta>`),
+copia. Pesos treinados: não públicos (licença do Drive&Act e do H3WB); ficam na
+pasta do Google Drive do autor e entram por `--origem <pasta>`,
 conferidos por SHA-256; `--empacotar` prepara a publicação. Um novo checkpoint
 em operação exige atualizar o SHA-256 no manifesto de `baixar_pesos.py`.
 
