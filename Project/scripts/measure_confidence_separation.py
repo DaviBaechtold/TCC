@@ -51,16 +51,12 @@ def main():
                                           MIRROR_VIEW_OBSERVABLE)
     from src.models.pose_pipeline import FullBodyPosePipeline
 
-    import importlib.util
-    spec = importlib.util.spec_from_file_location(
-        'panel_defaults', Path(__file__).with_name('run_panel.py'))
-    panel = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(panel)
+    from src.models import operating_config as panel
 
     work_dir = Path('work_dirs/separacao')
     work_dir.mkdir(parents=True, exist_ok=True)
     pose = FullBodyPosePipeline(
-        panel._config_without_flip_test(panel.POSE_CONFIG, work_dir),
+        panel.config_without_flip_test(panel.POSE_CONFIG, work_dir),
         args.ckpt, args.device, detector=None)
 
     images = json.loads(args.annotations.read_text())['images'][:args.max_frames]

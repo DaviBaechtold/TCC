@@ -26,7 +26,6 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 # O H3WB normaliza contra uma imagem de 1000x1000.
-IMAGE_SIZE = 1000
 
 # Lote da inferência. Cabe com folga nos 8 GB e a janela é pequena; o limite
 # aqui é a leitura do conjunto, não a GPU.
@@ -76,7 +75,7 @@ def main():
     from src.data.h3wb_dataset import (last_frame_target,
                                        load_validation_windows,
                                        window_factor)
-    from src.models.sequence_lifter import SequenceLifter
+    from src.models.sequence_lifter import H3WB_IMAGE_SIZE, SequenceLifter
 
     samples = load_validation_windows(args.lift_cfg, args.max_windows)
     targets = np.stack([last_frame_target(s) for s in samples])
@@ -116,7 +115,7 @@ def main():
 
         predicted = np.concatenate([
             lifter.predict_windows(corrupted[start:start + BATCH_SIZE],
-                                   (IMAGE_SIZE, IMAGE_SIZE),
+                                   (H3WB_IMAGE_SIZE, H3WB_IMAGE_SIZE),
                                    factors[start:start + BATCH_SIZE])
             for start in range(0, len(corrupted), BATCH_SIZE)
         ])

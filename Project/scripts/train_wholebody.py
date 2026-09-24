@@ -18,7 +18,6 @@ Exemplos:
 """
 
 import argparse
-import os
 import sys
 from pathlib import Path
 
@@ -79,8 +78,6 @@ def rescale_schedule(cfg, epochs):
 def main():
     args = parse_args()
 
-    import torch
-    import numpy as np
 
     from src.models import torch_compat  # noqa: F401
 
@@ -165,7 +162,7 @@ def _apply_lora_if_requested(cfg, args, runner, resuming):
 
     # O MMPose 1.3.2 não converte bfloat16 para NumPy ao medir acurácia.
     from src.models import bf16_compat  # noqa: F401
-    from src.models.lora import (adapter_output_magnitude, freeze_except_lora,
+    from src.models.lora import (freeze_except_lora,
                                  inject_lora, parameter_summary)
 
     model = runner.model
@@ -222,7 +219,7 @@ def _apply_lora_if_requested(cfg, args, runner, resuming):
     print(f'  LoRA          posto {rank}, {sum(adapted.values())} camadas '
           f'adaptadas {dict(adapted)}')
     print(f'  normalização  {frozen_norms} camadas congeladas em modo eval')
-    print(f'  init_weights  neutralizado (pesos vêm do checkpoint)')
+    print('  init_weights  neutralizado (pesos vêm do checkpoint)')
     print(f'  parâmetros    {summary["trainable_M"]:.1f}M treináveis de '
           f'{summary["total_M"]:.1f}M ({summary["trainable_pct"]:.1f}%)')
     print('=' * 72)

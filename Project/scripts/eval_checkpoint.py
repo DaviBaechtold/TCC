@@ -39,8 +39,6 @@ def parse_args():
 def main():
     args = parse_args()
 
-    import torch
-    import numpy as np
 
     from src.models import torch_compat  # noqa: F401
 

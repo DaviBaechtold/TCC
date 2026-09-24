@@ -20,7 +20,6 @@ mas muda a taxa, e a taxa também é relatada aqui.
 """
 
 import argparse
-import importlib.util
 import json
 import sys
 from pathlib import Path
@@ -38,15 +37,6 @@ CACHE_DIR = Path('work_dirs/live_quality')
 # Quadros de aquecimento da janela temporal: a saída deles tem contexto
 # artificial (a janela é preenchida por repetição) e não representa o regime.
 WARMUP_FRAMES = 16
-
-
-def load_panel():
-    """O painel é a definição operacional do sistema; medir outra coisa não vale."""
-    spec = importlib.util.spec_from_file_location(
-        'panel_defaults', Path(__file__).with_name('run_panel.py'))
-    panel = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(panel)
-    return panel
 
 
 def parse_args(panel):
@@ -71,7 +61,7 @@ def parse_args(panel):
     parser.add_argument('--distancia', type=float, default=None,
                         help='Distância ao ocupante em metros; o padrão vem da '
                              'montagem')
-    parser.add_argument('--teto-confianca', type=panel.confianca_opcional,
+    parser.add_argument('--teto-confianca', type=panel.optional_confidence,
                         default=panel.LIFT_UNOBSERVED_CONFIDENCE,
                         help='Teto de confiança das juntas não observadas; '
                              'precisa casar com o treino do checkpoint')
@@ -110,7 +100,7 @@ def detect_2d(panel, args) -> dict:
     detector = build_person_detector(
         args.detector, args.device, args.bbox_thr or DEFAULT_DETECTOR_SCORE)
     pipeline = FullBodyPosePipeline(
-        panel._config_without_flip_test(args.cfg, CACHE_DIR),
+        panel.config_without_flip_test(args.cfg, CACHE_DIR),
         args.ckpt, args.device, detector)
 
     capture = cv2.VideoCapture(str(args.video))
@@ -135,7 +125,7 @@ def detect_2d(panel, args) -> dict:
 
 
 def main():
-    panel = load_panel()
+    from src.models import operating_config as panel
     args = parse_args(panel)
 
     from src.evaluation.live_quality import report

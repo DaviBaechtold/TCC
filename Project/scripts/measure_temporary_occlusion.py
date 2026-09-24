@@ -20,7 +20,6 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-IMAGE_SIZE = 1000          # o H3WB normaliza por um quadro de 1000x1000
 
 
 def parse_args():
@@ -54,7 +53,7 @@ def main():
                                                     occlude_last_frames,
                                                     without_context)
     from src.data.estimator_noise import UNOBSERVED_CONFIDENCE_CAP
-    from src.models.sequence_lifter import SequenceLifter
+    from src.models.sequence_lifter import H3WB_IMAGE_SIZE, SequenceLifter
 
     samples = load_validation_windows(args.lift_cfg, args.max_windows)
     targets = np.stack([last_frame_target(s) for s in samples])
@@ -67,7 +66,7 @@ def main():
     def predict(windows: np.ndarray) -> np.ndarray:
         return np.concatenate([
             lifter.predict_windows(windows[i:i + args.batch_size],
-                                   (IMAGE_SIZE, IMAGE_SIZE),
+                                   (H3WB_IMAGE_SIZE, H3WB_IMAGE_SIZE),
                                    factors[i:i + args.batch_size])
             for i in range(0, len(windows), args.batch_size)])
 

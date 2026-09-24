@@ -29,7 +29,6 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-IMAGE_SIZE = 1000
 DEPTHS = (1, 2, 3, 4, 5)
 ACCURACY_WINDOWS = 300
 BATCH_SIZE = 32
@@ -60,7 +59,7 @@ def main():
     from src.data.h3wb_dataset import (last_frame_target,
                                        load_validation_windows, window_factor)
     from src.evaluation.throughput import describe_device, measure
-    from src.models.sequence_lifter import SequenceLifter
+    from src.models.sequence_lifter import H3WB_IMAGE_SIZE, SequenceLifter
 
     init_default_scope('mmpose')
     cfg = Config.fromfile(args.lift_cfg)
@@ -101,12 +100,12 @@ def main():
                                 inference_dtype=dtype)
         # O caminho ao vivo: uma janela por chamada, decodificação incluída.
         r = measure(lambda lifter=lifter: lifter.predict_windows(
-                        uma, (IMAGE_SIZE, IMAGE_SIZE), fatores[:1]),
+                        uma, (H3WB_IMAGE_SIZE, H3WB_IMAGE_SIZE), fatores[:1]),
                     label=nome, conditions={}, iterations=args.iterations,
                     warmup=args.warmup)
         pred = np.concatenate([
             lifter.predict_windows(entradas[i:i + BATCH_SIZE],
-                                   (IMAGE_SIZE, IMAGE_SIZE),
+                                   (H3WB_IMAGE_SIZE, H3WB_IMAGE_SIZE),
                                    fatores[i:i + BATCH_SIZE])
             for i in range(0, len(entradas), BATCH_SIZE)])
         mpjpe = float(np.linalg.norm(pred - alvos, axis=-1).mean() * 1000)

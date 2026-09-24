@@ -233,7 +233,7 @@ Drive&Act de 3,3 para 71,1mm, canela de 25,1 para 302,2mm; PA-MPJPE dos 12
 pontos 41,49→38,34. Coerência melhora mas com metade do movimento — não
 reivindicada.
 
-**Lifting em float16** (`--precisao`, padrão `DEFAULT_LIFT_PRECISION` no painel):
+**Lifting em float16** (`--precisao`, padrão `DEFAULT_LIFT_PRECISION` em `src/models/operating_config.py`):
 `scripts/benchmark_lifting.py` mede 27,91→10,72ms por 0,04mm (39,31→39,35 no
 S7); a latência do DSTFormer é linear, ~5,5ms por bloco. **Escala temporal:** as
 janelas do H3WB têm 100ms medianos entre quadros e 3,7s de duração; ao vivo, 33ms
@@ -385,7 +385,7 @@ python scripts/train_wholebody.py \
   --config configs/rtmpose_m_wholebody_gray_ft.py [--epochs 10]
 
 # Painel de validação ao vivo, com os modelos correntes por padrão
-python scripts/run_panel.py [--montagem mesa|retrovisor] [--distancia 1.35]
+python scripts/run_panel.py [--montagem mesa|retrovisor] [--distancia 1.17]
 
 # Protocolo de corte: quanto o lifting erra nas juntas que a câmera não vê.
 # A condição `mesa` é o mecanismo que treina o v3 — para ele mede aderência ao
@@ -511,20 +511,20 @@ não é refatoração — é rearrumar a mesma bagunça.
 
 ## Dívida conhecida — corrigir ao encostar, não em mutirão
 
-Estas violações existem hoje. Não são para consertar de uma vez; são para
-consertar quando a tarefa em curso passar por elas.
+Nenhuma registrada desde a revisão de 24/09/2026, que quitou a lista anterior:
 
-- **`src/evaluation/evaluate_pose.py` e `evaluate_pose_video.py`** ainda misturam
-  as três camadas num arquivo, e comparam RGB contra IR num protocolo que a
-  medição de domain gap substituiu. São as próximas a passar pela regra.
-- **`scripts/evaluate_accuracy_comparison.py`** funciona, mas chama de
-  "bottom-up" o que na verdade é usar o frame inteiro como caixa única. O que
-  ele mede — acurácia com caixa do detector contra caixa única — é justamente a
-  metade ainda aberta da QP1, então vale reaproveitar em vez de descartar. O
-  caminho mais curto para essa resposta, porém, é gerar um arquivo de detecções
-  e rodar o `eval_checkpoint.py` duas vezes.
-- O remendo do `torch.load` ainda aparece copiado em alguns scripts antigos;
-  `src/models/torch_compat.py` é o lugar dele.
+- `evaluate_pose.py`, `evaluate_pose_video.py` e `evaluate_accuracy_comparison.py`
+  foram removidos. O protocolo RGB contra IR que eles mediam foi substituído
+  pela medição de domain gap, e a metade da QP1 que o terceiro guardava foi
+  respondida pelo `compare_detectors.py`.
+- **A configuração de operação saiu do controller.** Que checkpoint roda em cada
+  montagem, limiar, precisão, distância e a construção do lifting moravam em
+  `scripts/run_panel.py`, e dez scripts o carregavam por `importlib` para ler
+  constantes --- regra de negócio no controller, e um controller importando
+  outro. Hoje vivem em `src/models/operating_config.py`, e o painel caiu de 580
+  para 363 linhas. Medido antes e depois: a medição ao vivo do tabuleiro sai
+  idêntica nos 40 campos.
+- O remendo do `torch.load` vive só em `src/models/torch_compat.py`.
 
 ## Convenções
 

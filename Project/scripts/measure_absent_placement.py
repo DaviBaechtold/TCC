@@ -15,7 +15,6 @@ distribuição delas que falta.
 """
 
 import argparse
-import importlib.util
 import json
 import sys
 from pathlib import Path
@@ -73,7 +72,7 @@ def webcam_detections(panel, args):
     detector = build_person_detector(args.detector, args.device,
                                      DEFAULT_DETECTOR_SCORE)
     pipeline = FullBodyPosePipeline(
-        panel._config_without_flip_test(panel.POSE_CONFIG, CACHE_2D),
+        panel.config_without_flip_test(panel.POSE_CONFIG, CACHE_2D),
         panel.POSE_CHECKPOINT, args.device, detector)
 
     capture = cv2.VideoCapture(str(WEBCAM_VIDEO))
@@ -101,7 +100,7 @@ def driveact_detections(panel, args):
     detector = build_person_detector(args.detector, args.device,
                                      DEFAULT_DETECTOR_SCORE)
     pipeline = FullBodyPosePipeline(
-        panel._config_without_flip_test(panel.POSE_CONFIG, CACHE_2D),
+        panel.config_without_flip_test(panel.POSE_CONFIG, CACHE_2D),
         panel.POSE_CHECKPOINT, args.device, detector)
 
     anotacoes = json.loads(DRIVEACT_ANNOTATIONS.read_text())
@@ -127,10 +126,7 @@ def main():
 
     from src.evaluation.absent_placement import placement, summarize
 
-    spec = importlib.util.spec_from_file_location(
-        'panel_defaults', Path(__file__).with_name('run_panel.py'))
-    panel = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(panel)
+    from src.models import operating_config as panel
 
     if args.fonte == 'webcam':
         keypoints, scores, tamanho = webcam_detections(panel, args)

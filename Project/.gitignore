@@ -52,15 +52,9 @@ data/**/*.json
 checkpoints/*
 !checkpoints/.gitkeep
 
-# Work dirs - keep only test_minimal5 structure
+# Checkpoints e logs de treino: grandes demais para o git, e reproduzíveis
+# pelos configs e pelas filas em scripts/.
 work_dirs/*
-!work_dirs/test_minimal5/
-work_dirs/test_minimal5/*.pth
-work_dirs/test_minimal5/2025*/
-
-# Keep config and structure docs
-!work_dirs/test_minimal5/rtmpose_m_wholebody_minimal.py
-!work_dirs/test_minimal5/last_checkpoint
 
 # Logs
 logs/

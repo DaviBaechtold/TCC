@@ -21,7 +21,6 @@ está disponível, não a causa da ausência.
 
 import argparse
 import json
-import importlib.util
 import sys
 from pathlib import Path
 
@@ -61,15 +60,6 @@ def parse_args():
     return p.parse_args()
 
 
-def load_panel():
-    """O painel é a definição operacional do sistema; medir outra coisa não vale."""
-    spec = importlib.util.spec_from_file_location(
-        'panel_defaults', Path(__file__).with_name('run_panel.py'))
-    panel = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(panel)
-    return panel
-
-
 def main():
     args = parse_args()
 
@@ -82,13 +72,13 @@ def main():
     from src.models.pose_pipeline import (FullBodyPosePipeline,
                                           build_person_detector)
 
-    panel = load_panel()
+    from src.models import operating_config as panel
     WORK_DIR.mkdir(parents=True, exist_ok=True)
 
     checkpoint = args.ckpt or panel.POSE_CHECKPOINT_BY_MOUNTING['retrovisor']
     detector = build_person_detector(args.detector, args.device)
     pipeline = FullBodyPosePipeline(
-        panel._config_without_flip_test(args.cfg or panel.POSE_CONFIG, WORK_DIR),
+        panel.config_without_flip_test(args.cfg or panel.POSE_CONFIG, WORK_DIR),
         checkpoint, args.device, detector)
 
     pares = annotated_pairs(json.loads(args.annotations.read_text()),

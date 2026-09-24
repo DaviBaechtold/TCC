@@ -17,7 +17,6 @@ bateria, e sob disputa de GPU ela mede outra coisa.
 """
 
 import argparse
-import importlib.util
 import json
 import sys
 from pathlib import Path
@@ -56,14 +55,6 @@ def parse_args():
     return p.parse_args()
 
 
-def carrega_painel():
-    spec = importlib.util.spec_from_file_location(
-        'panel_defaults', Path(__file__).with_name('run_panel.py'))
-    painel = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(painel)
-    return painel
-
-
 def le_resultado(caminho: str, *chaves):
     """Lê um número de uma medição já gravada, ou devolve None se faltar."""
     arquivo = Path(caminho)
@@ -90,7 +81,7 @@ def quadros_do_video(caminho: Path, limite: int, painel):
 
 def main():
     args = parse_args()
-    painel = carrega_painel()
+    from src.models import operating_config as painel
 
     import cv2
     import torch
@@ -109,7 +100,7 @@ def main():
     detector = build_person_detector(args.detector, args.device,
                                      DEFAULT_DETECTOR_SCORE)
     pose = FullBodyPosePipeline(
-        painel._config_without_flip_test(painel.POSE_CONFIG, trabalho),
+        painel.config_without_flip_test(painel.POSE_CONFIG, trabalho),
         painel.POSE_CHECKPOINT, args.device, detector)
 
     testes: dict[str, dict] = {}
@@ -168,7 +159,7 @@ def main():
     # domínio veicular com o modelo do outro domínio mede a troca de modelo, não
     # a oclusão. A primeira execução desta bateria caiu nessa.
     pose_veicular = FullBodyPosePipeline(
-        painel._config_without_flip_test(painel.POSE_CONFIG, trabalho),
+        painel.config_without_flip_test(painel.POSE_CONFIG, trabalho),
         painel.POSE_CHECKPOINT_BY_MOUNTING['retrovisor'], args.device, detector)
     testes['3_oclusao'] = oclusao_driveact(pose_veicular, cv2, ocluir,
                                            torso_length, instance_error)

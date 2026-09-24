@@ -83,18 +83,14 @@ def main():
                                           RTMDET_CHECKPOINT, RTMDET_CONFIG)
     from src.models.yolo_detector import YoloPersonDetector
 
-    import importlib.util
-    spec = importlib.util.spec_from_file_location(
-        'panel_defaults', Path(__file__).with_name('run_panel.py'))
-    panel = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(panel)
+    from src.models import operating_config as panel
 
     pairs = annotated_pairs(json.loads(args.annotations.read_text()),
                             args.max_frames)
 
     work_dir = Path('work_dirs/qp1')
     work_dir.mkdir(parents=True, exist_ok=True)
-    pose_config = panel._config_without_flip_test(panel.POSE_CONFIG, work_dir)
+    pose_config = panel.config_without_flip_test(panel.POSE_CONFIG, work_dir)
     # O estimador da montagem de retrovisor, que é a montagem do Drive&Act. O
     # padrão anterior era o da mesa, e medir o domínio veicular com o modelo do
     # outro domínio mede a troca de modelo junto com o detector.

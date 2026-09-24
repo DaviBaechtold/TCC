@@ -21,7 +21,6 @@ Etapa 3, que melhorou o corpo e desfez a face sem que nada medisse a face.
 """
 
 import argparse
-import importlib.util
 import json
 import sys
 from pathlib import Path
@@ -132,17 +131,14 @@ def main():
                                           build_person_detector)
     from src.utils.bbox_utils import bbox_iou
 
-    spec = importlib.util.spec_from_file_location(
-        'panel_defaults', Path(__file__).with_name('run_panel.py'))
-    panel = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(panel)
+    from src.models import operating_config as panel
 
     WORK_DIR.mkdir(parents=True, exist_ok=True)
     # Flip test desligado: é a condição de operação do painel, que é onde a
     # suspeita apareceu. Ligado, mediria outra configuração.
     detector = build_person_detector(args.detector, args.device)
     pipeline = FullBodyPosePipeline(
-        panel._config_without_flip_test(args.cfg, WORK_DIR),
+        panel.config_without_flip_test(args.cfg, WORK_DIR),
         args.ckpt, args.device, detector=detector)
 
     instancias = usable_annotations(args.data_root / args.ann_file,

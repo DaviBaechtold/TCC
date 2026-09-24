@@ -62,7 +62,6 @@ def main():
     args = parse_args()
 
     import cv2
-    import importlib.util
 
     from src.data.driveact import read_pose_csv
     from src.evaluation.normalized_keypoint_error import occupant_index
@@ -70,10 +69,7 @@ def main():
                                           FullBodyPosePipeline, PersonDetector,
                                           RTMDET_CHECKPOINT, RTMDET_CONFIG)
 
-    spec = importlib.util.spec_from_file_location(
-        'panel_defaults', Path(__file__).with_name('run_panel.py'))
-    painel = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(painel)
+    from src.models import operating_config as painel
 
     anotacoes = json.loads(
         (args.data_root / f'driveact_{SPLIT}.{args.split}.json').read_text())
@@ -98,7 +94,7 @@ def main():
     # O estimador da montagem de retrovisor, que é quem alimenta o lifting neste
     # domínio --- treinar com a saída de outro modelo mediria outro sistema.
     pose = FullBodyPosePipeline(
-        painel._config_without_flip_test(painel.POSE_CONFIG, trabalho),
+        painel.config_without_flip_test(painel.POSE_CONFIG, trabalho),
         painel.POSE_CHECKPOINT_BY_MOUNTING['retrovisor'], args.device, detector)
 
     sequencias = sorted(por_sequencia)

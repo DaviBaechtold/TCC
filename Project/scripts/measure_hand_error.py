@@ -18,7 +18,6 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-IMAGE_SIZE = 1000
 BATCH_SIZE = 16
 
 
@@ -40,24 +39,21 @@ def main():
 
     from src.models import torch_compat  # noqa: F401
     from src.evaluation.hand_error import decompose
-    from src.models.sequence_lifter import SequenceLifter
+    from src.models.sequence_lifter import H3WB_IMAGE_SIZE, SequenceLifter
 
-    import importlib.util
-    spec = importlib.util.spec_from_file_location(
-        'truncation', Path(__file__).with_name('measure_lifting_truncation.py'))
-    protocolo = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(protocolo)
+    import src.data.h3wb_dataset  # noqa: F401  registra o dataset
+    from src.data.h3wb_dataset import (last_frame_target,
+                                       load_validation_windows, window_factor)
 
-    amostras = protocolo.load_windows(args.lift_cfg, args.max_windows)
-    alvos = np.stack([protocolo.target_of(s) for s in amostras])
-    fatores = np.array([float(np.asarray(
-        s['data_samples'].metainfo['factor']).ravel()[-1]) for s in amostras])
+    amostras = load_validation_windows(args.lift_cfg, args.max_windows)
+    alvos = np.stack([last_frame_target(s) for s in amostras])
+    fatores = np.array([window_factor(s) for s in amostras])
     entradas = np.stack([s['inputs'].numpy() for s in amostras])
 
     lifter = SequenceLifter(args.lift_cfg, args.lift_ckpt, args.device)
     preditos = np.concatenate([
         lifter.predict_windows(entradas[i:i + BATCH_SIZE],
-                               (IMAGE_SIZE, IMAGE_SIZE),
+                               (H3WB_IMAGE_SIZE, H3WB_IMAGE_SIZE),
                                fatores[i:i + BATCH_SIZE])
         for i in range(0, len(entradas), BATCH_SIZE)])
 

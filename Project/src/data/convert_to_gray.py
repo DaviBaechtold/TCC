@@ -8,9 +8,7 @@ simulando as características de câmeras infravermelhas.
 import cv2
 import numpy as np
 from pathlib import Path
-from typing import Tuple, Optional
 from tqdm import tqdm
-import json
 import shutil
 
 
@@ -237,7 +235,7 @@ def create_visualization(
         axes[idx, 0].axis("off")
         
         axes[idx, 1].imshow(gray)
-        axes[idx, 1].set_title(f"Grayscale (IR Simulation)")
+        axes[idx, 1].set_title("Grayscale (IR Simulation)")
         axes[idx, 1].axis("off")
     
     plt.tight_layout()

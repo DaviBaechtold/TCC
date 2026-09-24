@@ -128,11 +128,7 @@ def main():
                                             OBSERVED_RESPONSE, CameraView,
                                             SequenceLifter, factor_from_camera)
 
-    import importlib.util
-    spec = importlib.util.spec_from_file_location(
-        'panel_defaults', Path(__file__).with_name('run_panel.py'))
-    panel = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(panel)
+    from src.models import operating_config as panel
 
     annotations = json.loads(args.annotations.read_text())
     by_sequence: dict[str, list[dict]] = {}
@@ -150,7 +146,7 @@ def main():
     detector = build_person_detector(args.detector, args.device,
                                      DEFAULT_DETECTOR_SCORE)
     pose = FullBodyPosePipeline(
-        panel._config_without_flip_test(panel.POSE_CONFIG, work_dir),
+        panel.config_without_flip_test(panel.POSE_CONFIG, work_dir),
         args.pose_ckpt or panel.POSE_CHECKPOINT, args.device, detector)
     # Quem normaliza é o lifter, e só ele. Antes o script dividia pela escala e
     # o lifter dividia de novo, entregando confiança na casa de 0,1 a um modelo
